@@ -1,104 +1,141 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-15 (Phase 1 design brainstorming complete; spec written)
+2025-04-17 (Phase 1 implementation complete, pending commit)
 
 ## Summary
-Building a personal inventory system for Phil to track resources (images, ebooks, videos, games) across devices, platforms, and storage locations.
+Personal inventory system for Phil to track resources (ebooks, web-readers; images/videos/games deferred) across devices, platforms, and storage locations.
 
 ## Key Decisions
 
 ### Stack
-- **Backend**: Rust, axum (HTTP), sqlx (DB), containerized (Docker/Alpine musl), low RAM
-- **Frontend**: Flutter — single Dart codebase, production-ready WebView on desktop + mobile, embedded webview for web reader progress tracking.
-- **Shared contract**: OpenAPI spec auto-generated from backend via `utoipa`
-- **Plugin system**: conf-based (TOML/YAML), trait-based in Rust, compiled-in via Cargo feature flags; OCP enforced. No dynamic loading (no WASM/dylib).
-- **Database**: PostgreSQL (primary) + SQLite (portable/local); shared schema with adapter factory; no PostgreSQL-only types in schema (ensures SQLite compatibility)
-- **Auth**: Single global API key from `API_KEY` env var; if absent → auto-generate UUIDv4, write to `.env` (best-effort), echo warning, exit(1)
-- **Device IDs**: auto-generated UUID for known devices; portable storage (USB, external HDD, etc.) uses a free-text ID field in `ResourceLocation` — no special device type needed.
+- **Backend**: Rust, axum, sqlx, Docker/Alpine musl, low RAM
+- **Frontend**: Flutter (BLoC), single Dart codebase, WebView for web reader progress
+- **Shared contract**: OpenAPI via `utoipa`; Dart client auto-generated via `openapi-generator`
+- **Plugin system**: trait-based Rust, compiled-in via Cargo feature flags (TOML config); no WASM/dylib
+- **Database**: PostgreSQL (primary) + SQLite (portable); shared schema via adapter factory; no PG-only types
+- **Auth**: Single global API key from `API_KEY` env; if absent → auto-generate UUIDv4, write `.env`, exit(1). Blank keys treated as missing.
+- **Device IDs**: UUID for known devices; free-text ID in `ResourceLocation` for portable storage
 
 ### Data Model
-- Polymorphic: shared `resources` base table + separate `ebook_metas` and `web_reader_metas` tables (1:1 FK)
-- `resource_locations` (1:N FK to resources): stores `device_id` (UUID string or free-text), `path_or_url`, `storage_type` (LocalFs | Nas | Platform | Portable)
-- Multiple locations per resource supported from day one; dedup logic deferred
+- Polymorphic: `resources` base + `ebook_metas`/`web_reader_metas` (1:1 FK)
+- `resource_locations` (1:N FK): `device_id`, `path_or_url`, `storage_type` (LocalFs|Nas|Platform|Portable)
+- Case-insensitive unique index on `resources(LOWER(title))`
+- Multiple locations per resource; dedup deferred
 
 ### Search
-- Phase 1: `LIKE`-based (`ILIKE` on PostgreSQL, `LOWER()` on SQLite)
-- Later phases: string-similarity % checking
-- Tags deferred to a later phase
+- Phase 1: LIKE-based (ILIKE on PG, LOWER() on SQLite)
+- Extension seam: `SearchStrategyKind` (Like|Fuzzy) with strategy trait; fuzzy = in-memory ranked matching
+- Tags deferred
 
 ### API Style
-- Action-named, type-segregated verbose paths: `/api/v1/inventory/ebooks/list`, `/api/v1/inventory/ebooks/:id/detail`, etc.
-- Full separation between ebook and web-reader routes
+- Action-named paths: `/api/v1/inventory/ebooks/list`, `/:id/detail`, etc.
+- System: `/api/v1/system/health`, `/api/v1/system/openapi`
 
 ### Flutter Config
-- Backend URL + API key passed via `--dart-define=BASE_URL=...` and `--dart-define=API_KEY=...`
-- API client auto-generated from OpenAPI spec using `openapi-generator` (Dart target)
+- `--dart-define=BASE_URL=...` and `--dart-define=API_KEY=...`
 
 ### Docker
-- Multi-stage: `rust:alpine` builder (musl static binary) → `alpine:latest` runtime
-- Clear all cargo/build caches in builder; `apk cache clean` in runtime
-- `docker-compose.yml`: `app` + `postgres:16-alpine`; SQLite mode = override `DATABASE_URL`
+- Multi-stage: `rust:alpine` builder → `alpine:latest` runtime
+- `docker-compose.yml`: `app` + `postgres:16-alpine`
 
-## Architecture Style
-Hexagonal (ports & adapters) + Clean Architecture layers. Strict pure/impure separation:
+## Architecture
 
-**Pure** — entities, value objects, use case functions, plugin trait interfaces, BLoC logic. No I/O, no async, no exceptions. Validation errors are acceptable as typed return values (not exceptions).
+Hexagonal (ports & adapters) + Clean Architecture. Strict pure/impure separation.
 
-**Impure** — all I/O: DB, HTTP, file system, user interaction. Impure boundary catches all exceptions and converts to typed errors. Nothing above the boundary uses try/catch or propagates raw exceptions.
+**Pure**: entities, VOs, use case validation, plugin trait interfaces, BLoC logic. No I/O.
+**Impure**: DB, HTTP, filesystem. Catches all exceptions → typed errors. No try/catch above boundary.
 
-### Backend Crate Structure (Rust)
+### Backend Crates (Rust workspace)
 
 | Crate | Layer | Pure? |
 |---|---|---|
-| `domain` | Entities + repository/plugin trait ports | ✅ Pure |
-| `use_cases` | Pure use case functions (validation, orchestration) | ✅ Pure |
-| `plugins` | Plugin trait interfaces + no-op stubs | ✅ Pure |
-| `services` | Async executors: call use_cases + inject repo traits + map IO errors | ❌ Impure boundary |
-| `adapters` | HTTP handlers (axum), DTOs, request/response mappers, utoipa | ❌ Impure |
-| `infrastructure` | sqlx DB adapters, plugin implementations | ❌ Impure |
-| `app` | Binary: config, DI wiring, startup, API key bootstrap | ❌ Impure |
+| `domain` | Entities, `DomainError`, repository trait ports, search strategy trait | ✅ |
+| `use_cases` | Validation DTOs + rules (`ValidationError`) | ✅ |
+| `plugins` | `MetadataExtractor`/`WebChecker` traits + no-op stubs (feature-gated) | ✅ |
+| `services` | Async DI services: validate → execute repos; search config seam | ❌ |
+| `adapters` | axum handlers, auth middleware, `ApiError` mapping, routes | ❌ |
+| `infrastructure` | SQLite/PG adapters, migrations, factory, portability, device binding | ❌ |
+| `app` | Config, bootstrap, runtime wiring, binary entry | ❌ |
 
-Dependency direction: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
+Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 
-### Flutter Structure (Dart)
+### Frontend (Flutter/Dart)
 
-Pattern: **BLoC** (flutter_bloc)  
-Error propagation: **Dart 3 sealed `Result<T>`** — Repository catches all exceptions, returns typed `Result`; BLoC exhaustively switches on it; no try/catch above Repository layer.
-
-| Layer | Pure? | Responsibility |
-|---|---|---|
-| `models/` | ✅ Pure | Sealed domain types, sealed `Result<T, Failure>` |
-| `repositories/` | ❌ Impure | HTTP calls via generated client; catch exceptions → return `Result` |
-| `blocs/` | ✅ Pure logic | Receive events, fold `Result` → state; no I/O, no try/catch |
-| `screens/` + `widgets/` | ❌ Impure | UI rendering, user interaction dispatch |
-| `api/` | ❌ Impure | Generated OpenAPI client (gitignored) |
-| `config/` | ✅ Pure | `AppConfig` reading dart-define values |
-
-## Current Phase
-**Phase 1 — MVP design approved. Spec written. Awaiting task file + implementation plan.**
+| Layer | Pure? |
+|---|---|
+| `models/` (sealed Result, domain types) | ✅ |
+| `repositories/` (HTTP → Result) | ❌ |
+| `blocs/` (events → states via Result.when) | ✅ |
+| `screens/` + `widgets/` | ❌ |
+| `api/` (generated, gitignored) | ❌ |
+| `config/` (dart-define) | ✅ |
 
 ## Phases Overview
-- **Phase 1 (MVP)**: Ebook + WebReader CRUD/search, ResourceLocation, auth, plugin skeleton, OpenAPI, Flutter minimal shell (list/add/search/detail — no WebView)
-- **Phase 2**: Plugin system (scrapers: DLSite, FANZA, Steam; metadata extractors; web chapter checkers)
-- **Phase 3**: Advanced frontend (WebView + progress tracking, batch ops, metadata auto-fill)
-- **Phase 4**: Platform integrations (BookWalker, Kindle, Steam library)
-- **Phase 5**: Data portability (PostgreSQL ↔ SQLite migration, export/import)
+- **Phase 1 (MVP+)**: Ebook + WebReader CRUD/search, ResourceLocation, auth, plugin skeleton, OpenAPI, SQLite/PG portability, fuzzy-search seam, Flutter shell + WebView progress + batch ops. **✅ Implemented.**
+- **Phase 2**: Real plugin implementations (metadata extractors, chapter checkers).
+- **Phase 3**: Image/video/game resource types.
+- **Phase 4**: Ecosystem integrations (BookWalker, Kindle, Steam/DLSite/FANZA).
+- **Phase 5**: Optimization and hardening.
 
 ## Phase 1 Deferred Items
 - Tags and tag-based search
-- Device management API (register/list/delink devices)
-- Progress tracking (comes with WebView in Phase 3)
+- Device management API (register/list/delink)
 - Deduplication warnings
 - Resource types: image, video, game
-- Real plugin implementations (scrapers, metadata extractors)
-- String-similarity fuzzy search
+- Real plugin implementations
+- Full metadata extraction auto-fill UX
+
+## Phase 1 Implementation Summary
+
+### Backend (all tasks complete: A0–A14)
+- **Domain (A2/A3)**: Entities, VOs, `DomainError` (NotFound/ValidationError/Conflict/InternalError), 4 async repository trait ports, in-memory contract tests.
+- **Use Cases (A4)**: Validation DTOs with field-level errors; title/URL/format/storage-type rules.
+- **Plugins (A5)**: `MetadataExtractor`/`WebChecker` traits; `PluginRegistry` + no-op stubs behind `stub-plugins` feature.
+- **Device Identity (A6b)**: `devices` migration, `DeviceBinding`, register/rebind/lookup with partial unique index.
+- **Infrastructure (A7)**: SQLite CRUD repos (rusqlite), PG scaffolds, `AdapterFactory`, migrations. Case-insensitive unique title index.
+- **Portability (A7b)**: Canonical snapshot model, normalize helpers, SQLite export/import round-trip, PG parity hook contracts.
+- **Search Seam (A7c)**: `SearchStrategyKind`/`SearchStrategy` trait in domain; Like + Fuzzy implementations in services; config-driven builder.
+- **Services (A8)**: `EbookService`/`WebReaderService` with DI repos, validate→execute flow, search config seam.
+- **Auth (A9)**: Bearer token middleware, empty-token rejection, system-route bypass.
+- **Adapters (A10-A12)**: Full ebook/web-reader HTTP handlers + system health/openapi routes, `ApiError` mapping.
+- **App (A13)**: Typed config, bootstrap (UUIDv4 gen, .env write), runtime router assembly.
+- **Docker (A14)**: Multi-stage Dockerfile, docker-compose.yml.
+- **Tests**: 70+ backend tests green (`cargo test --workspace`).
+
+### Frontend (all tasks complete: B1–B12)
+- **Models (B2)**: Sealed Result, failure hierarchy, resource models (including `WebReaderMeta.siteName`).
+- **BLoCs (B4-B5)**: Ebook/WebReader blocs with exhaustive Result.when folding, no try/catch.
+- **Screens (B6-B9)**: List (tabbed), add/edit (with prefill), search (debounced), detail (location/delete/edit).
+- **Widgets**: resource_list_item, location_form_sheet, web_reader_progress_tracker, app_failure_text.
+- **WebView Progress (B11)**: `WebReaderProgressSignal` model + `TrackWebReaderProgress` event + tracker widget (contract placeholder).
+- **Batch Ops (B12)**: Request contract models + repository contract + UI screen.
+- **Integration (B10)**: Real add-resource flow test on macOS.
+- **In-Memory Repos**: Full CRUD for offline/test wiring.
+- **Tests**: 22 frontend tests + integration test green.
+
+### Review-Driven Fixes Applied
+1. Generated runtime IDs (not hardcoded `new-resource`).
+2. Edit mode dispatches Update events (not Add).
+3. `siteName` added to `WebReaderMeta`/`UpdateWebReaderInput`.
+4. Location-add chained after successful ops only.
+5. List reloads after detail/add navigation.
+6. Detail listeners scoped to location/progress ops.
+7. Edit prefills from loaded detail data.
+8. Test provider scope: MultiBlocProvider above MaterialApp.
+9. Blank API_KEY normalized to None at config/bootstrap/auth layers.
+10. CI unique title index prevents TOCTOU race.
+
+## Environment Notes
+- Rust toolchain: rustc 1.82.0, uuid pinned to 1.8.0.
+- Flutter/Dart: installed via Homebrew. CocoaPods needs `PATH="/opt/homebrew/bin:$PATH"` for macOS integration tests.
+- `flutter test integration_test -d macos` produces harmless "Failed to foreground app" warning.
 
 ## Open Questions
-_(All resolved — none remaining.)_
+_(None remaining.)_
 
 ## References
 - Requirements: `TODO.md`
 - Agent rules: `AGENTS.md`
-- Phase 1 spec: `docs/superpowers/specs/2026-04-15-phase1-mvp-design.md`
-- Phase 1 tasks: `tasks/phase1.md` (pending)
+- Phase 1 tasks: `tasks/phase1.md`
+- Requirements matrix: `tasks/phase1-requirements-matrix.json`

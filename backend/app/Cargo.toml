@@ -1,0 +1,18 @@
+[package]
+name = "app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7"
+domain = { path = "../domain" }
+use_cases = { path = "../use_cases" }
+plugins = { path = "../plugins" }
+services = { path = "../services" }
+adapters = { path = "../adapters" }
+infrastructure = { path = "../infrastructure" }
+uuid = { version = "=1.8.0", default-features = false, features = ["v4"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
+
+[dev-dependencies]
+tower = "0.5"

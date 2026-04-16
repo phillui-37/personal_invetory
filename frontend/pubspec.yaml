@@ -1,0 +1,26 @@
+name: personal_inventory_frontend
+description: Personal inventory Flutter frontend (Phase 1 scaffold)
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.5
+  http: ^1.2.2
+  flutter_dotenv: ^5.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  bloc_test: ^9.1.7
+  lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

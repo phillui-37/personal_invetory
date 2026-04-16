@@ -5,6 +5,19 @@
 **Methodology:** TDD — Red → Green → Refactor on every task  
 **Resource types in scope:** Ebook, WebReader only
 
+## Critical Alignment Fixes (from TODO.md + AGENTS.md)
+
+This plan is corrected to explicitly cover required items that were previously implicit or deferred:
+- Device identity lifecycle (unique IDs, ID reuse and delink semantics)
+- PostgreSQL ↔ SQLite round-trip portability validation
+- Fuzzy search path (phase-1 compatible baseline + phase-next extension hook)
+- Web progress tracking (URL + DOM signal path)
+- Batch operations (import, metadata update/copy) as planned implementation track
+
+Also aligned with `AGENTS.md`:
+- No panic-driven control flow for recoverable startup/config errors
+- Mandatory per-task TDD gate: write failing test first, verify red, then implementation
+
 ---
 
 ## Architecture Principles
@@ -36,6 +49,24 @@ screens/widgets (impure UI)
 ---
 
 ## Track A — Backend (Rust)
+
+### A0 · Plan-Requirement Lock & Scope Guard
+
+Create a machine-checkable requirements matrix (`tasks/phase1-requirements-matrix.json`) mapping each requirement in `TODO.md` to:
+- `phase`: `phase1` or `deferred`
+- `task_ids`: concrete task IDs in this plan
+- `status`: `planned`
+
+Include explicit entries for:
+- Device ID uniqueness + reuse/delink behavior
+- DB portability
+- Fuzzy search
+- Web URL/DOM progress signals
+- Batch operations
+
+**Acceptance:** Every requirement line from `TODO.md` has exactly one mapping record; no unmapped requirement remains.
+
+---
 
 ### A1 · Rust Workspace Scaffold
 
@@ -190,6 +221,7 @@ Migration files:
 2. `0002_create_ebook_metas.sql` (FK to resources, ON DELETE CASCADE)
 3. `0003_create_web_reader_metas.sql` (FK to resources, ON DELETE CASCADE)
 4. `0004_create_resource_locations.sql` (FK to resources, ON DELETE CASCADE)
+5. `0005_create_devices.sql` (device registry with unique active device ID semantics)
 
 Indices:
 - `resources`: `resource_type`, `title`
@@ -200,6 +232,24 @@ Indices:
 **TDD:** Migration test runs all migrations against in-memory SQLite, verifies all tables and columns exist.
 
 **Acceptance:** Migration test green. Manual verification against local PostgreSQL.
+
+---
+
+### A6b · Infrastructure — Device Identity Semantics
+**Crate:** `infrastructure` + `services` | **Zone:** Impure
+
+Implement device identity behavior required by `TODO.md`:
+- `devices` table tracks active device IDs
+- Reusing an existing `device_id` on a new device registration delinks old device association and rebinds to the new device record
+- Portable storage locations still allow free-text device IDs in location input
+
+Service-level rules:
+- `register_device` enforces "one active owner per device_id"
+- `rebind_device_id` keeps historical linkage auditable via timestamps/status
+
+**TDD:** Integration tests for first registration, re-registration (reuse), and old-device delink behavior.
+
+**Acceptance:** Tests confirm deterministic ID reuse behavior with no duplicate active owners.
 
 ---
 
@@ -228,13 +278,47 @@ LIKE search:
 - PostgreSQL: `ILIKE '%q%'` on `title`, `author`, `url`, `site_name`
 - SQLite: `LOWER(col) LIKE LOWER('%q%')`
 
-`AdapterFactory::from_url(database_url: &str) -> AdapterBundle` routes by URL prefix. Panics with a clear message on unknown prefix.
+`AdapterFactory::from_url(database_url: &str) -> Result<AdapterBundle, DomainError>` routes by URL prefix. Unknown prefix returns typed startup/config error (no panic).
 
 **All sqlx errors are caught here and mapped to `DomainError::InternalError` — they never escape this crate.**
 
 **TDD:** Integration tests against SQLite in-memory for all adapter methods. PostgreSQL tests `#[ignore]`'d (run in CI).
 
 **Acceptance:** `cargo test -p infrastructure` green (SQLite). PostgreSQL suite green in CI.
+
+---
+
+### A7b · Infrastructure — Cross-DB Portability Verification
+**Crate:** `infrastructure` | **Zone:** Impure
+
+Add canonical export/import pipeline for portability checks:
+- Export canonical JSON snapshot from SQLite
+- Import into PostgreSQL
+- Re-export PostgreSQL snapshot
+- Compare normalized snapshots for equality
+
+Normalization rules:
+- Stable ordering by primary keys
+- Canonical datetime formatting
+- No backend-specific field drift
+
+**TDD:** Portability integration test fixture with mixed Ebook/WebReader/resource_locations records.
+
+**Acceptance:** SQLite → PostgreSQL → SQLite round-trip yields data-equivalent canonical snapshots.
+
+---
+
+### A7c · Infrastructure — Fuzzy Search Extension Hook
+**Crate:** `domain` + `infrastructure` + `services`
+
+Phase-1 behavior remains LIKE-based by default, but add extension seam:
+- `SearchStrategy` trait with `Like` and `Fuzzy` implementations
+- Config key selects strategy per backend
+- SQLite supports FTS5 path; PostgreSQL supports trigram/similarity path
+
+**TDD:** Contract tests ensuring both strategies return deterministic ranked results for the same fixture set.
+
+**Acceptance:** Default strategy remains LIKE; fuzzy strategy can be switched on without service-layer changes.
 
 ---
 
@@ -657,20 +741,59 @@ Integration test (`integration_test/`) against a running backend in SQLite mode:
 
 ---
 
+### B11 · Flutter + Backend — WebView Progress Tracking (URL + DOM)
+
+Implement URL/DOM-only progress tracking path for web-reader resources:
+- Embed WebView in web-reader detail flow
+- Inject JS bridge that captures URL and chapter/progress signal from DOM selectors
+- Send progress updates to backend endpoint
+- Backend persists last known chapter/progress marker for that resource
+
+**TDD:** Widget/integration tests for progress signal emission and backend update invocation; backend handler tests for update validation and persistence.
+
+**Acceptance:** Browsing in WebView updates stored progress using only URL + DOM-derived data.
+
+---
+
+### B12 · Flutter + Backend — Batch Operations
+
+Deliver batch operations required by `TODO.md`:
+- Batch import resources (multi-file / directory, optional recursive)
+- Batch metadata update
+- Batch metadata copy
+
+Backend:
+- Bulk endpoints with itemized success/failure response
+- Partial-failure handling with stable per-item error payloads
+
+Frontend:
+- Batch operation screens/dialogs
+- Progress + summary reporting
+
+**TDD:** Backend bulk endpoint tests and frontend widget/integration tests for mixed success/failure batches.
+
+**Acceptance:** User can execute all three batch operations with clear per-item results.
+
+---
+
 ## Task Dependency Graph
 
 ```
-A1 (workspace)
- └─ A2 (domain entities)
-      └─ A3 (domain traits + errors)
-           ├─ A4 (use_cases)            pure ─────────────────────┐
-           ├─ A5 (plugins)              pure                       │
-           ├─ A6 (migrations)                                      │
-           └─ A7 (DB adapters)          impure                     │
-                └─ A8 (services)        impure boundary ← A4, A5   │
-                     └─ A9 (HTTP setup) impure                     │
-                          ├─ A10 (ebook handlers)                  │
-                          ├─ A11 (web-reader handlers)             │
+A0 (requirements matrix)
+  └─ A1 (workspace)
+  └─ A2 (domain entities)
+       └─ A3 (domain traits + errors)
+            ├─ A4 (use_cases)            pure ─────────────────────┐
+            ├─ A5 (plugins)              pure                       │
+            ├─ A6 (migrations)                                      │
+            ├─ A6b (device identity)                                │
+            ├─ A7 (DB adapters)          impure                     │
+            ├─ A7b (portability checks)                             │
+            └─ A7c (fuzzy extension seam)                           │
+                 └─ A8 (services)        impure boundary ← A4, A5   │
+                      └─ A9 (HTTP setup) impure                     │
+                           ├─ A10 (ebook handlers)                  │
+                           ├─ A11 (web-reader handlers)             │
                           └─ A12 (system + OpenAPI)                │
                                └─ A13 (app binary)                 │
                                     └─ A14 (Docker)                │
@@ -681,8 +804,10 @@ A14 complete (OpenAPI available)                                   │
            └─ B3 (API client + repos)   impure boundary             │
                 ├─ B4 (EbookBloc)       pure ← B2                   │
                 ├─ B5 (WebReaderBloc)   pure ← B2                   │
-                └─ B6–B9 (screens)      impure ← B4, B5
-                     └─ B10 (E2E test)
+                 └─ B6–B9 (screens)      impure ← B4, B5
+                      ├─ B10 (E2E test)
+                      ├─ B11 (webview progress)
+                      └─ B12 (batch ops)
 ```
 
 ---
@@ -693,8 +818,12 @@ A14 complete (OpenAPI available)                                   │
 - [ ] PostgreSQL integration tests pass (`cargo test -p infrastructure -- --ignored`)
 - [ ] `docker compose up --build` starts successfully; health check responds 200
 - [ ] OpenAPI spec at `/api/v1/system/openapi` is valid JSON with all endpoints present
-- [ ] No `try/catch` / `panic!` / `unwrap` outside `infrastructure` and `app` crates (Rust)
+- [ ] No `try/catch` / `panic!` / `unwrap` outside explicit impure boundaries; startup/config errors are typed (no panic-based flow)
 - [ ] No `try/catch` outside repository implementations (Flutter)
 - [ ] `flutter test` passes (all widget tests)
 - [ ] Integration test B10 passes against SQLite backend
+- [ ] Device ID reuse/delink semantics validated by integration tests
+- [ ] SQLite↔PostgreSQL round-trip portability test passes
+- [ ] URL/DOM web progress updates persisted correctly
+- [ ] Batch operations (import/update/copy metadata) pass backend + frontend tests
 - [ ] `CONTEXT.md` updated to reflect Phase 1 complete

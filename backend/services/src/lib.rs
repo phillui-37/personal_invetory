@@ -1,0 +1,31 @@
+mod ebook;
+mod search;
+mod web_reader;
+
+use domain::DomainError;
+use use_cases::ValidationError;
+
+pub use domain::SearchStrategyKind;
+pub use ebook::{EbookDetail, EbookService};
+pub use search::SearchConfig;
+pub use use_cases::ebook::{NewEbookInput, UpdateEbookInput};
+pub use use_cases::location::NewLocationInput;
+pub use use_cases::web_reader::NewWebReaderInput;
+pub use web_reader::{WebReaderDetail, WebReaderService};
+
+pub(crate) fn map_validation_error(error: ValidationError) -> DomainError {
+    DomainError::ValidationError(format_validation_error(&error))
+}
+
+fn format_validation_error(error: &ValidationError) -> String {
+    error
+        .field_errors
+        .iter()
+        .map(|(field, messages)| format!("{field}: {}", messages.join(", ")))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+pub fn services_ready() -> bool {
+    domain::domain_ready() && use_cases::use_cases_ready() && plugins::plugins_ready()
+}

@@ -1,0 +1,12 @@
+[package]
+name = "use_cases"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+domain = { path = "../domain" }
+url = "=2.4.1"
+
+[dev-dependencies]
+chrono = { version = "0.4.38", features = ["clock"] }
+uuid = { version = "1.8.0", features = ["v4"] }

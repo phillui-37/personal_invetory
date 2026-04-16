@@ -1,0 +1,12 @@
+[workspace]
+members = [
+  "domain",
+  "use_cases",
+  "plugins",
+  "services",
+  "adapters",
+  "infrastructure",
+  "app",
+]
+resolver = "2"
+

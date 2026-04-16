@@ -1,0 +1,10 @@
+.dart_tool/
+.build/
+.packages
+.pub/
+.metadata
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+lib/api/*
+!lib/api/.gitkeep
