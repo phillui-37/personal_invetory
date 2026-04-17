@@ -8,8 +8,9 @@ RUN cd backend \
     && rm -rf /root/.cargo/registry /root/.cargo/git
 
 FROM alpine:latest AS runtime
-RUN apk add --no-cache ca-certificates tzdata \
+RUN apk add --no-cache ca-certificates tzdata chromium \
     && rm -rf /var/cache/apk/*
+ENV CHROMIUM_PATH=/usr/bin/chromium-browser
 WORKDIR /app
 COPY --from=builder /build/backend/target/release/app ./app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

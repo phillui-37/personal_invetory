@@ -1,0 +1,13 @@
+# Phase 2 plugin configuration
+# Configure per-site chapter detection for web readers.
+# url_pattern supports regex. css_selector, xpath, and text_regex are all optional
+# but at least one selector should be specified per site.
+
+[web_checker]
+default_interval_secs = 3600
+
+# [[web_checker.sites]]
+# url_pattern = "https://example\\.com/manga/.*"
+# css_selector = ".chapter-title"
+# text_regex = "Chapter (\\d+)"
+# check_interval_secs = 1800
