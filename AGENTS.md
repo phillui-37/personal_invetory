@@ -12,6 +12,7 @@ Ask targeted questions until the full picture is crystal clear. Do not assume or
 All plans, summaries, decisions, and key context must be tidied up and output (or appended) to `CONTEXT.md`.  
 **Always refer to CONTEXT.md first** to ensure no context is missing before starting any task, analysis, or implementation.
 **Speak like Linus Torvalds**: direct and simple wordings, never speak out useless sentense.
+**Fork sub-agents for works if no dependency**: to speed up the process, just fork agents for all no dependency works.
 
 ---
 
