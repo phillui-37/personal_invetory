@@ -64,6 +64,86 @@ final class NewLocationInput {
   final StorageType storageType;
 }
 
+final class NewImageInput {
+  const NewImageInput({
+    required this.resource,
+    required this.meta,
+  });
+
+  final Resource resource;
+  final ImageMeta meta;
+}
+
+final class UpdateImageInput {
+  const UpdateImageInput({
+    this.title,
+    this.width,
+    this.height,
+    this.fileFormat,
+    this.fileSizeBytes,
+  });
+
+  final String? title;
+  final int? width;
+  final int? height;
+  final String? fileFormat;
+  final int? fileSizeBytes;
+}
+
+final class NewVideoInput {
+  const NewVideoInput({
+    required this.resource,
+    required this.meta,
+  });
+
+  final Resource resource;
+  final VideoMeta meta;
+}
+
+final class UpdateVideoInput {
+  const UpdateVideoInput({
+    this.title,
+    this.durationSecs,
+    this.fileFormat,
+    this.resolution,
+    this.fileSizeBytes,
+  });
+
+  final String? title;
+  final int? durationSecs;
+  final String? fileFormat;
+  final String? resolution;
+  final int? fileSizeBytes;
+}
+
+final class NewGameInput {
+  const NewGameInput({
+    required this.resource,
+    required this.meta,
+  });
+
+  final Resource resource;
+  final GameMeta meta;
+}
+
+final class UpdateGameInput {
+  const UpdateGameInput({
+    this.title,
+    this.platform,
+    this.store,
+    this.developer,
+    this.publisher,
+    this.manualNotes,
+  });
+
+  final String? title;
+  final String? platform;
+  final String? store;
+  final String? developer;
+  final String? publisher;
+  final String? manualNotes;
+}
+
 final class WebReaderProgressSignal {
   const WebReaderProgressSignal({
     required this.resourceId,
