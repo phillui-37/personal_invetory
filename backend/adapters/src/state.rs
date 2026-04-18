@@ -3,20 +3,33 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use chrono::Utc;
 use domain::{
-    DomainError, EbookMeta, EbookMetaRepository, LocationRepository, NewEbookMeta, NewResource,
-    NewResourceLocation, NewWebReaderMeta, Resource, ResourceLocation, ResourceRepository,
+    ChapterCheck, DomainError, EbookMeta, EbookMetaRepository,
+    LocationRepository, NewEbookMeta, NewResource, NewResourceLocation, NewWebReaderMeta,
+    Notification, Resource, ResourceLocation, ResourceRepository,
     UpdateResource, WebReaderMeta, WebReaderMetaRepository,
 };
 use plugins::PluginRegistry;
-use services::{EbookService, WebReaderService};
+use serde::Serialize;
+use services::{ChapterCheckOps, EbookService, WebReaderService};
+use tokio::sync::broadcast;
+use utoipa::ToSchema;
 use uuid::Uuid;
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct NotificationEvent {
+    pub id: Uuid,
+    pub resource_id: Uuid,
+    pub message: String,
+}
 
 pub struct AppState {
     pub ebook_service: Arc<EbookService>,
     pub web_reader_service: Arc<WebReaderService>,
+    pub chapter_check_service: Option<Arc<dyn ChapterCheckOps>>,
     pub plugin_registry: Arc<PluginRegistry>,
     pub api_key: String,
     pub openapi_json: String,
+    pub notification_tx: broadcast::Sender<NotificationEvent>,
 }
 
 impl AppState {
@@ -25,13 +38,21 @@ impl AppState {
         web_reader_service: Arc<WebReaderService>,
         api_key: String,
     ) -> Self {
+        let (notification_tx, _) = broadcast::channel(64);
         Self {
             ebook_service,
             web_reader_service,
+            chapter_check_service: None,
             plugin_registry: Arc::new(PluginRegistry::default()),
             api_key,
             openapi_json: "{}".to_string(),
+            notification_tx,
         }
+    }
+
+    pub fn with_chapter_check_service(mut self, svc: Arc<dyn ChapterCheckOps>) -> Self {
+        self.chapter_check_service = Some(svc);
+        self
     }
 
     pub fn for_tests(api_key: String) -> Self {
@@ -49,7 +70,30 @@ impl AppState {
             location_repo,
         ));
 
-        Self::new(ebook_service, web_reader_service, api_key)
+        let mut state = Self::new(ebook_service, web_reader_service, api_key);
+        state.chapter_check_service = Some(Arc::new(NoopChapterCheckOps));
+        state
+    }
+}
+
+struct NoopChapterCheckOps;
+
+#[async_trait]
+impl ChapterCheckOps for NoopChapterCheckOps {
+    async fn check_resource(&self, resource_id: Uuid) -> Result<ChapterCheck, DomainError> {
+        Err(DomainError::NotFound(format!("resource {resource_id} not found")))
+    }
+
+    async fn list_check_history(&self, _resource_id: Uuid) -> Result<Vec<ChapterCheck>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn list_notifications(&self, _unread_only: bool) -> Result<Vec<Notification>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn mark_notification_read(&self, _id: Uuid) -> Result<(), DomainError> {
+        Ok(())
     }
 }
 
@@ -139,6 +183,9 @@ impl WebReaderMetaRepository for NoopWebReaderMetaRepository {
             url: input.url,
             site_name: input.site_name,
             last_checked_chapter: input.last_checked_chapter,
+            check_interval_secs: input.check_interval_secs,
+            last_checked_at: input.last_checked_at,
+            progress_css_selector: input.progress_css_selector,
         })
     }
 }
@@ -170,5 +217,19 @@ impl LocationRepository for NoopLocationRepository {
 
     async fn remove(&self, _resource_id: Uuid, _location_id: Uuid) -> Result<(), DomainError> {
         Ok(())
+    }
+}
+
+/// Implements NotificationBroadcaster by sending to a tokio broadcast channel.
+pub struct BroadcastNotifier(pub broadcast::Sender<NotificationEvent>);
+
+impl domain::NotificationBroadcaster for BroadcastNotifier {
+    fn broadcast(&self, notification: &Notification) {
+        let event = NotificationEvent {
+            id: notification.id,
+            resource_id: notification.resource_id,
+            message: notification.message.clone(),
+        };
+        let _ = self.0.send(event);
     }
 }

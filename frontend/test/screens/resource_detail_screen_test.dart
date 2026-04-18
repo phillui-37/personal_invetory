@@ -164,4 +164,71 @@ void main() {
 
     expect(ebookRepo.deleteCalls, 1);
   });
+
+  testWidgets('ResourceDetailScreen shows chapter checks and dispatches check now', (
+    tester,
+  ) async {
+    final checkedAt = DateTime.utc(2025, 1, 1, 12);
+    final ebookRepo = FakeEbookRepository();
+    final webReaderRepo = FakeWebReaderRepository(
+      detailResult: const Success(
+        WebReaderDetail(
+          resource: Resource(
+            id: 'w1',
+            title: 'Reader',
+            resourceType: ResourceType.webReader,
+          ),
+          meta: WebReaderMeta(resourceId: 'w1', url: 'https://example.com/ch1'),
+          locations: [],
+        ),
+      ),
+      listCheckHistoryResult: Success([
+        ChapterCheck(
+          id: 'chk1',
+          resourceId: 'w1',
+          hasNewChapter: true,
+          latestChapter: 'Chapter 2',
+          checkedAt: checkedAt,
+        ),
+      ]),
+      triggerCheckResult: Success(
+        ChapterCheck(
+          id: 'chk2',
+          resourceId: 'w1',
+          hasNewChapter: false,
+          checkedAt: checkedAt,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiBlocProvider(
+          providers: [
+            BlocProvider(create: (_) => EbookBloc(ebookRepo)),
+            BlocProvider(create: (_) => WebReaderBloc(webReaderRepo)),
+          ],
+          child: const ResourceDetailScreen(
+            resourceId: 'w1',
+            resourceType: ResourceType.webReader,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Chapter Checks'), findsOneWidget);
+    await tester.tap(find.byType(ExpansionTile));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Latest: Chapter 2'), findsOneWidget);
+
+    final button = tester.widget<TextButton>(find.byKey(const Key('check-now-button')));
+    button.onPressed!.call();
+    await tester.pump();
+
+    expect(webReaderRepo.triggerCheckCalls, 1);
+    expect(webReaderRepo.lastTriggerCheckResourceId, 'w1');
+  });
 }

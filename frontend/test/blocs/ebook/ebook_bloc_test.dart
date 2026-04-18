@@ -1,6 +1,7 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_inventory_frontend/blocs/ebook/ebook_bloc.dart';
+import 'package:personal_inventory_frontend/models/batch_operations.dart';
 import 'package:personal_inventory_frontend/models/failures.dart';
 import 'package:personal_inventory_frontend/models/repository_inputs.dart';
 import 'package:personal_inventory_frontend/models/resources.dart';
@@ -184,5 +185,12 @@ final class _FakeEbookRepository implements EbookRepository {
   Future<Result<Resource, AppFailure>> updateEbook(String id, UpdateEbookInput input) {
     return _onUpdateEbook?.call(id, input) ??
         Future.value(const Failure(ServerFailure(500)));
+  }
+
+  @override
+  Future<Result<BatchImportResult, AppFailure>> batchImport(
+    List<BatchImportEntry> entries,
+  ) {
+    return Future.value(const Success(BatchImportResult(succeeded: [], failed: [])));
   }
 }

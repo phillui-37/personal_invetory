@@ -32,9 +32,17 @@ pub fn bootstrap_api_key(api_key: Option<String>, env_path: &Path) -> ApiKeyBoot
 
     let generated_key = Uuid::new_v4().to_string();
     let existed_before_write = env_path.exists();
+    let needs_leading_newline = existed_before_write
+        && std::fs::read(env_path)
+            .map(|bytes| !bytes.is_empty() && bytes.last().copied() != Some(b'\n'))
+            .unwrap_or(false);
+    let line = if needs_leading_newline {
+        format!("\nAPI_KEY={generated_key}\n")
+    } else {
+        format!("API_KEY={generated_key}\n")
+    };
     let env_write = match OpenOptions::new().create(true).append(true).open(env_path) {
         Ok(mut file) => {
-            let line = format!("API_KEY={generated_key}\n");
             match file.write_all(line.as_bytes()) {
                 Ok(()) => {
                     if existed_before_write {
@@ -133,6 +141,25 @@ mod tests {
         let content = fs::read_to_string(&env_path).expect("appended .env should be readable");
         assert!(content.contains("DATABASE_URL=sqlite://./inventory.db"));
         assert!(content.contains(&format!("API_KEY={api_key}")));
+
+        fs::remove_file(&env_path).expect("cleanup test env file");
+    }
+
+    #[test]
+    fn bootstrap_appends_with_leading_newline_when_file_lacks_trailing_newline() {
+        let env_path = test_artifact_path("append-no-newline");
+        fs::write(&env_path, "DATABASE_URL=sqlite://./inventory.db").expect("seed env file without trailing newline");
+
+        let result = bootstrap_api_key(None, &env_path);
+        let ApiKeyBootstrapResult::GeneratedAndMustExit { api_key, .. } = result else {
+            panic!("missing API key should trigger generated+must-exit branch");
+        };
+
+        let content = fs::read_to_string(&env_path).expect("appended .env should be readable");
+        assert!(
+            content.contains(&format!("\nAPI_KEY={api_key}")),
+            "should have inserted a newline before API_KEY: {content:?}"
+        );
 
         fs::remove_file(&env_path).expect("cleanup test env file");
     }

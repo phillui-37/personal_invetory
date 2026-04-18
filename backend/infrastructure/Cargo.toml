@@ -3,6 +3,9 @@ name = "infrastructure"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+firebase = ["dep:reqwest", "dep:jsonwebtoken", "dep:serde_json", "dep:thiserror"]
+
 [dependencies]
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["clock"] }
@@ -10,6 +13,13 @@ domain = { path = "../domain" }
 plugins = { path = "../plugins" }
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "=1.8.0", default-features = false, features = ["v4"] }
+reqwest = { version = "0.12", optional = true, features = ["json", "rustls-tls"], default-features = false }
+jsonwebtoken = { version = "9", optional = true }
+serde_json = { version = "1", optional = true }
+serde = { version = "1", features = ["derive"] }
+thiserror = { version = "1", optional = true }
 
 [dev-dependencies]
 futures = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+wiremock = "0.6"

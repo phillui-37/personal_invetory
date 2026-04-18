@@ -1,4 +1,4 @@
-use domain::{NewEbookMeta, NewResource, Resource, ResourceType, UpdateResource};
+use domain::{EbookMeta, NewEbookMeta, NewResource, Resource, ResourceType, UpdateResource};
 
 use crate::ValidationError;
 
@@ -51,6 +51,7 @@ pub fn validate_new_ebook(
 
 pub fn validate_update_ebook(
     existing: &Resource,
+    existing_meta: &EbookMeta,
     input: &UpdateEbookInput,
 ) -> Result<(UpdateResource, NewEbookMeta), ValidationError> {
     let mut error = ValidationError::new();
@@ -73,11 +74,12 @@ pub fn validate_update_ebook(
             notes: input.notes.clone(),
         },
         NewEbookMeta {
-            author: input.author.clone(),
-            isbn: input.isbn.clone(),
-            publisher: input.publisher.clone(),
-            language: input.language.clone(),
-            file_format: normalize_file_format(input.file_format.as_deref()),
+            author: input.author.clone().or_else(|| existing_meta.author.clone()),
+            isbn: input.isbn.clone().or_else(|| existing_meta.isbn.clone()),
+            publisher: input.publisher.clone().or_else(|| existing_meta.publisher.clone()),
+            language: input.language.clone().or_else(|| existing_meta.language.clone()),
+            file_format: normalize_file_format(input.file_format.as_deref())
+                .or_else(|| existing_meta.file_format.clone()),
         },
     ))
 }
@@ -117,7 +119,7 @@ fn is_allowed_file_format(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
-    use domain::{Resource, ResourceType};
+    use domain::{self, Resource, ResourceType};
     use uuid::Uuid;
 
     use super::{validate_new_ebook, validate_update_ebook, NewEbookInput, UpdateEbookInput};
@@ -143,6 +145,17 @@ mod tests {
             resource_type: ResourceType::Ebook,
             created_at: now,
             updated_at: now,
+        }
+    }
+
+    fn existing_meta() -> domain::EbookMeta {
+        domain::EbookMeta {
+            resource_id: Uuid::new_v4(),
+            author: Some("Existing Author".to_string()),
+            isbn: Some("existing-isbn".to_string()),
+            publisher: Some("Existing Pub".to_string()),
+            language: Some("JP".to_string()),
+            file_format: Some("pdf".to_string()),
         }
     }
 
@@ -212,6 +225,7 @@ mod tests {
     #[test]
     fn validate_update_ebook_accepts_valid_input() {
         let existing = existing_resource();
+        let meta = existing_meta();
         let input = UpdateEbookInput {
             title: Some("Updated".to_string()),
             notes: Some("updated note".to_string()),
@@ -222,14 +236,15 @@ mod tests {
             file_format: Some("mobi".to_string()),
         };
 
-        let (resource, meta) = validate_update_ebook(&existing, &input).expect("should be valid");
+        let (resource, meta_out) = validate_update_ebook(&existing, &meta, &input).expect("should be valid");
         assert_eq!(resource.title, Some("Updated".to_string()));
-        assert_eq!(meta.file_format, Some("mobi".to_string()));
+        assert_eq!(meta_out.file_format, Some("mobi".to_string()));
     }
 
     #[test]
     fn validate_update_ebook_rejects_empty_title_when_provided() {
         let existing = existing_resource();
+        let meta = existing_meta();
         let input = UpdateEbookInput {
             title: Some(" ".to_string()),
             notes: None,
@@ -240,13 +255,14 @@ mod tests {
             file_format: None,
         };
 
-        let error = validate_update_ebook(&existing, &input).expect_err("should fail");
+        let error = validate_update_ebook(&existing, &meta, &input).expect_err("should fail");
         assert_eq!(error.field_errors["title"][0], "title must not be empty");
     }
 
     #[test]
     fn validate_update_ebook_rejects_title_over_500_chars_when_provided() {
         let existing = existing_resource();
+        let meta = existing_meta();
         let input = UpdateEbookInput {
             title: Some("a".repeat(501)),
             notes: None,
@@ -257,7 +273,7 @@ mod tests {
             file_format: None,
         };
 
-        let error = validate_update_ebook(&existing, &input).expect_err("should fail");
+        let error = validate_update_ebook(&existing, &meta, &input).expect_err("should fail");
         assert_eq!(
             error.field_errors["title"][0],
             "title must be at most 500 chars"
@@ -267,6 +283,7 @@ mod tests {
     #[test]
     fn validate_update_ebook_rejects_invalid_file_format() {
         let existing = existing_resource();
+        let meta = existing_meta();
         let input = UpdateEbookInput {
             title: None,
             notes: None,
@@ -277,7 +294,7 @@ mod tests {
             file_format: Some("txt".to_string()),
         };
 
-        let error = validate_update_ebook(&existing, &input).expect_err("should fail");
+        let error = validate_update_ebook(&existing, &meta, &input).expect_err("should fail");
         assert_eq!(
             error.field_errors["file_format"][0],
             "file_format must be one of: pdf, epub, mobi, azw3"
@@ -287,6 +304,7 @@ mod tests {
     #[test]
     fn validate_update_ebook_allows_no_title_change() {
         let existing = existing_resource();
+        let meta = existing_meta();
         let input = UpdateEbookInput {
             title: None,
             notes: None,
@@ -297,8 +315,30 @@ mod tests {
             file_format: Some("pdf".to_string()),
         };
 
-        let (resource, meta) = validate_update_ebook(&existing, &input).expect("should be valid");
+        let (resource, meta_out) = validate_update_ebook(&existing, &meta, &input).expect("should be valid");
         assert_eq!(resource.title, None);
-        assert_eq!(meta.file_format, Some("pdf".to_string()));
+        assert_eq!(meta_out.file_format, Some("pdf".to_string()));
+    }
+
+    #[test]
+    fn validate_update_ebook_preserves_existing_meta_when_fields_omitted() {
+        let existing = existing_resource();
+        let meta = existing_meta();
+        let input = UpdateEbookInput {
+            title: Some("New Title".to_string()),
+            notes: None,
+            author: None,
+            isbn: None,
+            publisher: None,
+            language: None,
+            file_format: None,
+        };
+
+        let (_, meta_out) = validate_update_ebook(&existing, &meta, &input).expect("should be valid");
+        assert_eq!(meta_out.author, Some("Existing Author".to_string()));
+        assert_eq!(meta_out.isbn, Some("existing-isbn".to_string()));
+        assert_eq!(meta_out.publisher, Some("Existing Pub".to_string()));
+        assert_eq!(meta_out.language, Some("JP".to_string()));
+        assert_eq!(meta_out.file_format, Some("pdf".to_string()));
     }
 }

@@ -43,3 +43,21 @@ final class ServerFailure extends AppFailure {
   @override
   List<Object?> get props => [statusCode];
 }
+
+final class LocalFailure extends AppFailure {
+  const LocalFailure(this.message);
+
+  final String message;
+
+  @override
+  List<Object?> get props => [message];
+}
+
+final class UnsupportedFailure extends AppFailure {
+  const UnsupportedFailure(this.message);
+
+  final String message;
+
+  @override
+  List<Object?> get props => [message];
+}

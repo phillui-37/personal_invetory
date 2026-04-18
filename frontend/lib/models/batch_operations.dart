@@ -72,3 +72,60 @@ final class BatchOperationResponse extends Equatable {
   @override
   List<Object?> get props => [type, results];
 }
+
+final class BatchImportEntry extends Equatable {
+  const BatchImportEntry({
+    required this.title,
+    this.author,
+    this.isbn,
+    this.publisher,
+    this.language,
+    this.fileFormat,
+    this.filePath,
+  });
+
+  final String title;
+  final String? author;
+  final String? isbn;
+  final String? publisher;
+  final String? language;
+  final String? fileFormat;
+  final String? filePath;
+
+  @override
+  List<Object?> get props => [
+    title,
+    author,
+    isbn,
+    publisher,
+    language,
+    fileFormat,
+    filePath,
+  ];
+}
+
+final class BatchImportFailureItem extends Equatable {
+  const BatchImportFailureItem({
+    required this.index,
+    required this.error,
+  });
+
+  final int index;
+  final String error;
+
+  @override
+  List<Object?> get props => [index, error];
+}
+
+final class BatchImportResult extends Equatable {
+  const BatchImportResult({
+    required this.succeeded,
+    required this.failed,
+  });
+
+  final List<String> succeeded;
+  final List<BatchImportFailureItem> failed;
+
+  @override
+  List<Object?> get props => [succeeded, failed];
+}

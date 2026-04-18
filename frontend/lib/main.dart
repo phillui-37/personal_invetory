@@ -1,13 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'blocs/ebook/ebook_bloc.dart';
 import 'blocs/web_reader/web_reader_bloc.dart';
-import 'models/batch_operations.dart';
 import 'repositories/in_memory_repositories.dart';
-import 'screens/batch_operations_screen.dart';
+import 'screens/bulk_import_screen.dart';
 import 'screens/resource_list_screen.dart';
 import 'screens/search_screen.dart';
 
@@ -29,21 +26,24 @@ class PersonalInventoryApp extends StatelessWidget {
         BlocProvider<WebReaderBloc>(create: (_) => WebReaderBloc(webReaderRepository)),
       ],
       child: MaterialApp(
-        home: const _AppShell(),
+        home: _AppShell(ebookRepository: ebookRepository),
       ),
     );
   }
 }
 
 class _AppShell extends StatefulWidget {
-  const _AppShell();
+  const _AppShell({
+    required this.ebookRepository,
+  });
+
+  final InMemoryEbookRepository ebookRepository;
 
   @override
   State<_AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<_AppShell> {
-  final _batchRepository = const InMemoryBatchOperationRepository();
   int _index = 0;
 
   @override
@@ -51,20 +51,7 @@ class _AppShellState extends State<_AppShell> {
     final pages = [
       const ResourceListScreen(),
       const SearchScreen(),
-      BatchOperationsScreen(
-        onImport: (request) {
-          unawaited(_batchRepository.batchImport(request));
-          _showBatchSnackBar(BatchOperationType.importResources);
-        },
-        onUpdate: (request) {
-          unawaited(_batchRepository.batchUpdateMetadata(request));
-          _showBatchSnackBar(BatchOperationType.updateMetadata);
-        },
-        onCopy: (request) {
-          unawaited(_batchRepository.batchCopyMetadata(request));
-          _showBatchSnackBar(BatchOperationType.copyMetadata);
-        },
-      ),
+      BulkImportScreen(ebookRepository: widget.ebookRepository),
     ];
 
     return Scaffold(
@@ -79,11 +66,5 @@ class _AppShellState extends State<_AppShell> {
         ],
       ),
     );
-  }
-
-  void _showBatchSnackBar(BatchOperationType type) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Batch request submitted: ${type.name}')));
   }
 }

@@ -10,6 +10,14 @@ import 'package:personal_inventory_frontend/screens/add_resource_screen.dart';
 
 import '../support/fake_repositories.dart';
 
+Future<void> _scrollToSubmit(WidgetTester tester) async {
+  await tester.scrollUntilVisible(
+    find.byKey(const Key('resource-submit')),
+    300,
+    scrollable: find.byType(Scrollable).first,
+  );
+}
+
 void main() {
   testWidgets('AddResourceScreen submits ebook payload from form', (tester) async {
     final ebookRepo = FakeEbookRepository(
@@ -35,6 +43,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('ebook-author')), 'Author One');
     await tester.enterText(find.byKey(const Key('location-device-id')), 'macbook');
     await tester.enterText(find.byKey(const Key('location-path')), '/books/book.epub');
+    await _scrollToSubmit(tester);
     await tester.tap(find.byKey(const Key('resource-submit')));
     await tester.pump();
 
@@ -64,6 +73,7 @@ void main() {
       ),
     );
 
+    await _scrollToSubmit(tester);
     await tester.tap(find.byKey(const Key('resource-submit')));
     await tester.pump();
 
@@ -93,6 +103,7 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('resource-title')), 'Updated');
     await tester.enterText(find.byKey(const Key('ebook-author')), 'Author Updated');
+    await _scrollToSubmit(tester);
     await tester.tap(find.byKey(const Key('resource-submit')));
     await tester.pump();
 
@@ -124,6 +135,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('resource-title')), 'Reader');
     await tester.enterText(find.byKey(const Key('web-reader-url')), 'https://example.com/read');
     await tester.enterText(find.byKey(const Key('web-reader-site-name')), 'Example Site');
+    await _scrollToSubmit(tester);
     await tester.tap(find.byKey(const Key('resource-submit')));
     await tester.pump();
 
@@ -176,5 +188,43 @@ void main() {
     expect(find.text('Stored Ebook'), findsOneWidget);
     expect(find.text('Stored Author'), findsOneWidget);
     expect(find.text('/stored/path.epub'), findsOneWidget);
+  });
+
+  testWidgets('AddResourceScreen shows Pick file button for ebooks', (tester) async {
+    final ebookRepo = FakeEbookRepository();
+    final webReaderRepo = FakeWebReaderRepository();
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => EbookBloc(ebookRepo)),
+          BlocProvider(create: (_) => WebReaderBloc(webReaderRepo)),
+        ],
+        child: const MaterialApp(home: AddResourceScreen()),
+      ),
+    );
+
+    expect(find.byKey(const Key('pick-ebook-file')), findsOneWidget);
+    expect(find.text('Pick file'), findsOneWidget);
+  });
+
+  testWidgets('AddResourceScreen hides Pick file button for web readers', (tester) async {
+    final ebookRepo = FakeEbookRepository();
+    final webReaderRepo = FakeWebReaderRepository();
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => EbookBloc(ebookRepo)),
+          BlocProvider(create: (_) => WebReaderBloc(webReaderRepo)),
+        ],
+        child: const MaterialApp(
+          home: AddResourceScreen(initialResourceType: ResourceType.webReader),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('pick-ebook-file')), findsNothing);
+    expect(find.text('Pick file'), findsNothing);
   });
 }

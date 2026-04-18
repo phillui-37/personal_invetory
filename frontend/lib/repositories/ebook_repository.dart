@@ -1,4 +1,5 @@
 import '../models/failures.dart';
+import '../models/batch_operations.dart';
 import '../models/repository_inputs.dart';
 import '../models/resources.dart';
 import '../models/result.dart';
@@ -22,4 +23,8 @@ abstract interface class EbookRepository {
   );
 
   Future<Result<void, AppFailure>> removeLocation(String resourceId, String locationId);
+
+  Future<Result<BatchImportResult, AppFailure>> batchImport(
+    List<BatchImportEntry> entries,
+  );
 }

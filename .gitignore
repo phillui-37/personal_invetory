@@ -3,3 +3,6 @@ backend/target/
 .idea/
 *.iml
 .DS_Store
+.env
+.env.local
+.env.*.local

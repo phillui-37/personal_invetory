@@ -1,3 +1,4 @@
+mod chapter_check;
 mod ebook;
 mod search;
 mod web_reader;
@@ -5,12 +6,13 @@ mod web_reader;
 use domain::DomainError;
 use use_cases::ValidationError;
 
+pub use chapter_check::{ChapterCheckOps, ChapterCheckService};
 pub use domain::SearchStrategyKind;
 pub use ebook::{EbookDetail, EbookService};
 pub use search::SearchConfig;
 pub use use_cases::ebook::{NewEbookInput, UpdateEbookInput};
 pub use use_cases::location::NewLocationInput;
-pub use use_cases::web_reader::NewWebReaderInput;
+pub use use_cases::web_reader::{NewWebReaderInput, UpdateWebReaderInput};
 pub use web_reader::{WebReaderDetail, WebReaderService};
 
 pub(crate) fn map_validation_error(error: ValidationError) -> DomainError {

@@ -93,6 +93,24 @@ final class TrackWebReaderProgress extends WebReaderEvent {
   List<Object?> get props => [signal];
 }
 
+final class TriggerChapterCheck extends WebReaderEvent {
+  const TriggerChapterCheck(this.resourceId);
+
+  final String resourceId;
+
+  @override
+  List<Object?> get props => [resourceId];
+}
+
+final class LoadCheckHistory extends WebReaderEvent {
+  const LoadCheckHistory(this.resourceId);
+
+  final String resourceId;
+
+  @override
+  List<Object?> get props => [resourceId];
+}
+
 sealed class WebReaderState extends Equatable {
   const WebReaderState();
 
@@ -153,6 +171,24 @@ final class WebReaderError extends WebReaderState {
   List<Object?> get props => [failure];
 }
 
+final class CheckHistoryLoaded extends WebReaderState {
+  const CheckHistoryLoaded(this.history);
+
+  final List<ChapterCheck> history;
+
+  @override
+  List<Object?> get props => [history];
+}
+
+final class ChapterCheckTriggered extends WebReaderState {
+  const ChapterCheckTriggered(this.result);
+
+  final ChapterCheck result;
+
+  @override
+  List<Object?> get props => [result];
+}
+
 final class WebReaderBloc extends Bloc<WebReaderEvent, WebReaderState> {
   WebReaderBloc(this._repository) : super(const WebReaderInitial()) {
     on<LoadWebReaders>(_onLoadWebReaders);
@@ -164,6 +200,8 @@ final class WebReaderBloc extends Bloc<WebReaderEvent, WebReaderState> {
     on<AddWebReaderLocation>(_onAddWebReaderLocation);
     on<RemoveWebReaderLocation>(_onRemoveWebReaderLocation);
     on<TrackWebReaderProgress>(_onTrackWebReaderProgress);
+    on<TriggerChapterCheck>(_onTriggerChapterCheck);
+    on<LoadCheckHistory>(_onLoadCheckHistory);
   }
 
   final WebReaderRepository _repository;
@@ -290,6 +328,30 @@ final class WebReaderBloc extends Bloc<WebReaderEvent, WebReaderState> {
   ) {
     result.when(
       success: (_) => emit(WebReaderOperationSuccess(operationType)),
+      failure: (failure) => emit(WebReaderError(failure)),
+    );
+  }
+
+  Future<void> _onTriggerChapterCheck(
+    TriggerChapterCheck event,
+    Emitter<WebReaderState> emit,
+  ) async {
+    emit(const WebReaderLoading());
+    final result = await _repository.triggerCheck(event.resourceId);
+    result.when(
+      success: (check) => emit(ChapterCheckTriggered(check)),
+      failure: (failure) => emit(WebReaderError(failure)),
+    );
+  }
+
+  Future<void> _onLoadCheckHistory(
+    LoadCheckHistory event,
+    Emitter<WebReaderState> emit,
+  ) async {
+    emit(const WebReaderLoading());
+    final result = await _repository.listCheckHistory(event.resourceId);
+    result.when(
+      success: (history) => emit(CheckHistoryLoaded(history)),
       failure: (failure) => emit(WebReaderError(failure)),
     );
   }

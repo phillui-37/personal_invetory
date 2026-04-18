@@ -115,3 +115,61 @@ final class WebReaderDetail extends Equatable {
   @override
   List<Object?> get props => [resource, meta, locations];
 }
+
+final class ChapterCheck extends Equatable {
+  const ChapterCheck({
+    required this.id,
+    required this.resourceId,
+    required this.hasNewChapter,
+    this.latestChapter,
+    required this.checkedAt,
+    this.errorMessage,
+  });
+
+  final String id;
+  final String resourceId;
+  final bool hasNewChapter;
+  final String? latestChapter;
+  final DateTime checkedAt;
+  final String? errorMessage;
+
+  factory ChapterCheck.fromJson(Map<String, dynamic> json) => ChapterCheck(
+    id: json['id'] as String,
+    resourceId: json['resource_id'] as String,
+    hasNewChapter: json['has_new_chapter'] as bool,
+    latestChapter: json['latest_chapter'] as String?,
+    checkedAt: DateTime.parse(json['checked_at'] as String),
+    errorMessage: json['error_message'] as String?,
+  );
+
+  @override
+  List<Object?> get props =>
+      [id, resourceId, hasNewChapter, latestChapter, checkedAt, errorMessage];
+}
+
+final class AppNotification extends Equatable {
+  const AppNotification({
+    required this.id,
+    required this.resourceId,
+    required this.message,
+    required this.createdAt,
+    required this.read,
+  });
+
+  final String id;
+  final String resourceId;
+  final String message;
+  final DateTime createdAt;
+  final bool read;
+
+  factory AppNotification.fromJson(Map<String, dynamic> json) => AppNotification(
+    id: json['id'] as String,
+    resourceId: json['resource_id'] as String,
+    message: json['message'] as String,
+    createdAt: DateTime.parse(json['created_at'] as String),
+    read: json['read'] as bool,
+  );
+
+  @override
+  List<Object?> get props => [id, resourceId, message, createdAt, read];
+}

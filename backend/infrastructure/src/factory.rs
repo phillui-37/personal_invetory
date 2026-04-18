@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
-use crate::{postgres, sqlite};
+use crate::sqlite;
 use domain::{
-    DomainError, EbookMetaRepository, LocationRepository, ResourceRepository, WebReaderMetaRepository,
+    ChapterCheckRepository, DomainError, EbookMetaRepository, LocationRepository,
+    NotificationRepository, ResourceRepository, WebReaderMetaRepository,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,6 +19,8 @@ pub struct AdapterBundle {
     pub ebook_meta_repo: Arc<dyn EbookMetaRepository>,
     pub web_reader_meta_repo: Arc<dyn WebReaderMetaRepository>,
     pub location_repo: Arc<dyn LocationRepository>,
+    pub chapter_check_repo: Arc<dyn ChapterCheckRepository>,
+    pub notification_repo: Arc<dyn NotificationRepository>,
 }
 
 pub struct AdapterFactory;
@@ -33,19 +36,17 @@ impl AdapterFactory {
                 resource_repo: Arc::new(sqlite::resource::SqliteResourceRepository::new(shared.clone())),
                 ebook_meta_repo: Arc::new(sqlite::ebook_meta::SqliteEbookMetaRepository::new(shared.clone())),
                 web_reader_meta_repo: Arc::new(sqlite::web_reader_meta::SqliteWebReaderMetaRepository::new(shared.clone())),
-                location_repo: Arc::new(sqlite::location::SqliteLocationRepository::new(shared)),
+                location_repo: Arc::new(sqlite::location::SqliteLocationRepository::new(shared.clone())),
+                chapter_check_repo: Arc::new(sqlite::chapter_check::SqliteChapterCheckRepository::new(shared.clone())),
+                notification_repo: Arc::new(sqlite::notification::SqliteNotificationRepository::new(shared)),
             });
         }
 
         if database_url.starts_with("postgres://") {
-            return Ok(AdapterBundle {
-                database: DatabaseAdapter::Postgres,
-                database_url: database_url.to_string(),
-                resource_repo: Arc::new(postgres::resource::PostgresResourceRepository),
-                ebook_meta_repo: Arc::new(postgres::ebook_meta::PostgresEbookMetaRepository),
-                web_reader_meta_repo: Arc::new(postgres::web_reader_meta::PostgresWebReaderMetaRepository),
-                location_repo: Arc::new(postgres::location::PostgresLocationRepository),
-            });
+            return Err(DomainError::ValidationError(
+                "Postgres adapter is not implemented yet; use a sqlite:// database URL for now"
+                    .to_string(),
+            ));
         }
 
         Err(DomainError::ValidationError(format!(

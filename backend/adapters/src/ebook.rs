@@ -6,9 +6,10 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use domain::{DomainError, Resource, ResourceLocation};
+use domain::{DomainError, EbookMeta, Resource, ResourceLocation};
 use serde::{Deserialize, Serialize};
 use services::{EbookDetail, NewEbookInput, NewLocationInput, UpdateEbookInput};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{ApiError, AppState};
@@ -18,14 +19,14 @@ pub struct SearchQuery {
     pub q: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct EbookDetailResponse {
     pub resource: Resource,
-    pub meta: domain::EbookMeta,
+    pub meta: EbookMeta,
     pub locations: Vec<ResourceLocation>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AddEbookRequest {
     pub title: String,
     pub notes: Option<String>,
@@ -36,7 +37,7 @@ pub struct AddEbookRequest {
     pub file_format: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateEbookRequest {
     pub title: Option<String>,
     pub notes: Option<String>,
@@ -47,13 +48,22 @@ pub struct UpdateEbookRequest {
     pub file_format: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AddLocationRequest {
     pub device_id: String,
     pub path_or_url: String,
     pub storage_type: String,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/inventory/ebooks/list",
+    responses(
+        (status = 200, description = "List of ebooks", body = Vec<Resource>),
+    ),
+    tag = "ebooks",
+    security(("bearer_auth" = []))
+)]
 pub async fn list_ebooks(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Resource>>, ApiError> {
@@ -61,6 +71,17 @@ pub async fn list_ebooks(
     Ok(Json(result))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/inventory/ebooks/search",
+    params(("q" = String, Query, description = "Search query")),
+    responses(
+        (status = 200, description = "Search results", body = Vec<Resource>),
+        (status = 400, description = "Empty query"),
+    ),
+    tag = "ebooks",
+    security(("bearer_auth" = []))
+)]
 pub async fn search_ebooks(
     State(state): State<Arc<AppState>>,
     Query(query): Query<SearchQuery>,
@@ -76,6 +97,17 @@ pub async fn search_ebooks(
     Ok(Json(result))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/inventory/ebooks/add",
+    request_body = AddEbookRequest,
+    responses(
+        (status = 200, description = "Created ebook detail", body = EbookDetailResponse),
+        (status = 409, description = "Title conflict"),
+    ),
+    tag = "ebooks",
+    security(("bearer_auth" = []))
+)]
 pub async fn add_ebook(
     State(state): State<Arc<AppState>>,
     Json(request): Json<AddEbookRequest>,
@@ -96,6 +128,17 @@ pub async fn add_ebook(
     Ok(Json(map_ebook_detail(detail)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/inventory/ebooks/{id}/detail",
+    params(("id" = Uuid, Path, description = "Ebook resource ID")),
+    responses(
+        (status = 200, description = "Ebook detail", body = EbookDetailResponse),
+        (status = 404, description = "Not found"),
+    ),
+    tag = "ebooks",
+    security(("bearer_auth" = []))
+)]
 pub async fn ebook_detail(
     State(state): State<Arc<AppState>>,
     Path(resource_id): Path<Uuid>,
@@ -104,6 +147,18 @@ pub async fn ebook_detail(
     Ok(Json(map_ebook_detail(detail)))
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/v1/inventory/ebooks/{id}/update",
+    params(("id" = Uuid, Path, description = "Ebook resource ID")),
+    request_body = UpdateEbookRequest,
+    responses(
+        (status = 200, description = "Updated ebook detail", body = EbookDetailResponse),
+        (status = 404, description = "Not found"),
+    ),
+    tag = "ebooks",
+    security(("bearer_auth" = []))
+)]
 pub async fn update_ebook(
     State(state): State<Arc<AppState>>,
     Path(resource_id): Path<Uuid>,
@@ -128,6 +183,17 @@ pub async fn update_ebook(
     Ok(Json(map_ebook_detail(detail)))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/inventory/ebooks/{id}/delete",
+    params(("id" = Uuid, Path, description = "Ebook resource ID")),
+    responses(
+        (status = 200, description = "Deleted"),
+        (status = 404, description = "Not found"),
+    ),
+    tag = "ebooks",
+    security(("bearer_auth" = []))
+)]
 pub async fn delete_ebook(
     State(state): State<Arc<AppState>>,
     Path(resource_id): Path<Uuid>,
@@ -136,6 +202,18 @@ pub async fn delete_ebook(
     Ok(StatusCode::OK)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/inventory/ebooks/{id}/locations/add",
+    params(("id" = Uuid, Path, description = "Ebook resource ID")),
+    request_body = AddLocationRequest,
+    responses(
+        (status = 200, description = "Added location", body = ResourceLocation),
+        (status = 404, description = "Not found"),
+    ),
+    tag = "ebooks",
+    security(("bearer_auth" = []))
+)]
 pub async fn add_ebook_location(
     State(state): State<Arc<AppState>>,
     Path(resource_id): Path<Uuid>,
@@ -156,6 +234,20 @@ pub async fn add_ebook_location(
     Ok(Json(location))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/inventory/ebooks/{id}/locations/{loc_id}/remove",
+    params(
+        ("id" = Uuid, Path, description = "Ebook resource ID"),
+        ("loc_id" = Uuid, Path, description = "Location ID"),
+    ),
+    responses(
+        (status = 200, description = "Removed"),
+        (status = 404, description = "Not found"),
+    ),
+    tag = "ebooks",
+    security(("bearer_auth" = []))
+)]
 pub async fn remove_ebook_location(
     State(state): State<Arc<AppState>>,
     Path((resource_id, location_id)): Path<(Uuid, Uuid)>,

@@ -3,16 +3,26 @@ name = "app"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["stub-plugins"]
+stub-plugins = ["plugins/stub-plugins"]
+real-plugins = ["plugins/real-plugins"]
+
 [dependencies]
 axum = "0.7"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["clock"] }
+dotenvy = "0.15"
 domain = { path = "../domain" }
 use_cases = { path = "../use_cases" }
-plugins = { path = "../plugins" }
+plugins = { path = "../plugins", default-features = false }
 services = { path = "../services" }
 adapters = { path = "../adapters" }
 infrastructure = { path = "../infrastructure" }
 uuid = { version = "=1.8.0", default-features = false, features = ["v4"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
+tokio-util = "0.7"
+toml = "0.6"
 
 [dev-dependencies]
 tower = "0.5"

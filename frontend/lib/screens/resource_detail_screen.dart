@@ -25,6 +25,9 @@ class ResourceDetailScreen extends StatefulWidget {
 }
 
 class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
+  WebReaderDetail? _lastWebReaderDetail;
+  List<ChapterCheck> _checkHistory = const [];
+
   @override
   void initState() {
     super.initState();
@@ -37,6 +40,7 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
       return;
     }
     context.read<WebReaderBloc>().add(LoadWebReaderDetail(widget.resourceId));
+    context.read<WebReaderBloc>().add(LoadCheckHistory(widget.resourceId));
   }
 
   void _confirmDelete() {
@@ -141,6 +145,12 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
         ),
         BlocListener<WebReaderBloc, WebReaderState>(
           listener: (context, state) {
+            if (state is WebReaderDetailLoaded) {
+              setState(() => _lastWebReaderDetail = state.webReader);
+            }
+            if (state is CheckHistoryLoaded) {
+              setState(() => _checkHistory = state.history);
+            }
             if (state is WebReaderOperationSuccess) {
               if (state.operationType == WebReaderOperationType.deleted) {
                 Navigator.of(context).pop();
@@ -151,6 +161,20 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
                   state.operationType == WebReaderOperationType.progressTracked) {
                 _loadDetail();
               }
+            }
+            if (state is ChapterCheckTriggered) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    state.result.hasNewChapter
+                        ? 'New chapter: ${state.result.latestChapter ?? "available"}'
+                        : 'No new chapter found.',
+                  ),
+                ),
+              );
+              context.read<WebReaderBloc>().add(
+                LoadCheckHistory(widget.resourceId),
+              );
             }
             if (state is WebReaderError) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -201,17 +225,27 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
               )
             : BlocBuilder<WebReaderBloc, WebReaderState>(
                 builder: (context, state) {
-                  if (state is WebReaderLoading) {
+                  final detail = switch (state) {
+                    WebReaderDetailLoaded(:final webReader) => webReader,
+                    _ => _lastWebReaderDetail,
+                  };
+                  if (detail == null && state is WebReaderLoading) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  if (state is WebReaderDetailLoaded) {
+                  if (detail != null) {
                     return _WebReaderDetailBody(
-                      detail: state.webReader,
+                      detail: detail,
+                      history: _checkHistory,
                       onAddLocation: _addLocation,
                       onRemoveLocation: _removeLocation,
                       onProgressSignal: (signal) {
                         context.read<WebReaderBloc>().add(
                           TrackWebReaderProgress(signal),
+                        );
+                      },
+                      onCheckNow: () {
+                        context.read<WebReaderBloc>().add(
+                          TriggerChapterCheck(widget.resourceId),
                         );
                       },
                     );
@@ -277,15 +311,19 @@ class _EbookDetailBody extends StatelessWidget {
 class _WebReaderDetailBody extends StatelessWidget {
   const _WebReaderDetailBody({
     required this.detail,
+    required this.history,
     required this.onAddLocation,
     required this.onRemoveLocation,
     required this.onProgressSignal,
+    required this.onCheckNow,
   });
 
   final WebReaderDetail detail;
+  final List<ChapterCheck> history;
   final VoidCallback onAddLocation;
   final ValueChanged<String> onRemoveLocation;
   final ValueChanged<WebReaderProgressSignal> onProgressSignal;
+  final VoidCallback onCheckNow;
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +359,62 @@ class _WebReaderDetailBody extends StatelessWidget {
           resourceId: detail.resource.id,
           onSignal: onProgressSignal,
         ),
+        const SizedBox(height: 12),
+        _ChapterChecksSection(
+          history: history,
+          onCheckNow: onCheckNow,
+        ),
       ],
+    );
+  }
+}
+
+class _ChapterChecksSection extends StatelessWidget {
+  const _ChapterChecksSection({
+    required this.history,
+    required this.onCheckNow,
+  });
+
+  final List<ChapterCheck> history;
+  final VoidCallback onCheckNow;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      title: const Text('Chapter Checks'),
+      trailing: TextButton.icon(
+        key: const Key('check-now-button'),
+        onPressed: onCheckNow,
+        icon: const Icon(Icons.refresh),
+        label: const Text('Check Now'),
+      ),
+      children: history.isEmpty
+          ? [const ListTile(title: Text('No check history.'))]
+          : history.map(_buildCheckTile).toList(),
+    );
+  }
+
+  Widget _buildCheckTile(ChapterCheck check) {
+    return ListTile(
+      key: Key('check-${check.id}'),
+      leading: Icon(
+        check.hasNewChapter ? Icons.new_releases : Icons.check_circle_outline,
+        color: check.hasNewChapter ? Colors.green : Colors.grey,
+      ),
+      title: Text(
+        check.latestChapter != null
+            ? 'Latest: ${check.latestChapter}'
+            : check.hasNewChapter
+            ? 'New chapter available'
+            : 'No new chapter',
+      ),
+      subtitle: Text(check.checkedAt.toLocal().toString()),
+      trailing: check.errorMessage != null
+          ? Tooltip(
+              message: check.errorMessage!,
+              child: const Icon(Icons.error_outline, color: Colors.red),
+            )
+          : null,
     );
   }
 }

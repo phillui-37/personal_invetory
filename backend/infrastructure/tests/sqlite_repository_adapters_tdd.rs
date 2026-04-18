@@ -141,6 +141,9 @@ fn sqlite_meta_and_location_repositories_map_domain_errors() {
                     url: "https://example.com/read".to_string(),
                     site_name: Some("Example".to_string()),
                     last_checked_chapter: Some("ch-1".to_string()),
+                    check_interval_secs: None,
+                    last_checked_at: None,
+                    progress_css_selector: None,
                 },
             )
             .await
@@ -201,5 +204,118 @@ fn sqlite_meta_and_location_repositories_map_domain_errors() {
             )
             .await;
         assert!(matches!(fk_miss, Err(DomainError::NotFound(_))));
+    });
+}
+
+#[test]
+fn sqlite_chapter_check_repository_create_and_list() {
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Web Comic".to_string(),
+                notes: None,
+                resource_type: ResourceType::WebReader,
+            })
+            .await
+            .expect("create resource");
+
+        let check = bundle
+            .chapter_check_repo
+            .create(resource.id, true, Some("ch-42".to_string()), None)
+            .await
+            .expect("create chapter check");
+        assert_eq!(check.resource_id, resource.id);
+        assert!(check.has_new_chapter);
+        assert_eq!(check.latest_chapter.as_deref(), Some("ch-42"));
+        assert!(check.error_message.is_none());
+
+        let err_check = bundle
+            .chapter_check_repo
+            .create(resource.id, false, None, Some("timeout".to_string()))
+            .await
+            .expect("create error check");
+        assert!(!err_check.has_new_chapter);
+        assert_eq!(err_check.error_message.as_deref(), Some("timeout"));
+
+        let listed = bundle
+            .chapter_check_repo
+            .list(resource.id)
+            .await
+            .expect("list checks");
+        assert_eq!(listed.len(), 2);
+        // ordered by checked_at DESC, so err_check was inserted last
+        assert_eq!(listed[0].id, err_check.id);
+        assert_eq!(listed[1].id, check.id);
+    });
+}
+
+#[test]
+fn sqlite_notification_repository_create_list_and_mark_read() {
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Manga Site".to_string(),
+                notes: None,
+                resource_type: ResourceType::WebReader,
+            })
+            .await
+            .expect("create resource");
+
+        let n1 = bundle
+            .notification_repo
+            .create(resource.id, "New chapter 10!".to_string())
+            .await
+            .expect("create notification 1");
+        assert!(!n1.read);
+
+        let n2 = bundle
+            .notification_repo
+            .create(resource.id, "New chapter 11!".to_string())
+            .await
+            .expect("create notification 2");
+
+        // list all
+        let all = bundle
+            .notification_repo
+            .list(false)
+            .await
+            .expect("list all notifications");
+        assert_eq!(all.len(), 2);
+
+        // list unread only
+        let unread = bundle
+            .notification_repo
+            .list(true)
+            .await
+            .expect("list unread");
+        assert_eq!(unread.len(), 2);
+
+        // mark one read
+        bundle
+            .notification_repo
+            .mark_read(n1.id)
+            .await
+            .expect("mark n1 read");
+
+        let unread_after = bundle
+            .notification_repo
+            .list(true)
+            .await
+            .expect("list unread after mark");
+        assert_eq!(unread_after.len(), 1);
+        assert_eq!(unread_after[0].id, n2.id);
+
+        // mark_read on missing id returns NotFound
+        let missing = bundle
+            .notification_repo
+            .mark_read(uuid::Uuid::new_v4())
+            .await;
+        assert!(matches!(missing, Err(DomainError::NotFound(_))));
     });
 }

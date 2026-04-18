@@ -27,4 +27,10 @@ abstract interface class WebReaderRepository {
   Future<Result<void, AppFailure>> removeLocation(String resourceId, String locationId);
 
   Future<Result<void, AppFailure>> trackProgress(WebReaderProgressSignal signal);
+
+  Future<Result<ChapterCheck, AppFailure>> triggerCheck(String resourceId);
+
+  Future<Result<List<ChapterCheck>, AppFailure>> listCheckHistory(
+    String resourceId,
+  );
 }

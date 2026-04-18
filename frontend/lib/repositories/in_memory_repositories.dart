@@ -113,10 +113,59 @@ class InMemoryEbookRepository implements EbookRepository {
     );
     return Success<Resource, AppFailure>(updated);
   }
+
+  @override
+  Future<Result<BatchImportResult, AppFailure>> batchImport(
+    List<BatchImportEntry> entries,
+  ) async {
+    final succeeded = <String>[];
+    final failed = <BatchImportFailureItem>[];
+
+    for (var i = 0; i < entries.length; i++) {
+      final entry = entries[i];
+      if (entry.title.trim().isEmpty) {
+        failed.add(
+          BatchImportFailureItem(index: i, error: 'title must not be empty'),
+        );
+        continue;
+      }
+
+      final id = 'resource-${DateTime.now().microsecondsSinceEpoch}-$i';
+      final resource = Resource(
+        id: id,
+        title: entry.title,
+        resourceType: ResourceType.ebook,
+      );
+      _items[id] = EbookDetail(
+        resource: resource,
+        meta: EbookMeta(
+          resourceId: id,
+          author: entry.author,
+          fileFormat: entry.fileFormat,
+        ),
+        locations: entry.filePath == null
+            ? const []
+            : [
+                ResourceLocation(
+                  id: '$id-loc-1',
+                  resourceId: id,
+                  deviceId: 'imported',
+                  pathOrUrl: entry.filePath!,
+                  storageType: StorageType.localFs,
+                ),
+              ],
+      );
+      succeeded.add(id);
+    }
+
+    return Success(BatchImportResult(succeeded: succeeded, failed: failed));
+  }
 }
 
 class InMemoryWebReaderRepository implements WebReaderRepository {
   final Map<String, WebReaderDetail> _items = <String, WebReaderDetail>{};
+  final Map<String, List<ChapterCheck>> _checkHistory =
+      <String, List<ChapterCheck>>{};
 
   @override
   Future<Result<Resource, AppFailure>> addWebReader(NewWebReaderInput input) async {
@@ -218,6 +267,32 @@ class InMemoryWebReaderRepository implements WebReaderRepository {
       locations: detail.locations,
     );
     return const Success<void, AppFailure>(null);
+  }
+
+  @override
+  Future<Result<ChapterCheck, AppFailure>> triggerCheck(
+    String resourceId,
+  ) async {
+    if (!_items.containsKey(resourceId)) {
+      return Failure<ChapterCheck, AppFailure>(NotFoundFailure(resourceId));
+    }
+    final check = ChapterCheck(
+      id: '${resourceId}_check_${DateTime.now().millisecondsSinceEpoch}',
+      resourceId: resourceId,
+      hasNewChapter: false,
+      checkedAt: DateTime.now(),
+    );
+    _checkHistory.putIfAbsent(resourceId, () => []).add(check);
+    return Success<ChapterCheck, AppFailure>(check);
+  }
+
+  @override
+  Future<Result<List<ChapterCheck>, AppFailure>> listCheckHistory(
+    String resourceId,
+  ) async {
+    return Success<List<ChapterCheck>, AppFailure>(
+      List.unmodifiable(_checkHistory[resourceId] ?? []),
+    );
   }
 
   @override

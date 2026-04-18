@@ -244,6 +244,9 @@ impl WebReaderMetaRepository for MockWebReaderMetaRepository {
             url: input.url,
             site_name: input.site_name,
             last_checked_chapter: input.last_checked_chapter,
+            check_interval_secs: input.check_interval_secs,
+            last_checked_at: input.last_checked_at,
+            progress_css_selector: input.progress_css_selector,
         };
         self.metas
             .lock()
@@ -554,6 +557,8 @@ fn web_reader_happy_path_adds_resource_and_meta() {
         url: "https://example.com/chapter/1".to_string(),
         site_name: Some("Example".to_string()),
         last_checked_chapter: Some("10".to_string()),
+        check_interval_secs: None,
+        progress_css_selector: None,
     };
 
     block_on(async {
@@ -576,6 +581,8 @@ fn web_reader_validation_error_maps_and_skips_repo_calls() {
         url: "not-a-url".to_string(),
         site_name: None,
         last_checked_chapter: None,
+        check_interval_secs: None,
+        progress_css_selector: None,
     };
 
     block_on(async {
@@ -603,6 +610,8 @@ fn web_reader_propagates_conflict_error_from_repo() {
         url: "https://example.com/a".to_string(),
         site_name: None,
         last_checked_chapter: None,
+        check_interval_secs: None,
+        progress_css_selector: None,
     };
 
     block_on(async {
@@ -647,6 +656,9 @@ fn web_reader_propagates_internal_error_from_repo() {
                 url: "https://example.com".to_string(),
                 site_name: None,
                 last_checked_chapter: None,
+                check_interval_secs: None,
+                last_checked_at: None,
+                progress_css_selector: None,
             },
         );
     let location_repo = Arc::new(MockLocationRepository::default());
@@ -684,4 +696,304 @@ fn web_reader_location_happy_path_adds_location() {
         assert_eq!(location.device_id, "dev-1");
         assert_eq!(location.storage_type, StorageType::Platform);
     });
+}
+
+// ── ChapterCheckService tests ──────────────────────────────────────────────
+
+use domain::{ChapterCheck, ChapterCheckRepository, Notification, NotificationRepository};
+use plugins::{CheckResult, PluginError, WebChecker};
+use services::ChapterCheckService;
+
+struct MockWebChecker {
+    result: Mutex<plugins::CheckResult>,
+    error: Mutex<Option<PluginError>>,
+    call_count: Mutex<usize>,
+}
+
+impl MockWebChecker {
+    fn new_returning(result: CheckResult) -> Self {
+        Self {
+            result: Mutex::new(result),
+            error: Mutex::new(None),
+            call_count: Mutex::new(0),
+        }
+    }
+
+    fn new_erroring(err: PluginError) -> Self {
+        Self {
+            result: Mutex::new(CheckResult::default()),
+            error: Mutex::new(Some(err)),
+            call_count: Mutex::new(0),
+        }
+    }
+
+    fn call_count(&self) -> usize {
+        *self.call_count.lock().expect("call count lock")
+    }
+}
+
+impl WebChecker for MockWebChecker {
+    fn check(&self, _url: &str, _known: Option<&str>) -> Result<CheckResult, PluginError> {
+        *self.call_count.lock().expect("call count lock") += 1;
+        if let Some(err) = self.error.lock().expect("error lock").take() {
+            return Err(err);
+        }
+        Ok(self.result.lock().expect("result lock").clone())
+    }
+}
+
+struct BlockingRuntimeWebChecker;
+
+impl WebChecker for BlockingRuntimeWebChecker {
+    fn check(&self, _url: &str, _known: Option<&str>) -> Result<CheckResult, PluginError> {
+        let runtime = tokio::runtime::Runtime::new()
+            .map_err(|err| PluginError::IoError(format!("tokio runtime: {err}")))?;
+        runtime.block_on(async {
+            Ok(CheckResult {
+                has_new: false,
+                latest_chapter: Some("ch-1".to_string()),
+            })
+        })
+    }
+}
+
+#[derive(Default)]
+struct MockChapterCheckRepository {
+    checks: Mutex<Vec<ChapterCheck>>,
+}
+
+#[async_trait]
+impl ChapterCheckRepository for MockChapterCheckRepository {
+    async fn create(
+        &self,
+        resource_id: Uuid,
+        has_new_chapter: bool,
+        latest_chapter: Option<String>,
+        error_message: Option<String>,
+    ) -> Result<ChapterCheck, DomainError> {
+        let check = ChapterCheck {
+            id: Uuid::new_v4(),
+            resource_id,
+            has_new_chapter,
+            latest_chapter,
+            checked_at: Utc::now(),
+            error_message,
+        };
+        self.checks.lock().expect("checks lock").push(check.clone());
+        Ok(check)
+    }
+
+    async fn list(&self, resource_id: Uuid) -> Result<Vec<ChapterCheck>, DomainError> {
+        Ok(self
+            .checks
+            .lock()
+            .expect("checks lock")
+            .iter()
+            .filter(|c| c.resource_id == resource_id)
+            .cloned()
+            .collect())
+    }
+}
+
+#[derive(Default)]
+struct MockNotificationRepository {
+    notifications: Mutex<Vec<Notification>>,
+}
+
+impl MockNotificationRepository {
+    fn count(&self) -> usize {
+        self.notifications.lock().expect("notif lock").len()
+    }
+}
+
+#[async_trait]
+impl NotificationRepository for MockNotificationRepository {
+    async fn create(
+        &self,
+        resource_id: Uuid,
+        message: String,
+    ) -> Result<Notification, DomainError> {
+        let n = Notification {
+            id: Uuid::new_v4(),
+            resource_id,
+            message,
+            created_at: Utc::now(),
+            read: false,
+        };
+        self.notifications.lock().expect("notif lock").push(n.clone());
+        Ok(n)
+    }
+
+    async fn list(&self, unread_only: bool) -> Result<Vec<Notification>, DomainError> {
+        Ok(self
+            .notifications
+            .lock()
+            .expect("notif lock")
+            .iter()
+            .filter(|n| !unread_only || !n.read)
+            .cloned()
+            .collect())
+    }
+
+    async fn mark_read(&self, id: Uuid) -> Result<(), DomainError> {
+        let mut guard = self.notifications.lock().expect("notif lock");
+        let n = guard
+            .iter_mut()
+            .find(|n| n.id == id)
+            .ok_or_else(|| DomainError::NotFound(format!("notification {id} not found")))?;
+        n.read = true;
+        Ok(())
+    }
+}
+
+fn seed_web_meta(repo: &MockWebReaderMetaRepository, resource_id: Uuid) {
+    repo.metas.lock().expect("meta lock").insert(
+        resource_id,
+        WebReaderMeta {
+            resource_id,
+            url: "https://example.com/comic".to_string(),
+            site_name: Some("Example".to_string()),
+            last_checked_chapter: Some("ch-1".to_string()),
+            check_interval_secs: None,
+            last_checked_at: None,
+            progress_css_selector: None,
+        },
+    );
+}
+
+fn build_chapter_check_service(
+    checker: Arc<MockWebChecker>,
+    web_meta_repo: Arc<MockWebReaderMetaRepository>,
+) -> (
+    ChapterCheckService<MockWebChecker, MockChapterCheckRepository, MockNotificationRepository, MockWebReaderMetaRepository>,
+    Arc<MockChapterCheckRepository>,
+    Arc<MockNotificationRepository>,
+) {
+    let check_repo = Arc::new(MockChapterCheckRepository::default());
+    let notif_repo = Arc::new(MockNotificationRepository::default());
+    let service = ChapterCheckService::new(
+        checker,
+        check_repo.clone(),
+        notif_repo.clone(),
+        web_meta_repo,
+        None,
+    );
+    (service, check_repo, notif_repo)
+}
+
+#[tokio::test]
+async fn chapter_check_service_new_chapter_creates_notification() {
+    let resource_id = Uuid::new_v4();
+    let web_meta_repo = Arc::new(MockWebReaderMetaRepository::default());
+    seed_web_meta(&web_meta_repo, resource_id);
+
+    let checker = Arc::new(MockWebChecker::new_returning(CheckResult {
+        has_new: true,
+        latest_chapter: Some("ch-2".to_string()),
+    }));
+    let (service, check_repo, notif_repo) =
+        build_chapter_check_service(checker.clone(), web_meta_repo.clone());
+
+    let check = service
+        .check_resource(resource_id)
+        .await
+        .expect("check resource");
+
+    assert!(check.has_new_chapter);
+    assert_eq!(check.latest_chapter.as_deref(), Some("ch-2"));
+    assert_eq!(checker.call_count(), 1);
+    assert_eq!(notif_repo.count(), 1);
+    assert_eq!(check_repo.list(resource_id).await.expect("list").len(), 1);
+
+    // web meta updated with new chapter
+    let meta = web_meta_repo.get(resource_id).await.expect("get meta");
+    assert_eq!(meta.last_checked_chapter.as_deref(), Some("ch-2"));
+    assert!(meta.last_checked_at.is_some());
+}
+
+#[tokio::test]
+async fn chapter_check_service_no_new_chapter_skips_notification() {
+    let resource_id = Uuid::new_v4();
+    let web_meta_repo = Arc::new(MockWebReaderMetaRepository::default());
+    seed_web_meta(&web_meta_repo, resource_id);
+
+    let checker = Arc::new(MockWebChecker::new_returning(CheckResult {
+        has_new: false,
+        latest_chapter: Some("ch-1".to_string()),
+    }));
+    let (service, _, notif_repo) =
+        build_chapter_check_service(checker, web_meta_repo.clone());
+
+    let check = service
+        .check_resource(resource_id)
+        .await
+        .expect("check resource");
+
+    assert!(!check.has_new_chapter);
+    assert_eq!(notif_repo.count(), 0);
+
+    let meta = web_meta_repo.get(resource_id).await.expect("get meta");
+    assert!(
+        meta.last_checked_at.is_some(),
+        "successful checks should record last_checked_at even when nothing changed"
+    );
+}
+
+#[tokio::test]
+async fn chapter_check_service_io_error_records_error_check() {
+    let resource_id = Uuid::new_v4();
+    let web_meta_repo = Arc::new(MockWebReaderMetaRepository::default());
+    seed_web_meta(&web_meta_repo, resource_id);
+
+    let checker = Arc::new(MockWebChecker::new_erroring(PluginError::IoError(
+        "connection timeout".to_string(),
+    )));
+    let (service, check_repo, notif_repo) =
+        build_chapter_check_service(checker, web_meta_repo);
+
+    let check = service
+        .check_resource(resource_id)
+        .await
+        .expect("error check should still succeed with error recorded");
+
+    assert!(!check.has_new_chapter);
+    assert_eq!(check.error_message.as_deref(), Some("connection timeout"));
+    assert_eq!(notif_repo.count(), 0);
+    assert_eq!(check_repo.list(resource_id).await.expect("list").len(), 1);
+}
+
+#[tokio::test]
+async fn chapter_check_service_unknown_resource_returns_not_found() {
+    let web_meta_repo = Arc::new(MockWebReaderMetaRepository::default());
+    let checker = Arc::new(MockWebChecker::new_returning(CheckResult::default()));
+    let (service, _, _) = build_chapter_check_service(checker, web_meta_repo);
+
+    let err = service
+        .check_resource(Uuid::new_v4())
+        .await
+        .expect_err("unknown resource should return error");
+    assert!(matches!(err, DomainError::NotFound(_)));
+}
+
+#[tokio::test]
+async fn chapter_check_service_runs_checker_without_nested_runtime_panic() {
+    let resource_id = Uuid::new_v4();
+    let web_meta_repo = Arc::new(MockWebReaderMetaRepository::default());
+    seed_web_meta(&web_meta_repo, resource_id);
+
+    let service = ChapterCheckService::new(
+        Arc::new(BlockingRuntimeWebChecker),
+        Arc::new(MockChapterCheckRepository::default()),
+        Arc::new(MockNotificationRepository::default()),
+        web_meta_repo,
+        None,
+    );
+
+    let check = service
+        .check_resource(resource_id)
+        .await
+        .expect("checker should run without panicking inside async runtime");
+
+    assert!(!check.has_new_chapter);
+    assert_eq!(check.latest_chapter.as_deref(), Some("ch-1"));
 }

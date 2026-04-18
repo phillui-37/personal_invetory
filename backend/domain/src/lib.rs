@@ -1,15 +1,16 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub enum ResourceType {
     Ebook,
     WebReader,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub enum StorageType {
     LocalFs,
     Nas,
@@ -17,7 +18,7 @@ pub enum StorageType {
     Portable,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct Resource {
     pub id: Uuid,
     pub title: String,
@@ -27,7 +28,7 @@ pub struct Resource {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct EbookMeta {
     pub resource_id: Uuid,
     pub author: Option<String>,
@@ -37,15 +38,37 @@ pub struct EbookMeta {
     pub file_format: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct WebReaderMeta {
     pub resource_id: Uuid,
     pub url: String,
     pub site_name: Option<String>,
     pub last_checked_chapter: Option<String>,
+    pub check_interval_secs: Option<u64>,
+    pub last_checked_at: Option<DateTime<Utc>>,
+    pub progress_css_selector: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct ChapterCheck {
+    pub id: Uuid,
+    pub resource_id: Uuid,
+    pub has_new_chapter: bool,
+    pub latest_chapter: Option<String>,
+    pub checked_at: DateTime<Utc>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct Notification {
+    pub id: Uuid,
+    pub resource_id: Uuid,
+    pub message: String,
+    pub created_at: DateTime<Utc>,
+    pub read: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct ResourceLocation {
     pub id: Uuid,
     pub resource_id: Uuid,
@@ -81,6 +104,9 @@ pub struct NewWebReaderMeta {
     pub url: String,
     pub site_name: Option<String>,
     pub last_checked_chapter: Option<String>,
+    pub check_interval_secs: Option<u64>,
+    pub last_checked_at: Option<DateTime<Utc>>,
+    pub progress_css_selector: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -158,6 +184,44 @@ pub trait LocationRepository: Send + Sync {
         input: NewResourceLocation,
     ) -> Result<ResourceLocation, DomainError>;
     async fn remove(&self, resource_id: Uuid, location_id: Uuid) -> Result<(), DomainError>;
+}
+
+#[async_trait]
+pub trait ChapterCheckRepository: Send + Sync {
+    async fn create(
+        &self,
+        resource_id: Uuid,
+        has_new_chapter: bool,
+        latest_chapter: Option<String>,
+        error_message: Option<String>,
+    ) -> Result<ChapterCheck, DomainError>;
+    async fn list(&self, resource_id: Uuid) -> Result<Vec<ChapterCheck>, DomainError>;
+}
+
+#[async_trait]
+pub trait NotificationRepository: Send + Sync {
+    async fn create(
+        &self,
+        resource_id: Uuid,
+        message: String,
+    ) -> Result<Notification, DomainError>;
+    async fn list(&self, unread_only: bool) -> Result<Vec<Notification>, DomainError>;
+    async fn mark_read(&self, id: Uuid) -> Result<(), DomainError>;
+}
+
+#[async_trait]
+pub trait PushNotifier: Send + Sync {
+    async fn send(
+        &self,
+        resource_id: Uuid,
+        title: &str,
+        body: &str,
+    ) -> Result<(), DomainError>;
+}
+
+/// Synchronous broadcaster for real-time notification delivery (SSE, etc).
+pub trait NotificationBroadcaster: Send + Sync {
+    fn broadcast(&self, notification: &Notification);
 }
 
 #[async_trait]
@@ -386,6 +450,9 @@ mod repository_contract_tests {
                 url: input.url,
                 site_name: input.site_name,
                 last_checked_chapter: input.last_checked_chapter,
+                check_interval_secs: input.check_interval_secs,
+                last_checked_at: input.last_checked_at,
+                progress_css_selector: input.progress_css_selector,
             };
             guard.insert(resource_id, value.clone());
             Ok(value)
@@ -555,6 +622,9 @@ mod repository_contract_tests {
                         url: "https://example.com/reader".to_string(),
                         site_name: Some("Example".to_string()),
                         last_checked_chapter: Some("chapter 2".to_string()),
+                        check_interval_secs: None,
+                        last_checked_at: None,
+                        progress_css_selector: None,
                     },
                 )
                 .await
@@ -612,5 +682,209 @@ mod repository_contract_tests {
             let remove_again = repository.remove(resource_id, created.id).await;
             assert!(matches!(remove_again, Err(DomainError::NotFound(_))));
         });
+    }
+
+    // ---- Phase 2 in-memory implementations ----
+
+    struct InMemoryChapterCheckRepository {
+        items: Mutex<Vec<ChapterCheck>>,
+    }
+
+    #[async_trait]
+    impl ChapterCheckRepository for InMemoryChapterCheckRepository {
+        async fn create(
+            &self,
+            resource_id: Uuid,
+            has_new_chapter: bool,
+            latest_chapter: Option<String>,
+            error_message: Option<String>,
+        ) -> Result<ChapterCheck, DomainError> {
+            let check = ChapterCheck {
+                id: Uuid::new_v4(),
+                resource_id,
+                has_new_chapter,
+                latest_chapter,
+                checked_at: Utc::now(),
+                error_message,
+            };
+            self.items.lock().expect("chapter check lock").push(check.clone());
+            Ok(check)
+        }
+
+        async fn list(&self, resource_id: Uuid) -> Result<Vec<ChapterCheck>, DomainError> {
+            let guard = self.items.lock().expect("chapter check lock");
+            let mut results: Vec<ChapterCheck> = guard
+                .iter()
+                .filter(|c| c.resource_id == resource_id)
+                .cloned()
+                .collect();
+            results.sort_by(|a, b| b.checked_at.cmp(&a.checked_at));
+            Ok(results)
+        }
+    }
+
+    struct InMemoryNotificationRepository {
+        items: Mutex<Vec<Notification>>,
+    }
+
+    #[async_trait]
+    impl NotificationRepository for InMemoryNotificationRepository {
+        async fn create(
+            &self,
+            resource_id: Uuid,
+            message: String,
+        ) -> Result<Notification, DomainError> {
+            let notification = Notification {
+                id: Uuid::new_v4(),
+                resource_id,
+                message,
+                created_at: Utc::now(),
+                read: false,
+            };
+            self.items
+                .lock()
+                .expect("notification lock")
+                .push(notification.clone());
+            Ok(notification)
+        }
+
+        async fn list(&self, unread_only: bool) -> Result<Vec<Notification>, DomainError> {
+            let guard = self.items.lock().expect("notification lock");
+            Ok(guard
+                .iter()
+                .filter(|n| !unread_only || !n.read)
+                .cloned()
+                .collect())
+        }
+
+        async fn mark_read(&self, id: Uuid) -> Result<(), DomainError> {
+            let mut guard = self.items.lock().expect("notification lock");
+            let notification = guard
+                .iter_mut()
+                .find(|n| n.id == id)
+                .ok_or_else(|| DomainError::NotFound(format!("notification {id} not found")))?;
+            notification.read = true;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn chapter_check_repository_create_list_contract() {
+        let repo = InMemoryChapterCheckRepository {
+            items: Mutex::new(Vec::new()),
+        };
+        let resource_id = Uuid::new_v4();
+        let other_id = Uuid::new_v4();
+
+        block_on(async {
+            let empty = repo.list(resource_id).await.expect("list empty");
+            assert!(empty.is_empty());
+
+            let check = repo
+                .create(resource_id, true, Some("ch-5".to_string()), None)
+                .await
+                .expect("create check");
+            assert_eq!(check.resource_id, resource_id);
+            assert!(check.has_new_chapter);
+            assert_eq!(check.latest_chapter.as_deref(), Some("ch-5"));
+            assert!(check.error_message.is_none());
+
+            let _ = repo
+                .create(resource_id, false, Some("ch-5".to_string()), None)
+                .await
+                .expect("create second check");
+
+            let checks = repo.list(resource_id).await.expect("list checks");
+            assert_eq!(checks.len(), 2);
+
+            let other_checks = repo.list(other_id).await.expect("list other checks");
+            assert!(other_checks.is_empty());
+
+            let error_check = repo
+                .create(resource_id, false, None, Some("timeout".to_string()))
+                .await
+                .expect("create error check");
+            assert_eq!(error_check.error_message.as_deref(), Some("timeout"));
+        });
+    }
+
+    #[test]
+    fn chapter_check_serde_round_trip() {
+        let now = Utc::now();
+        let check = ChapterCheck {
+            id: Uuid::new_v4(),
+            resource_id: Uuid::new_v4(),
+            has_new_chapter: true,
+            latest_chapter: Some("Chapter 10".to_string()),
+            checked_at: now,
+            error_message: None,
+        };
+        let serialized = serde_json::to_string(&check).expect("serialize chapter check");
+        let deserialized: ChapterCheck =
+            serde_json::from_str(&serialized).expect("deserialize chapter check");
+        assert_eq!(check.id, deserialized.id);
+        assert_eq!(check.has_new_chapter, deserialized.has_new_chapter);
+        assert_eq!(check.latest_chapter, deserialized.latest_chapter);
+    }
+
+    #[test]
+    fn notification_repository_create_list_mark_read_contract() {
+        let repo = InMemoryNotificationRepository {
+            items: Mutex::new(Vec::new()),
+        };
+        let resource_id = Uuid::new_v4();
+
+        block_on(async {
+            let all_empty = repo.list(false).await.expect("list all empty");
+            assert!(all_empty.is_empty());
+
+            let n1 = repo
+                .create(resource_id, "New chapter: ch-1".to_string())
+                .await
+                .expect("create notification");
+            assert_eq!(n1.resource_id, resource_id);
+            assert!(!n1.read);
+
+            let n2 = repo
+                .create(resource_id, "New chapter: ch-2".to_string())
+                .await
+                .expect("create second notification");
+
+            let all = repo.list(false).await.expect("list all");
+            assert_eq!(all.len(), 2);
+
+            let unread = repo.list(true).await.expect("list unread");
+            assert_eq!(unread.len(), 2);
+
+            repo.mark_read(n1.id).await.expect("mark n1 read");
+
+            let after_mark = repo.list(true).await.expect("list unread after mark");
+            assert_eq!(after_mark.len(), 1);
+            assert_eq!(after_mark[0].id, n2.id);
+
+            let all_after = repo.list(false).await.expect("list all after mark");
+            assert_eq!(all_after.len(), 2);
+
+            let not_found = repo.mark_read(Uuid::new_v4()).await;
+            assert!(matches!(not_found, Err(DomainError::NotFound(_))));
+        });
+    }
+
+    #[test]
+    fn notification_serde_round_trip() {
+        let now = Utc::now();
+        let notification = Notification {
+            id: Uuid::new_v4(),
+            resource_id: Uuid::new_v4(),
+            message: "New chapter detected".to_string(),
+            created_at: now,
+            read: false,
+        };
+        let serialized = serde_json::to_string(&notification).expect("serialize notification");
+        let deserialized: Notification =
+            serde_json::from_str(&serialized).expect("deserialize notification");
+        assert_eq!(notification.id, deserialized.id);
+        assert_eq!(notification.message, deserialized.message);
+        assert!(!deserialized.read);
     }
 }

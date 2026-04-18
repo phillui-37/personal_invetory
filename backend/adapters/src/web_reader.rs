@@ -6,9 +6,10 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use domain::{DomainError, Resource, ResourceLocation};
+use domain::{DomainError, Resource, ResourceLocation, WebReaderMeta};
 use serde::{Deserialize, Serialize};
-use services::{NewLocationInput, NewWebReaderInput, WebReaderDetail};
+use services::{NewLocationInput, NewWebReaderInput, UpdateWebReaderInput, WebReaderDetail};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{ApiError, AppState};
@@ -18,29 +19,51 @@ pub struct SearchQuery {
     pub q: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct WebReaderDetailResponse {
     pub resource: Resource,
-    pub meta: domain::WebReaderMeta,
+    pub meta: WebReaderMeta,
     pub locations: Vec<ResourceLocation>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpsertWebReaderRequest {
     pub title: String,
     pub notes: Option<String>,
     pub url: String,
     pub site_name: Option<String>,
     pub last_checked_chapter: Option<String>,
+    pub check_interval_secs: Option<u64>,
+    pub progress_css_selector: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateWebReaderRequest {
+    pub title: Option<String>,
+    pub notes: Option<String>,
+    pub url: Option<String>,
+    pub site_name: Option<String>,
+    pub last_checked_chapter: Option<String>,
+    pub check_interval_secs: Option<u64>,
+    pub progress_css_selector: Option<String>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AddLocationRequest {
     pub device_id: String,
     pub path_or_url: String,
     pub storage_type: String,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/inventory/web-readers/list",
+    responses(
+        (status = 200, description = "List of web readers", body = Vec<Resource>),
+    ),
+    tag = "web_readers",
+    security(("bearer_auth" = []))
+)]
 pub async fn list_web_readers(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Resource>>, ApiError> {
@@ -48,6 +71,17 @@ pub async fn list_web_readers(
     Ok(Json(result))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/inventory/web-readers/search",
+    params(("q" = String, Query, description = "Search query")),
+    responses(
+        (status = 200, description = "Search results", body = Vec<Resource>),
+        (status = 400, description = "Empty query"),
+    ),
+    tag = "web_readers",
+    security(("bearer_auth" = []))
+)]
 pub async fn search_web_readers(
     State(state): State<Arc<AppState>>,
     Query(query): Query<SearchQuery>,
@@ -63,6 +97,17 @@ pub async fn search_web_readers(
     Ok(Json(result))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/inventory/web-readers/add",
+    request_body = UpsertWebReaderRequest,
+    responses(
+        (status = 200, description = "Created web reader", body = WebReaderDetailResponse),
+        (status = 409, description = "Title conflict"),
+    ),
+    tag = "web_readers",
+    security(("bearer_auth" = []))
+)]
 pub async fn add_web_reader(
     State(state): State<Arc<AppState>>,
     Json(request): Json<UpsertWebReaderRequest>,
@@ -75,12 +120,25 @@ pub async fn add_web_reader(
             url: request.url,
             site_name: request.site_name,
             last_checked_chapter: request.last_checked_chapter,
+            check_interval_secs: request.check_interval_secs,
+            progress_css_selector: request.progress_css_selector,
         })
         .await?;
 
     Ok(Json(map_web_reader_detail(detail)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/inventory/web-readers/{id}/detail",
+    params(("id" = Uuid, Path, description = "Web reader resource ID")),
+    responses(
+        (status = 200, description = "Web reader detail", body = WebReaderDetailResponse),
+        (status = 404, description = "Not found"),
+    ),
+    tag = "web_readers",
+    security(("bearer_auth" = []))
+)]
 pub async fn web_reader_detail(
     State(state): State<Arc<AppState>>,
     Path(resource_id): Path<Uuid>,
@@ -92,21 +150,35 @@ pub async fn web_reader_detail(
     Ok(Json(map_web_reader_detail(detail)))
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/v1/inventory/web-readers/{id}/update",
+    params(("id" = Uuid, Path, description = "Web reader resource ID")),
+    request_body = UpdateWebReaderRequest,
+    responses(
+        (status = 200, description = "Updated web reader", body = WebReaderDetailResponse),
+        (status = 404, description = "Not found"),
+    ),
+    tag = "web_readers",
+    security(("bearer_auth" = []))
+)]
 pub async fn update_web_reader(
     State(state): State<Arc<AppState>>,
     Path(resource_id): Path<Uuid>,
-    Json(request): Json<UpsertWebReaderRequest>,
+    Json(request): Json<UpdateWebReaderRequest>,
 ) -> Result<Json<WebReaderDetailResponse>, ApiError> {
     let detail = state
         .web_reader_service
         .update_web_reader(
             resource_id,
-            NewWebReaderInput {
+            UpdateWebReaderInput {
                 title: request.title,
                 notes: request.notes,
                 url: request.url,
                 site_name: request.site_name,
                 last_checked_chapter: request.last_checked_chapter,
+                check_interval_secs: request.check_interval_secs,
+                progress_css_selector: request.progress_css_selector,
             },
         )
         .await?;
@@ -114,6 +186,17 @@ pub async fn update_web_reader(
     Ok(Json(map_web_reader_detail(detail)))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/inventory/web-readers/{id}/delete",
+    params(("id" = Uuid, Path, description = "Web reader resource ID")),
+    responses(
+        (status = 200, description = "Deleted"),
+        (status = 404, description = "Not found"),
+    ),
+    tag = "web_readers",
+    security(("bearer_auth" = []))
+)]
 pub async fn delete_web_reader(
     State(state): State<Arc<AppState>>,
     Path(resource_id): Path<Uuid>,
@@ -125,6 +208,18 @@ pub async fn delete_web_reader(
     Ok(StatusCode::OK)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/inventory/web-readers/{id}/locations/add",
+    params(("id" = Uuid, Path, description = "Web reader resource ID")),
+    request_body = AddLocationRequest,
+    responses(
+        (status = 200, description = "Added location", body = ResourceLocation),
+        (status = 404, description = "Not found"),
+    ),
+    tag = "web_readers",
+    security(("bearer_auth" = []))
+)]
 pub async fn add_web_reader_location(
     State(state): State<Arc<AppState>>,
     Path(resource_id): Path<Uuid>,
@@ -145,6 +240,20 @@ pub async fn add_web_reader_location(
     Ok(Json(location))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/inventory/web-readers/{id}/locations/{loc_id}/remove",
+    params(
+        ("id" = Uuid, Path, description = "Web reader resource ID"),
+        ("loc_id" = Uuid, Path, description = "Location ID"),
+    ),
+    responses(
+        (status = 200, description = "Removed"),
+        (status = 404, description = "Not found"),
+    ),
+    tag = "web_readers",
+    security(("bearer_auth" = []))
+)]
 pub async fn remove_web_reader_location(
     State(state): State<Arc<AppState>>,
     Path((resource_id, location_id)): Path<(Uuid, Uuid)>,

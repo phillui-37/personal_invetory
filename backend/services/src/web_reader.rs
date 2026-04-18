@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use domain::{
     DomainError, LocationRepository, Resource, ResourceLocation, ResourceRepository,
-    UpdateResource, WebReaderMeta, WebReaderMetaRepository,
+    WebReaderMeta, WebReaderMetaRepository,
 };
 use uuid::Uuid;
 
-use crate::{map_validation_error, NewLocationInput, NewWebReaderInput};
+use crate::{map_validation_error, NewLocationInput, NewWebReaderInput, UpdateWebReaderInput};
 use crate::{search::build_search_strategy, SearchConfig};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -110,21 +110,17 @@ impl WebReaderService {
     pub async fn update_web_reader(
         &self,
         resource_id: Uuid,
-        input: NewWebReaderInput,
+        input: UpdateWebReaderInput,
     ) -> Result<WebReaderDetail, DomainError> {
-        self.resource_repo.get_by_id(resource_id).await?;
+        let existing = self.resource_repo.get_by_id(resource_id).await?;
+        let existing_meta = self.web_reader_meta_repo.get(resource_id).await?;
         let (resource_input, meta_input) =
-            use_cases::web_reader::validate_new_web_reader(&input).map_err(map_validation_error)?;
+            use_cases::web_reader::validate_update_web_reader(&existing, &existing_meta, &input)
+                .map_err(map_validation_error)?;
 
         let resource = self
             .resource_repo
-            .update(
-                resource_id,
-                UpdateResource {
-                    title: Some(resource_input.title),
-                    notes: resource_input.notes,
-                },
-            )
+            .update(resource_id, resource_input)
             .await?;
         let meta = self
             .web_reader_meta_repo

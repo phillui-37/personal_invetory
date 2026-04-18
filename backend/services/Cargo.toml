@@ -5,13 +5,16 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
+chrono = { version = "0.4", features = ["clock"] }
 domain = { path = "../domain" }
 use_cases = { path = "../use_cases" }
 plugins = { path = "../plugins" }
+tokio = { version = "1", features = ["rt-multi-thread"] }
 uuid = { version = "=1.8.0", default-features = false, features = ["v4"] }
 
 [dev-dependencies]
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["clock"] }
 futures = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 uuid = { version = "=1.8.0", default-features = false, features = ["v4"] }

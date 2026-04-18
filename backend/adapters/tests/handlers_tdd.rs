@@ -330,3 +330,102 @@ async fn system_handlers_return_expected_payloads_and_bypass_auth() {
         .expect("paths object")
         .is_empty());
 }
+
+#[tokio::test]
+async fn chapter_check_handler_returns_404_for_unknown_resource() {
+    let app = app_with_openapi("{}");
+    let unknown_id = uuid::Uuid::new_v4();
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/inventory/web-readers/{unknown_id}/check"
+                ))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn chapter_check_history_returns_empty_list() {
+    let app = app_with_openapi("{}");
+    let id = uuid::Uuid::new_v4();
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/inventory/web-readers/{id}/checks"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.expect("bytes");
+    let list: Value = serde_json::from_slice(&body).expect("json");
+    assert!(list.as_array().expect("array").is_empty());
+}
+
+#[tokio::test]
+async fn notifications_list_returns_empty() {
+    let app = app_with_openapi("{}");
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/notifications")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.expect("bytes");
+    let list: Value = serde_json::from_slice(&body).expect("json");
+    assert!(list.as_array().expect("array").is_empty());
+}
+
+#[tokio::test]
+async fn batch_import_partial_success_with_invalid_entry() {
+    let app = app_with_openapi("{}");
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/inventory/ebooks/batch-import")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!([
+                        {"title": "Book A"},
+                        {"title": ""},
+                        {"title": "Book C"}
+                    ])
+                    .to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.expect("bytes");
+    let result: Value = serde_json::from_slice(&body).expect("json");
+    let succeeded = result["succeeded"].as_array().expect("succeeded");
+    let failed = result["failed"].as_array().expect("failed");
+    assert_eq!(succeeded.len(), 2, "two valid entries should succeed");
+    assert_eq!(failed.len(), 1, "one invalid entry should fail");
+    assert_eq!(failed[0]["index"], 1);
+}

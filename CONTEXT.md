@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2025-04-17 (Phase 1 implementation complete, pending commit)
+2026-04-18 (Phase 2 review fixes complete)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers; images/videos/games deferred) across devices, platforms, and storage locations.
@@ -13,7 +13,7 @@ Personal inventory system for Phil to track resources (ebooks, web-readers; imag
 - **Frontend**: Flutter (BLoC), single Dart codebase, WebView for web reader progress
 - **Shared contract**: OpenAPI via `utoipa`; Dart client auto-generated via `openapi-generator`
 - **Plugin system**: trait-based Rust, compiled-in via Cargo feature flags (TOML config); no WASM/dylib
-- **Database**: PostgreSQL (primary) + SQLite (portable); shared schema via adapter factory; no PG-only types
+- **Database**: SQLite is the only working runtime adapter today; PostgreSQL remains planned but now fails fast explicitly instead of selecting stub repositories.
 - **Auth**: Single global API key from `API_KEY` env; if absent → auto-generate UUIDv4, write `.env`, exit(1). Blank keys treated as missing.
 - **Device IDs**: UUID for known devices; free-text ID in `ResourceLocation` for portable storage
 
@@ -31,9 +31,25 @@ Personal inventory system for Phil to track resources (ebooks, web-readers; imag
 ### API Style
 - Action-named paths: `/api/v1/inventory/ebooks/list`, `/:id/detail`, etc.
 - System: `/api/v1/system/health`, `/api/v1/system/openapi`
+- Phase 2 endpoints:
+  - `/api/v1/inventory/ebooks/batch-import`
+  - `/api/v1/inventory/web-readers/:id/check`
+  - `/api/v1/inventory/web-readers/:id/checks`
+  - `/api/v1/notifications`
+  - `/api/v1/notifications/:id/read`
+  - `/api/v1/notifications/stream`
 
 ### Flutter Config
 - `--dart-define=BASE_URL=...` and `--dart-define=API_KEY=...`
+
+### Phase 2 Decisions
+- **PDF metadata extraction**: `syncfusion_flutter_pdf`
+- **EPUB metadata extraction**: manual ZIP + OPF parsing using `archive`
+- **MOBI/AZW3 metadata extraction**: unsupported in Phase 2; defer native Rust bridge path to later phase
+- **Notifications**: backend supports SSE plus optional Firebase FCM push
+- **OpenAPI**: backend now derives spec from handlers/schemas with `utoipa`
+- **Scheduler**: app runtime now loads `plugins.toml`, wires `ChapterCheckService`, and starts the scheduler when `SCHEDULER_ENABLED` is true
+- **Docker Chromium path**: `/usr/bin/chromium-browser`
 
 ### Docker
 - Multi-stage: `rust:alpine` builder → `alpine:latest` runtime
@@ -70,10 +86,11 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 | `screens/` + `widgets/` | ❌ |
 | `api/` (generated, gitignored) | ❌ |
 | `config/` (dart-define) | ✅ |
+| `plugins/` (metadata extractors + registry) | Mixed |
 
 ## Phases Overview
 - **Phase 1 (MVP+)**: Ebook + WebReader CRUD/search, ResourceLocation, auth, plugin skeleton, OpenAPI, SQLite/PG portability, fuzzy-search seam, Flutter shell + WebView progress + batch ops. **✅ Implemented.**
-- **Phase 2**: Real plugin implementations (metadata extractors, chapter checkers).
+- **Phase 2**: Real plugin implementations, scheduler, notifications, batch import, OpenAPI refresh, and Flutter metadata/check-history UX. **✅ Implemented.**
 - **Phase 3**: Image/video/game resource types.
 - **Phase 4**: Ecosystem integrations (BookWalker, Kindle, Steam/DLSite/FANZA).
 - **Phase 5**: Optimization and hardening.
@@ -85,6 +102,22 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - Resource types: image, video, game
 - Real plugin implementations
 - Full metadata extraction auto-fill UX
+
+## Phase 2 Implementation Summary
+
+### Backend
+- **Scheduler**: chapter checks run through `ChapterCheckService` via an `OpsCheckRunner` adapter, and the app actually starts the scheduler in runtime.
+- **Push**: Firebase FCM client added behind feature gate; notification broadcast seam added in domain/services.
+- **Adapters**: batch import, chapter-check trigger/history, notifications list/read/SSE endpoints added.
+- **OpenAPI**: `utoipa` schemas/paths added across domain and adapters; runtime injects generated JSON into app state.
+- **Runtime/Docker**: Chromium installed in container, compose exports `CHROMIUM_PATH=/usr/bin/chromium-browser`, runtime reads `plugins.toml` with default fallback behavior, and notifications/chapter-check routes are fully wired.
+
+### Frontend
+- **Plugins**: `MetadataExtractor` abstraction, extractor registry, PDF extractor, EPUB extractor, MOBI/AZW3 unsupported stub.
+- **Import UX**: add-resource screen supports picking ebook files and metadata auto-fill; app shell includes a bulk ebook import screen.
+- **Web reader UX**: progress tracker parses JS channel payloads; web reader detail screen shows chapter check history and a “Check Now” action.
+- **Notifications**: notification repository + HTTP implementation added for list/read/SSE wiring.
+- **Tests**: frontend coverage expanded for metadata extractors, progress parsing, chapter-check bloc/screen behavior, notification routes, and bulk import screen rendering.
 
 ## Phase 1 Implementation Summary
 
@@ -125,6 +158,13 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 8. Test provider scope: MultiBlocProvider above MaterialApp.
 9. Blank API_KEY normalized to None at config/bootstrap/auth layers.
 10. CI unique title index prevents TOCTOU race.
+11. Runtime now wires `ChapterCheckService`, loads `plugins.toml`, and starts the scheduler instead of leaving chapter-check routes inert.
+12. `ChapterCheckService` runs web checks via `spawn_blocking`, avoiding nested-Tokio panics from real Chromium checks.
+13. Successful no-change checks now still update `last_checked_at`, so the scheduler does not hammer the same resource every tick.
+14. Postgres URLs now fail fast explicitly instead of routing into stub repositories that only return internal errors.
+15. Batch import now reports location-write failures in `failed` entries instead of claiming full success.
+16. Frontend SSE notification watching now cancels the inner HTTP stream subscription when the consumer unsubscribes.
+17. Frontend bulk import directory scanning now uses async filesystem traversal instead of recursive `listSync` on the UI thread.
 
 ## Environment Notes
 - Rust toolchain: rustc 1.82.0, uuid pinned to 1.8.0.

@@ -3,6 +3,9 @@ mod portability;
 pub mod postgres;
 pub mod sqlite;
 
+#[cfg(feature = "firebase")]
+pub mod fcm;
+
 pub use factory::{resolve_search_strategy, AdapterBundle, AdapterFactory, DatabaseAdapter};
 pub use portability::{
     export_canonical_snapshot_sqlite, import_canonical_snapshot_sqlite, normalize_ebook_meta_rows,
@@ -104,10 +107,14 @@ mod tests {
     }
 
     #[test]
-    fn adapter_factory_recognizes_postgres_prefix() {
-        let bundle = super::AdapterFactory::from_url("postgres://localhost:5432/inventory")
-            .expect("postgres adapter bundle");
-        assert!(matches!(bundle.database, super::DatabaseAdapter::Postgres));
+    fn adapter_factory_rejects_postgres_until_implemented() {
+        let error = match super::AdapterFactory::from_url("postgres://localhost:5432/inventory") {
+            Ok(_) => panic!("postgres adapter should fail fast until repositories exist"),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(error, DomainError::ValidationError(message) if message.contains("Postgres adapter is not implemented"))
+        );
     }
 
     #[test]

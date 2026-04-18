@@ -1,6 +1,7 @@
 mod bootstrap;
 mod config;
 mod runtime;
+mod scheduler;
 
 use std::path::Path;
 
@@ -16,6 +17,8 @@ async fn main() {
     let _ = services::services_ready();
     let _ = adapters::adapters_ready();
     let _ = infrastructure::infrastructure_ready();
+
+    let _ = dotenvy::dotenv();
 
     let config = match AppConfig::from_env() {
         Ok(config) => config,

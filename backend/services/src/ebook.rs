@@ -52,13 +52,23 @@ impl EbookService {
     }
 
     pub async fn list_ebooks(&self) -> Result<Vec<Resource>, DomainError> {
-        self.resource_repo.list().await
+        Ok(self
+            .resource_repo
+            .list()
+            .await?
+            .into_iter()
+            .filter(|r| r.resource_type == domain::ResourceType::Ebook)
+            .collect())
     }
 
     pub async fn search_ebooks(&self, query: &str) -> Result<Vec<Resource>, DomainError> {
-        self.search_strategy
+        Ok(self
+            .search_strategy
             .search(self.resource_repo.as_ref(), query)
-            .await
+            .await?
+            .into_iter()
+            .filter(|r| r.resource_type == domain::ResourceType::Ebook)
+            .collect())
     }
 
     pub async fn ebook_detail(&self, resource_id: Uuid) -> Result<EbookDetail, DomainError> {
@@ -94,8 +104,9 @@ impl EbookService {
         input: UpdateEbookInput,
     ) -> Result<EbookDetail, DomainError> {
         let existing = self.resource_repo.get_by_id(resource_id).await?;
+        let existing_meta = self.ebook_meta_repo.get(resource_id).await?;
         let (resource_input, meta_input) =
-            use_cases::ebook::validate_update_ebook(&existing, &input)
+            use_cases::ebook::validate_update_ebook(&existing, &existing_meta, &input)
                 .map_err(map_validation_error)?;
 
         let resource = self

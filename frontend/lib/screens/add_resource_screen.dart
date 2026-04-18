@@ -1,22 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../blocs/ebook/ebook_bloc.dart';
 import '../blocs/web_reader/web_reader_bloc.dart';
 import '../models/failures.dart';
 import '../models/repository_inputs.dart';
 import '../models/resources.dart';
+import '../plugins/epub_metadata_extractor.dart';
+import '../plugins/extractor_registry.dart';
+import '../plugins/metadata_extractor.dart';
+import '../plugins/mobi_metadata_extractor.dart';
+import '../plugins/pdf_metadata_extractor.dart';
 import '../widgets/app_failure_text.dart';
 
 class AddResourceScreen extends StatefulWidget {
   const AddResourceScreen({
     this.initialResourceType = ResourceType.ebook,
     this.resourceId,
+    this.pickEbookFile,
+    this.extractorRegistry,
     super.key,
   });
 
   final ResourceType initialResourceType;
   final String? resourceId;
+  final Future<String?> Function()? pickEbookFile;
+  final ExtractorRegistry? extractorRegistry;
 
   @override
   State<AddResourceScreen> createState() => _AddResourceScreenState();
@@ -37,6 +47,14 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
   NewLocationInput? _pendingLocation;
   String? _pendingResourceId;
   bool _prefilled = false;
+
+  late final ExtractorRegistry _extractorRegistry =
+      widget.extractorRegistry ??
+      ExtractorRegistry([
+        PdfMetadataExtractor(),
+        EpubMetadataExtractor(),
+        MobiMetadataExtractor(),
+      ]);
 
   @override
   void initState() {
@@ -71,6 +89,85 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(appFailureMessage(failure))));
+  }
+
+  Future<void> _pickAndExtractMetadata() async {
+    final path = widget.pickEbookFile != null
+        ? await widget.pickEbookFile!.call()
+        : await _defaultPickEbookFile();
+    if (path == null || path.isEmpty) {
+      return;
+    }
+
+    _pathController.text = path;
+    final extractor = _extractorRegistry.forPath(path);
+    if (extractor == null) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Auto-fill not available for this format')),
+      );
+      return;
+    }
+
+    final result = await extractor.extract(path);
+    if (!mounted) {
+      return;
+    }
+
+    result.when(
+      success: (meta) {
+        _applyExtractedMeta(path, meta);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Metadata extracted from ${_basename(path)}',
+            ),
+          ),
+        );
+      },
+      failure: (failure) {
+        final message = switch (failure) {
+          UnsupportedFailure() => 'Auto-fill not available for this format',
+          _ => 'Could not read metadata: ${appFailureMessage(failure)}',
+        };
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      },
+    );
+    setState(() {});
+  }
+
+  Future<String?> _defaultPickEbookFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf', 'epub', 'mobi', 'azw3'],
+    );
+    return result?.files.single.path;
+  }
+
+  void _applyExtractedMeta(String path, ExtractedMeta meta) {
+    if (_titleController.text.trim().isEmpty && meta.title != null) {
+      _titleController.text = meta.title!;
+    }
+    if (_authorController.text.trim().isEmpty && meta.author != null) {
+      _authorController.text = meta.author!;
+    }
+    if (_fileFormatController.text.trim().isEmpty) {
+      _fileFormatController.text = meta.fileFormat ?? _extensionWithoutDot(path);
+    }
+  }
+
+  String _basename(String path) => path.split(RegExp(r'[/\\]')).last;
+
+  String _extensionWithoutDot(String path) {
+    final dotIndex = path.lastIndexOf('.');
+    if (dotIndex == -1 || dotIndex == path.length - 1) {
+      return '';
+    }
+    return path.substring(dotIndex + 1).toLowerCase();
   }
 
   void _submit() {
@@ -338,6 +435,16 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
               decoration: const InputDecoration(labelText: 'Notes'),
             ),
             if (_resourceType == ResourceType.ebook) ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.icon(
+                  key: const Key('pick-ebook-file'),
+                  onPressed: _pickAndExtractMetadata,
+                  icon: const Icon(Icons.file_open),
+                  label: const Text('Pick file'),
+                ),
+              ),
               TextField(
                 key: const Key('ebook-author'),
                 controller: _authorController,

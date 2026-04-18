@@ -1,4 +1,5 @@
 import 'package:personal_inventory_frontend/models/failures.dart';
+import 'package:personal_inventory_frontend/models/batch_operations.dart';
 import 'package:personal_inventory_frontend/models/repository_inputs.dart';
 import 'package:personal_inventory_frontend/models/resources.dart';
 import 'package:personal_inventory_frontend/models/result.dart';
@@ -15,6 +16,9 @@ class FakeEbookRepository implements EbookRepository {
     this.deleteResult = const Success(null),
     this.addLocationResult,
     this.removeLocationResult = const Success(null),
+    this.batchImportResult = const Success(
+      BatchImportResult(succeeded: [], failed: []),
+    ),
   });
 
   Result<List<Resource>, AppFailure> listResult;
@@ -25,6 +29,7 @@ class FakeEbookRepository implements EbookRepository {
   Result<void, AppFailure> deleteResult;
   Result<ResourceLocation, AppFailure>? addLocationResult;
   Result<void, AppFailure> removeLocationResult;
+  Result<BatchImportResult, AppFailure> batchImportResult;
 
   int listCalls = 0;
   int searchCalls = 0;
@@ -32,11 +37,13 @@ class FakeEbookRepository implements EbookRepository {
   int addCalls = 0;
   int updateCalls = 0;
   int addLocationCalls = 0;
+  int batchImportCalls = 0;
   String? lastUpdateId;
   UpdateEbookInput? lastUpdateInput;
   String? lastAddLocationResourceId;
   NewLocationInput? lastAddLocationInput;
   NewEbookInput? lastAddInput;
+  List<BatchImportEntry>? lastBatchImportEntries;
 
   @override
   Future<Result<Resource, AppFailure>> addEbook(NewEbookInput input) async {
@@ -91,6 +98,15 @@ class FakeEbookRepository implements EbookRepository {
   }
 
   @override
+  Future<Result<BatchImportResult, AppFailure>> batchImport(
+    List<BatchImportEntry> entries,
+  ) async {
+    batchImportCalls += 1;
+    lastBatchImportEntries = entries;
+    return batchImportResult;
+  }
+
+  @override
   Future<Result<List<Resource>, AppFailure>> searchEbooks(String query) async {
     searchCalls += 1;
     return searchResult;
@@ -119,6 +135,8 @@ class FakeWebReaderRepository implements WebReaderRepository {
     this.addLocationResult,
     this.removeLocationResult = const Success(null),
     this.trackProgressResult = const Success(null),
+    this.triggerCheckResult,
+    this.listCheckHistoryResult = const Success([]),
   });
 
   Result<List<Resource>, AppFailure> listResult;
@@ -130,6 +148,8 @@ class FakeWebReaderRepository implements WebReaderRepository {
   Result<ResourceLocation, AppFailure>? addLocationResult;
   Result<void, AppFailure> removeLocationResult;
   Result<void, AppFailure> trackProgressResult;
+  Result<ChapterCheck, AppFailure>? triggerCheckResult;
+  Result<List<ChapterCheck>, AppFailure> listCheckHistoryResult;
 
   int listCalls = 0;
   int searchCalls = 0;
@@ -138,11 +158,15 @@ class FakeWebReaderRepository implements WebReaderRepository {
   int addCalls = 0;
   int updateCalls = 0;
   int addLocationCalls = 0;
+  int triggerCheckCalls = 0;
+  int listCheckHistoryCalls = 0;
   String? lastUpdateId;
   UpdateWebReaderInput? lastUpdateInput;
   String? lastAddLocationResourceId;
   NewLocationInput? lastAddLocationInput;
   NewWebReaderInput? lastAddInput;
+  String? lastTriggerCheckResourceId;
+  String? lastListCheckHistoryResourceId;
 
   @override
   Future<Result<Resource, AppFailure>> addWebReader(NewWebReaderInput input) async {
@@ -206,6 +230,24 @@ class FakeWebReaderRepository implements WebReaderRepository {
   Future<Result<void, AppFailure>> trackProgress(WebReaderProgressSignal signal) async {
     trackProgressCalls += 1;
     return trackProgressResult;
+  }
+
+  @override
+  Future<Result<ChapterCheck, AppFailure>> triggerCheck(
+    String resourceId,
+  ) async {
+    triggerCheckCalls += 1;
+    lastTriggerCheckResourceId = resourceId;
+    return triggerCheckResult ?? const Failure(ServerFailure(500));
+  }
+
+  @override
+  Future<Result<List<ChapterCheck>, AppFailure>> listCheckHistory(
+    String resourceId,
+  ) async {
+    listCheckHistoryCalls += 1;
+    lastListCheckHistoryResourceId = resourceId;
+    return listCheckHistoryResult;
   }
 
   @override

@@ -52,6 +52,46 @@ void main() {
         WebReaderOperationSuccess(WebReaderOperationType.progressTracked),
       ],
     );
+
+    final _checkedAt = DateTime.utc(2025, 1, 1);
+    final _check = ChapterCheck(
+      id: 'chk1',
+      resourceId: 'w1',
+      hasNewChapter: true,
+      latestChapter: 'Chapter 42',
+      checkedAt: _checkedAt,
+    );
+
+    blocTest<WebReaderBloc, WebReaderState>(
+      'TriggerChapterCheck → emits loading then ChapterCheckTriggered on success',
+      build: () => WebReaderBloc(_FakeWebReaderRepository(
+        onTriggerCheck: (_) async => Success(_check),
+      )),
+      act: (bloc) => bloc.add(const TriggerChapterCheck('w1')),
+      expect: () => [const WebReaderLoading(), ChapterCheckTriggered(_check)],
+    );
+
+    blocTest<WebReaderBloc, WebReaderState>(
+      'TriggerChapterCheck → emits loading then WebReaderError on failure',
+      build: () => WebReaderBloc(_FakeWebReaderRepository(
+        onTriggerCheck: (_) async =>
+            const Failure(ServerFailure(500)),
+      )),
+      act: (bloc) => bloc.add(const TriggerChapterCheck('w1')),
+      expect: () => const [
+        WebReaderLoading(),
+        WebReaderError(ServerFailure(500)),
+      ],
+    );
+
+    blocTest<WebReaderBloc, WebReaderState>(
+      'LoadCheckHistory → emits loading then CheckHistoryLoaded on success',
+      build: () => WebReaderBloc(_FakeWebReaderRepository(
+        onListCheckHistory: (_) async => Success([_check]),
+      )),
+      act: (bloc) => bloc.add(const LoadCheckHistory('w1')),
+      expect: () => [const WebReaderLoading(), CheckHistoryLoaded([_check])],
+    );
   });
 }
 
@@ -76,6 +116,10 @@ final class _FakeWebReaderRepository implements WebReaderRepository {
         onRemoveLocation,
     Future<Result<void, AppFailure>> Function(WebReaderProgressSignal signal)?
         onTrackProgress,
+    Future<Result<ChapterCheck, AppFailure>> Function(String resourceId)?
+        onTriggerCheck,
+    Future<Result<List<ChapterCheck>, AppFailure>> Function(String resourceId)?
+        onListCheckHistory,
   }) : _onListWebReaders = onListWebReaders,
        _onSearchWebReaders = onSearchWebReaders,
        _onGetWebReader = onGetWebReader,
@@ -84,7 +128,9 @@ final class _FakeWebReaderRepository implements WebReaderRepository {
        _onDeleteWebReader = onDeleteWebReader,
        _onAddLocation = onAddLocation,
        _onRemoveLocation = onRemoveLocation,
-       _onTrackProgress = onTrackProgress;
+       _onTrackProgress = onTrackProgress,
+       _onTriggerCheck = onTriggerCheck,
+       _onListCheckHistory = onListCheckHistory;
 
   final Future<Result<List<Resource>, AppFailure>> Function()? _onListWebReaders;
   final Future<Result<List<Resource>, AppFailure>> Function(String query)?
@@ -107,6 +153,10 @@ final class _FakeWebReaderRepository implements WebReaderRepository {
       _onRemoveLocation;
   final Future<Result<void, AppFailure>> Function(WebReaderProgressSignal signal)?
       _onTrackProgress;
+  final Future<Result<ChapterCheck, AppFailure>> Function(String resourceId)?
+      _onTriggerCheck;
+  final Future<Result<List<ChapterCheck>, AppFailure>> Function(String resourceId)?
+      _onListCheckHistory;
 
   @override
   Future<Result<Resource, AppFailure>> addWebReader(NewWebReaderInput input) {
@@ -170,4 +220,19 @@ final class _FakeWebReaderRepository implements WebReaderRepository {
     return _onUpdateWebReader?.call(id, input) ??
         Future.value(const Failure(ServerFailure(500)));
   }
+
+  @override
+  Future<Result<ChapterCheck, AppFailure>> triggerCheck(String resourceId) {
+    return _onTriggerCheck?.call(resourceId) ??
+        Future.value(const Failure(ServerFailure(500)));
+  }
+
+  @override
+  Future<Result<List<ChapterCheck>, AppFailure>> listCheckHistory(
+    String resourceId,
+  ) {
+    return _onListCheckHistory?.call(resourceId) ??
+        Future.value(const Success([]));
+  }
 }
+

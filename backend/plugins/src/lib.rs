@@ -33,7 +33,7 @@ pub trait MetadataExtractor: Send + Sync {
 }
 
 pub trait WebChecker: Send + Sync {
-    fn check(&self, url: &str) -> Result<CheckResult, PluginError>;
+    fn check(&self, url: &str, known_chapter: Option<&str>) -> Result<CheckResult, PluginError>;
 }
 
 #[cfg(feature = "stub-plugins")]
@@ -57,7 +57,7 @@ pub struct NoOpWebChecker;
 
 #[cfg(feature = "stub-plugins")]
 impl WebChecker for NoOpWebChecker {
-    fn check(&self, _url: &str) -> Result<CheckResult, PluginError> {
+    fn check(&self, _url: &str, _known_chapter: Option<&str>) -> Result<CheckResult, PluginError> {
         Ok(CheckResult::default())
     }
 }
@@ -97,9 +97,9 @@ pub struct PluginRegistry {
 
 impl PluginRegistry {
     pub fn from_config(config: &PluginsConfig) -> Self {
-        #[cfg(feature = "stub-plugins")]
+        #[cfg(any(feature = "stub-plugins", feature = "real-plugins"))]
         let mut registry = Self::default();
-        #[cfg(not(feature = "stub-plugins"))]
+        #[cfg(not(any(feature = "stub-plugins", feature = "real-plugins")))]
         let registry = Self::default();
 
         #[cfg(feature = "stub-plugins")]
@@ -114,7 +114,16 @@ impl PluginRegistry {
             }
         }
 
-        #[cfg(not(feature = "stub-plugins"))]
+        #[cfg(feature = "real-plugins")]
+        {
+            let web_checker_config = config.web_checker.clone();
+            let chromium_path = std::env::var("CHROMIUM_PATH").ok();
+            registry.web_checkers.push(Box::new(
+                chromium::ChromiumWebChecker::new(web_checker_config, chromium_path),
+            ));
+        }
+
+        #[cfg(not(any(feature = "stub-plugins", feature = "real-plugins")))]
         let _ = config;
 
         registry
@@ -122,16 +131,154 @@ impl PluginRegistry {
 }
 
 /// Returns the first SiteConfig whose url_pattern (treated as a regex) matches the given URL.
-/// Returns None if no config matches.
+/// Returns None if no config matches. Logs a warning to stderr for invalid patterns.
 pub fn match_site_config<'a>(url: &str, configs: &'a [SiteConfig]) -> Option<&'a SiteConfig> {
     for config in configs {
-        if let Ok(regex) = regex::Regex::new(&config.url_pattern) {
-            if regex.is_match(url) {
-                return Some(config);
+        match regex::Regex::new(&config.url_pattern) {
+            Ok(regex) => {
+                if regex.is_match(url) {
+                    return Some(config);
+                }
+            }
+            Err(err) => {
+                eprintln!(
+                    "plugins: invalid url_pattern '{}': {err}",
+                    config.url_pattern
+                );
             }
         }
     }
     None
+}
+
+/// Validates all url_pattern regexes in a slice of SiteConfig at load time.
+/// Returns a list of error messages for any invalid patterns.
+pub fn validate_site_config_patterns(configs: &[SiteConfig]) -> Vec<String> {
+    configs
+        .iter()
+        .filter_map(|config| {
+            regex::Regex::new(&config.url_pattern)
+                .err()
+                .map(|err| format!("invalid url_pattern '{}': {err}", config.url_pattern))
+        })
+        .collect()
+}
+
+#[cfg(feature = "real-plugins")]
+pub mod chromium {
+    use super::{match_site_config, CheckResult, PluginError, WebChecker, WebCheckerConfig};
+    use futures::StreamExt as _;
+
+    pub struct ChromiumWebChecker {
+        pub config: WebCheckerConfig,
+        pub chromium_path: Option<String>,
+    }
+
+    impl ChromiumWebChecker {
+        pub fn new(config: WebCheckerConfig, chromium_path: Option<String>) -> Self {
+            Self {
+                config,
+                chromium_path,
+            }
+        }
+    }
+
+    impl WebChecker for ChromiumWebChecker {
+        fn check(&self, url: &str, known_chapter: Option<&str>) -> Result<CheckResult, PluginError> {
+            let site = match_site_config(url, &self.config.sites)
+                .ok_or(PluginError::UnsupportedInput)?;
+
+            let rt = tokio::runtime::Runtime::new()
+                .map_err(|e| PluginError::IoError(format!("tokio runtime: {e}")))?;
+
+            rt.block_on(async {
+                use chromiumoxide::{Browser, BrowserConfig};
+
+                let mut builder = BrowserConfig::builder();
+                if let Some(path) = &self.chromium_path {
+                    builder = builder.chrome_executable(path);
+                }
+                let config = builder
+                    .build()
+                    .map_err(|e| PluginError::IoError(format!("browser config: {e}")))?;
+
+                let (mut browser, mut handler) = Browser::launch(config)
+                    .await
+                    .map_err(|e| PluginError::IoError(format!("browser launch: {e}")))?;
+
+                let handle = tokio::spawn(async move {
+                    while let Some(_event) = handler.next().await {}
+                });
+
+                let page = browser
+                    .new_page(url)
+                    .await
+                    .map_err(|e| PluginError::IoError(format!("open page: {e}")))?;
+
+                let mut extracted: Option<String> = None;
+
+                // CSS selector takes priority
+                if extracted.is_none() {
+                    if let Some(selector) = &site.css_selector {
+                        if let Ok(element) = page.find_element(selector.as_str()).await {
+                            if let Ok(Some(text)) = element.inner_text().await {
+                                extracted = Some(text);
+                            }
+                        }
+                    }
+                }
+
+                // XPath fallback
+                if extracted.is_none() {
+                    if let Some(xpath) = &site.xpath {
+                        let js = format!(
+                            r#"(function(){{
+                                var result = document.evaluate({xpath:?}, document, null,
+                                    XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                                var node = result.singleNodeValue;
+                                return node ? node.textContent : null;
+                            }})()"#,
+                            xpath = xpath
+                        );
+                        if let Ok(val) = page.evaluate(js).await {
+                            if let Some(s) = val.value().and_then(|v| v.as_str()) {
+                                extracted = Some(s.to_string());
+                            }
+                        }
+                    }
+                }
+
+                // Text regex fallback
+                if extracted.is_none() {
+                    if let Some(pattern) = &site.text_regex {
+                        let content = page
+                            .content()
+                            .await
+                            .map_err(|e| PluginError::IoError(format!("get content: {e}")))?;
+                        if let Ok(re) = regex::Regex::new(pattern) {
+                            if let Some(caps) = re.captures(&content) {
+                                extracted = caps.get(1).map(|m| m.as_str().to_string());
+                            }
+                        }
+                    }
+                }
+
+                browser.close().await.ok();
+                handle.abort();
+
+                let has_new = match (&extracted, known_chapter) {
+                    (Some(found), Some(known)) => found != known,
+                    (Some(_), None) => true,
+                    (None, _) => false,
+                };
+
+                Ok(CheckResult {
+                    has_new,
+                    latest_chapter: extracted,
+                })
+            })
+        }
+    }
 }
 
 #[cfg(test)]
@@ -170,7 +317,7 @@ mod tests {
     fn no_op_web_checker_returns_no_new_chapter() {
         let checker = NoOpWebChecker;
         let result = checker
-            .check("https://example.com")
+            .check("https://example.com", None)
             .expect("expected no-op success");
 
         assert_eq!(
@@ -311,5 +458,67 @@ url_pattern = "https://test\\.com"
 
         let result = match_site_config("https://EXAMPLE.COM/", &configs);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn match_site_config_skips_invalid_regex_pattern() {
+        let configs = vec![
+            SiteConfig {
+                url_pattern: "https://[invalid".to_string(),
+                css_selector: None,
+                xpath: None,
+                text_regex: None,
+                check_interval_secs: None,
+            },
+            SiteConfig {
+                url_pattern: "https://valid\\.com/.*".to_string(),
+                css_selector: Some("sel".to_string()),
+                xpath: None,
+                text_regex: None,
+                check_interval_secs: None,
+            },
+        ];
+
+        let result = match_site_config("https://valid.com/page", &configs);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().css_selector, Some("sel".to_string()));
+    }
+
+    #[test]
+    fn validate_site_config_patterns_returns_errors_for_invalid_patterns() {
+        let configs = vec![
+            SiteConfig {
+                url_pattern: "https://valid\\.com/.*".to_string(),
+                css_selector: None,
+                xpath: None,
+                text_regex: None,
+                check_interval_secs: None,
+            },
+            SiteConfig {
+                url_pattern: "https://[unclosed".to_string(),
+                css_selector: None,
+                xpath: None,
+                text_regex: None,
+                check_interval_secs: None,
+            },
+        ];
+
+        let errors = super::validate_site_config_patterns(&configs);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("https://[unclosed"));
+    }
+
+    #[test]
+    fn validate_site_config_patterns_returns_empty_for_valid_patterns() {
+        let configs = vec![SiteConfig {
+            url_pattern: "https://example\\.com/.*".to_string(),
+            css_selector: None,
+            xpath: None,
+            text_regex: None,
+            check_interval_secs: None,
+        }];
+
+        let errors = super::validate_site_config_patterns(&configs);
+        assert!(errors.is_empty());
     }
 }
