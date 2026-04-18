@@ -8,6 +8,9 @@ use uuid::Uuid;
 pub enum ResourceType {
     Ebook,
     WebReader,
+    Image,
+    Video,
+    Game,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
@@ -116,6 +119,59 @@ pub struct NewResourceLocation {
     pub storage_type: StorageType,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct ImageMeta {
+    pub resource_id: Uuid,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub file_format: Option<String>,
+    pub file_size_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct VideoMeta {
+    pub resource_id: Uuid,
+    pub duration_secs: Option<u64>,
+    pub file_format: Option<String>,
+    pub resolution: Option<String>,
+    pub file_size_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct GameMeta {
+    pub resource_id: Uuid,
+    pub platform: Option<String>,
+    pub store: Option<String>,
+    pub developer: Option<String>,
+    pub publisher: Option<String>,
+    pub manual_notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NewImageMeta {
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub file_format: Option<String>,
+    pub file_size_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NewVideoMeta {
+    pub duration_secs: Option<u64>,
+    pub file_format: Option<String>,
+    pub resolution: Option<String>,
+    pub file_size_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NewGameMeta {
+    pub platform: Option<String>,
+    pub store: Option<String>,
+    pub developer: Option<String>,
+    pub publisher: Option<String>,
+    pub manual_notes: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainError {
     NotFound(String),
@@ -173,6 +229,36 @@ pub trait WebReaderMetaRepository: Send + Sync {
         resource_id: Uuid,
         input: NewWebReaderMeta,
     ) -> Result<WebReaderMeta, DomainError>;
+}
+
+#[async_trait]
+pub trait ImageMetaRepository: Send + Sync {
+    async fn get(&self, resource_id: Uuid) -> Result<ImageMeta, DomainError>;
+    async fn upsert(
+        &self,
+        resource_id: Uuid,
+        input: NewImageMeta,
+    ) -> Result<ImageMeta, DomainError>;
+}
+
+#[async_trait]
+pub trait VideoMetaRepository: Send + Sync {
+    async fn get(&self, resource_id: Uuid) -> Result<VideoMeta, DomainError>;
+    async fn upsert(
+        &self,
+        resource_id: Uuid,
+        input: NewVideoMeta,
+    ) -> Result<VideoMeta, DomainError>;
+}
+
+#[async_trait]
+pub trait GameMetaRepository: Send + Sync {
+    async fn get(&self, resource_id: Uuid) -> Result<GameMeta, DomainError>;
+    async fn upsert(
+        &self,
+        resource_id: Uuid,
+        input: NewGameMeta,
+    ) -> Result<GameMeta, DomainError>;
 }
 
 #[async_trait]
@@ -240,7 +326,10 @@ pub fn domain_ready() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{Resource, ResourceType, StorageType};
+    use super::{
+        GameMeta, ImageMeta, NewGameMeta, NewImageMeta, NewVideoMeta, Resource, ResourceType,
+        StorageType, VideoMeta,
+    };
     use chrono::Utc;
     use uuid::Uuid;
 
@@ -273,6 +362,88 @@ mod tests {
         let deserialized: ResourceType =
             serde_json::from_str(&serialized).expect("deserialize resource type");
         assert_eq!(deserialized, ResourceType::WebReader);
+    }
+
+    #[test]
+    fn serde_deserializes_phase_three_resource_types() {
+        for raw in ["\"Image\"", "\"Video\"", "\"Game\""] {
+            let parsed = serde_json::from_str::<ResourceType>(raw);
+            assert!(parsed.is_ok(), "expected {raw} to deserialize into ResourceType");
+        }
+    }
+
+    #[test]
+    fn image_meta_holds_expected_fields() {
+        let meta = ImageMeta {
+            resource_id: Uuid::new_v4(),
+            width: Some(1920),
+            height: Some(1080),
+            file_format: Some("png".to_string()),
+            file_size_bytes: Some(204800),
+        };
+        assert_eq!(meta.width, Some(1920));
+        assert_eq!(meta.file_format.as_deref(), Some("png"));
+    }
+
+    #[test]
+    fn video_meta_holds_expected_fields() {
+        let meta = VideoMeta {
+            resource_id: Uuid::new_v4(),
+            duration_secs: Some(3600),
+            file_format: Some("mkv".to_string()),
+            resolution: Some("1920x1080".to_string()),
+            file_size_bytes: Some(1_000_000),
+        };
+        assert_eq!(meta.duration_secs, Some(3600));
+        assert_eq!(meta.file_format.as_deref(), Some("mkv"));
+    }
+
+    #[test]
+    fn game_meta_holds_expected_fields() {
+        let meta = GameMeta {
+            resource_id: Uuid::new_v4(),
+            platform: Some("Nintendo Switch".to_string()),
+            store: Some("eShop".to_string()),
+            developer: Option::<String>::None,
+            publisher: Option::<String>::None,
+            manual_notes: Some("physical cartridge".to_string()),
+        };
+        assert_eq!(meta.platform.as_deref(), Some("Nintendo Switch"));
+        assert_eq!(meta.manual_notes.as_deref(), Some("physical cartridge"));
+    }
+
+    #[test]
+    fn new_image_meta_can_be_constructed() {
+        let input = NewImageMeta {
+            width: Some(800),
+            height: Some(600),
+            file_format: Some("jpg".to_string()),
+            file_size_bytes: None,
+        };
+        assert_eq!(input.width, Some(800));
+    }
+
+    #[test]
+    fn new_video_meta_can_be_constructed() {
+        let input = NewVideoMeta {
+            duration_secs: Some(120),
+            file_format: Some("mp4".to_string()),
+            resolution: None,
+            file_size_bytes: None,
+        };
+        assert_eq!(input.duration_secs, Some(120));
+    }
+
+    #[test]
+    fn new_game_meta_can_be_constructed() {
+        let input = NewGameMeta {
+            platform: Some("Steam".to_string()),
+            store: Some("Steam".to_string()),
+            developer: None,
+            publisher: None,
+            manual_notes: None,
+        };
+        assert_eq!(input.platform.as_deref(), Some("Steam"));
     }
 }
 

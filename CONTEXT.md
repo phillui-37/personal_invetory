@@ -172,7 +172,13 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - `flutter test integration_test -d macos` produces harmless "Failed to foreground app" warning.
 
 ## Open Questions
-_(None remaining.)_
+- Phase 3 planning direction is set: add image, video, and game as end-to-end vertical slices over the existing backend/frontend architecture.
+- Android/iOS/desktop frontend build setup is explicitly deferred to Phase 4 as cross-cutting platform work, not Phase 3 implementation scope.
+
+## Phase 3 Kickoff Notes
+- Kickoff implementation follows the Phase 3 task sheet order instead of jumping straight into one slice.
+- Shared foundation work starts first: scope lock, shared type expansion, repository/validation seams, then SQLite persistence.
+- The first Red step targets shared resource-type expansion in backend/domain and frontend/models before adding slice-specific services or screens.
 
 ## References
 - Requirements: `TODO.md`

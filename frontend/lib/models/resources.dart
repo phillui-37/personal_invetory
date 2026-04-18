@@ -3,6 +3,9 @@ import 'package:equatable/equatable.dart';
 enum ResourceType {
   ebook,
   webReader,
+  image,
+  video,
+  game,
 }
 
 enum StorageType {
@@ -110,6 +113,110 @@ final class WebReaderDetail extends Equatable {
 
   final Resource resource;
   final WebReaderMeta meta;
+  final List<ResourceLocation> locations;
+
+  @override
+  List<Object?> get props => [resource, meta, locations];
+}
+
+final class ImageMeta extends Equatable {
+  const ImageMeta({
+    required this.resourceId,
+    this.width,
+    this.height,
+    this.fileFormat,
+    this.fileSizeBytes,
+  });
+
+  final String resourceId;
+  final int? width;
+  final int? height;
+  final String? fileFormat;
+  final int? fileSizeBytes;
+
+  @override
+  List<Object?> get props => [resourceId, width, height, fileFormat, fileSizeBytes];
+}
+
+final class VideoMeta extends Equatable {
+  const VideoMeta({
+    required this.resourceId,
+    this.durationSecs,
+    this.fileFormat,
+    this.resolution,
+    this.fileSizeBytes,
+  });
+
+  final String resourceId;
+  final int? durationSecs;
+  final String? fileFormat;
+  final String? resolution;
+  final int? fileSizeBytes;
+
+  @override
+  List<Object?> get props => [resourceId, durationSecs, fileFormat, resolution, fileSizeBytes];
+}
+
+final class GameMeta extends Equatable {
+  const GameMeta({
+    required this.resourceId,
+    this.platform,
+    this.store,
+    this.developer,
+    this.publisher,
+    this.manualNotes,
+  });
+
+  final String resourceId;
+  final String? platform;
+  final String? store;
+  final String? developer;
+  final String? publisher;
+  final String? manualNotes;
+
+  @override
+  List<Object?> get props => [resourceId, platform, store, developer, publisher, manualNotes];
+}
+
+final class ImageDetail extends Equatable {
+  const ImageDetail({
+    required this.resource,
+    required this.meta,
+    required this.locations,
+  });
+
+  final Resource resource;
+  final ImageMeta meta;
+  final List<ResourceLocation> locations;
+
+  @override
+  List<Object?> get props => [resource, meta, locations];
+}
+
+final class VideoDetail extends Equatable {
+  const VideoDetail({
+    required this.resource,
+    required this.meta,
+    required this.locations,
+  });
+
+  final Resource resource;
+  final VideoMeta meta;
+  final List<ResourceLocation> locations;
+
+  @override
+  List<Object?> get props => [resource, meta, locations];
+}
+
+final class GameDetail extends Equatable {
+  const GameDetail({
+    required this.resource,
+    required this.meta,
+    required this.locations,
+  });
+
+  final Resource resource;
+  final GameMeta meta;
   final List<ResourceLocation> locations;
 
   @override

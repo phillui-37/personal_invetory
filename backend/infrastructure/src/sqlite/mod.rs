@@ -86,6 +86,9 @@ pub fn encode_resource_type(resource_type: &ResourceType) -> &'static str {
     match resource_type {
         ResourceType::Ebook => "ebook",
         ResourceType::WebReader => "web_reader",
+        ResourceType::Image => "image",
+        ResourceType::Video => "video",
+        ResourceType::Game => "game",
     }
 }
 
@@ -93,6 +96,9 @@ pub fn decode_resource_type(raw: String) -> Result<ResourceType, DomainError> {
     match raw.as_str() {
         "ebook" | "Ebook" => Ok(ResourceType::Ebook),
         "web_reader" | "WebReader" => Ok(ResourceType::WebReader),
+        "image" | "Image" => Ok(ResourceType::Image),
+        "video" | "Video" => Ok(ResourceType::Video),
+        "game" | "Game" => Ok(ResourceType::Game),
         _ => Err(DomainError::InternalError(format!(
             "unknown resource_type value: {raw}"
         ))),
