@@ -1,6 +1,7 @@
 mod auth;
 mod batch_import;
 mod chapter_check;
+mod dedup_handler;
 mod ebook;
 mod error;
 mod game;
@@ -10,6 +11,7 @@ mod openapi;
 mod routes;
 mod state;
 mod system;
+mod vault_handler;
 mod video;
 mod web_reader;
 

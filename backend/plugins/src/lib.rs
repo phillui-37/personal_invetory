@@ -1,4 +1,5 @@
 pub mod browser_session;
+pub mod ecosystem;
 
 use std::collections::HashMap;
 

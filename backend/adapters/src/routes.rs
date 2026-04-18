@@ -10,6 +10,7 @@ use crate::{
     auth_middleware,
     batch_import::batch_import_ebooks,
     chapter_check::{list_chapter_checks, trigger_chapter_check},
+    dedup_handler::{dismiss_warning, list_pending_warnings, merge_resources, scan_duplicates},
     ebook::{
         add_ebook, add_ebook_location, delete_ebook, ebook_detail, list_ebooks,
         remove_ebook_location, search_ebooks, update_ebook,
@@ -24,6 +25,10 @@ use crate::{
     },
     notifications::{list_notifications, mark_notification_read, notifications_stream},
     system::{health, openapi},
+    vault_handler::{
+        delete_credential, initialize_vault, list_vault_platforms, lock_vault,
+        retrieve_credential, store_credential, unlock_vault, vault_status,
+    },
     video::{
         add_video, add_video_location, delete_video, list_videos, remove_video_location,
         search_videos, update_video, video_detail,
@@ -160,6 +165,20 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/notifications", get(list_notifications))
         .route("/api/v1/notifications/:id/read", post(mark_notification_read))
         .route("/api/v1/notifications/stream", get(notifications_stream))
+        // Vault
+        .route("/api/v1/vault/status", get(vault_status))
+        .route("/api/v1/vault/initialize", post(initialize_vault))
+        .route("/api/v1/vault/unlock", post(unlock_vault))
+        .route("/api/v1/vault/lock", post(lock_vault))
+        .route("/api/v1/vault/credentials/store", post(store_credential))
+        .route("/api/v1/vault/credentials/retrieve", post(retrieve_credential))
+        .route("/api/v1/vault/credentials/delete", post(delete_credential))
+        .route("/api/v1/vault/platforms", get(list_vault_platforms))
+        // Dedup
+        .route("/api/v1/dedup/scan", post(scan_duplicates))
+        .route("/api/v1/dedup/warnings", get(list_pending_warnings))
+        .route("/api/v1/dedup/warnings/:id/dismiss", post(dismiss_warning))
+        .route("/api/v1/dedup/warnings/:id/merge", post(merge_resources))
         .layer(from_fn_with_state(state.clone(), auth_middleware))
         .with_state(state)
 }

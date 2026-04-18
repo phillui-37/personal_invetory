@@ -36,6 +36,8 @@ pub struct AppState {
     pub api_key: String,
     pub openapi_json: String,
     pub notification_tx: broadcast::Sender<NotificationEvent>,
+    pub vault_service: Option<Arc<dyn domain::vault::CredentialVault>>,
+    pub dedup_service: Option<Arc<services::DedupService>>,
 }
 
 impl AppState {
@@ -59,11 +61,23 @@ impl AppState {
             api_key,
             openapi_json: "{}".to_string(),
             notification_tx,
+            vault_service: None,
+            dedup_service: None,
         }
     }
 
     pub fn with_chapter_check_service(mut self, svc: Arc<dyn ChapterCheckOps>) -> Self {
         self.chapter_check_service = Some(svc);
+        self
+    }
+
+    pub fn with_vault_service(mut self, svc: Arc<dyn domain::vault::CredentialVault>) -> Self {
+        self.vault_service = Some(svc);
+        self
+    }
+
+    pub fn with_dedup_service(mut self, svc: Arc<services::DedupService>) -> Self {
+        self.dedup_service = Some(svc);
         self
     }
 
@@ -106,6 +120,8 @@ impl AppState {
             api_key,
         );
         state.chapter_check_service = Some(Arc::new(NoopChapterCheckOps));
+        state.vault_service = None;
+        state.dedup_service = None;
         state
     }
 }
