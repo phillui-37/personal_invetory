@@ -31,6 +31,12 @@ pub fn encrypt(key: &[u8; 32], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>), D
 }
 
 pub fn decrypt(key: &[u8; 32], ciphertext: &[u8], nonce: &[u8]) -> Result<Vec<u8>, DomainError> {
+    if nonce.len() != 12 {
+        return Err(DomainError::InternalError(format!(
+            "invalid nonce length: expected 12, got {}",
+            nonce.len()
+        )));
+    }
     let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
     let nonce = Nonce::from_slice(nonce);
     cipher

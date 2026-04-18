@@ -34,6 +34,7 @@ pub trait DedupWarningRepository: Send + Sync {
     async fn list_pending(&self) -> Result<Vec<DedupWarning>, DomainError>;
     async fn dismiss(&self, id: Uuid) -> Result<(), DomainError>;
     async fn mark_merged(&self, id: Uuid) -> Result<(), DomainError>;
+    async fn get_by_id(&self, id: Uuid) -> Result<DedupWarning, DomainError>;
     async fn exists_pair(&self, a: Uuid, b: Uuid) -> Result<bool, DomainError>;
 }
 

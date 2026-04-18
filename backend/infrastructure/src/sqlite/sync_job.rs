@@ -5,7 +5,7 @@ use uuid::Uuid;
 use domain::sync::{NewSyncJob, SyncJob, SyncJobRepository, SyncJobStatus};
 use domain::DomainError;
 
-use super::{map_sqlite_error, parse_timestamp, SharedSqliteConnection};
+use super::{map_sqlite_error, parse_timestamp_for_row, parse_uuid_for_row, SharedSqliteConnection};
 
 pub struct SqliteSyncJobRepository {
     conn: SharedSqliteConnection,
@@ -69,7 +69,7 @@ impl SyncJobRepository for SqliteSyncJobRepository {
         let status_str = encode_sync_status(&job.status);
         let started_at = job.started_at.map(|t| t.to_rfc3339());
         let completed_at = job.completed_at.map(|t| t.to_rfc3339());
-        conn.execute(
+        let affected = conn.execute(
             "UPDATE sync_jobs SET status = ?1, started_at = ?2, completed_at = ?3,
              items_found = ?4, items_created = ?5, items_skipped = ?6, items_failed = ?7,
              error_message = ?8 WHERE id = ?9",
@@ -80,6 +80,9 @@ impl SyncJobRepository for SqliteSyncJobRepository {
             ],
         )
         .map_err(map_sqlite_error)?;
+        if affected == 0 {
+            return Err(DomainError::NotFound(format!("sync job {} not found", job.id)));
+        }
         Ok(())
     }
 
@@ -99,14 +102,14 @@ impl SyncJobRepository for SqliteSyncJobRepository {
                     id,
                     platform: row.get(0)?,
                     status: decode_sync_status(&status_str),
-                    started_at: started_at.map(|s| parse_timestamp(s).unwrap_or_default()),
-                    completed_at: completed_at.map(|s| parse_timestamp(s).unwrap_or_default()),
+                    started_at: started_at.map(parse_timestamp_for_row).transpose()?,
+                    completed_at: completed_at.map(parse_timestamp_for_row).transpose()?,
                     items_found: u32::try_from(row.get::<_, i64>(4)?).unwrap_or(0),
                     items_created: u32::try_from(row.get::<_, i64>(5)?).unwrap_or(0),
                     items_skipped: u32::try_from(row.get::<_, i64>(6)?).unwrap_or(0),
                     items_failed: u32::try_from(row.get::<_, i64>(7)?).unwrap_or(0),
                     error_message: row.get(8)?,
-                    created_at: parse_timestamp(created_at_str).unwrap_or_default(),
+                    created_at: parse_timestamp_for_row(created_at_str)?,
                 })
             },
         )
@@ -135,17 +138,17 @@ impl SyncJobRepository for SqliteSyncJobRepository {
                 let completed_at: Option<String> = row.get(3)?;
                 let created_at_str: String = row.get(9)?;
                 Ok(SyncJob {
-                    id: Uuid::parse_str(&id_str).unwrap_or_default(),
+                    id: parse_uuid_for_row(&id_str)?,
                     platform: platform.to_string(),
                     status: decode_sync_status(&status_str),
-                    started_at: started_at.map(|s| parse_timestamp(s).unwrap_or_default()),
-                    completed_at: completed_at.map(|s| parse_timestamp(s).unwrap_or_default()),
+                    started_at: started_at.map(parse_timestamp_for_row).transpose()?,
+                    completed_at: completed_at.map(parse_timestamp_for_row).transpose()?,
                     items_found: u32::try_from(row.get::<_, i64>(4)?).unwrap_or(0),
                     items_created: u32::try_from(row.get::<_, i64>(5)?).unwrap_or(0),
                     items_skipped: u32::try_from(row.get::<_, i64>(6)?).unwrap_or(0),
                     items_failed: u32::try_from(row.get::<_, i64>(7)?).unwrap_or(0),
                     error_message: row.get(8)?,
-                    created_at: parse_timestamp(created_at_str).unwrap_or_default(),
+                    created_at: parse_timestamp_for_row(created_at_str)?,
                 })
             })
             .map_err(map_sqlite_error)?

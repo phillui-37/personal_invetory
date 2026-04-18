@@ -38,6 +38,28 @@ impl SyncService {
         job.status = SyncJobStatus::Running;
         self.sync_job_repo.update(&job).await?;
 
+        let result = self.run_steam_sync(&mut job, &games).await;
+
+        match result {
+            Ok(()) => {
+                job.status = SyncJobStatus::Completed;
+                self.sync_job_repo.update(&job).await?;
+                Ok(job)
+            }
+            Err(e) => {
+                job.status = SyncJobStatus::Failed;
+                job.error_message = Some(format!("{e:?}"));
+                let _ = self.sync_job_repo.update(&job).await;
+                Err(e)
+            }
+        }
+    }
+
+    async fn run_steam_sync(
+        &self,
+        job: &mut SyncJob,
+        games: &[SteamOwnedGame],
+    ) -> Result<(), DomainError> {
         let existing = self.resource_repo.list().await?;
         let existing_titles: Vec<String> = existing
             .iter()
@@ -49,7 +71,7 @@ impl SyncService {
         let mut created = 0u32;
         let mut skipped = 0u32;
 
-        for game in &games {
+        for game in games {
             let title_lower = game.name.to_lowercase();
             if existing_titles.contains(&title_lower) {
                 skipped += 1;
@@ -88,10 +110,7 @@ impl SyncService {
         job.items_created = created;
         job.items_skipped = skipped;
         job.items_failed = 0;
-        job.status = SyncJobStatus::Completed;
-        self.sync_job_repo.update(&job).await?;
-
-        Ok(job)
+        Ok(())
     }
 
     pub async fn list_jobs(&self, platform: &str) -> Result<Vec<SyncJob>, DomainError> {

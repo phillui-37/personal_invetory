@@ -15,6 +15,7 @@ use chrono::{DateTime, Utc};
 use domain::{DomainError, ResourceType, StorageType};
 use rusqlite::{Connection, Error as SqlError, ErrorCode, OpenFlags};
 use std::sync::{Arc, Mutex};
+use uuid::Uuid;
 
 pub type SharedSqliteConnection = Arc<Mutex<Connection>>;
 
@@ -143,4 +144,32 @@ pub fn parse_timestamp(raw: String) -> Result<DateTime<Utc>, DomainError> {
     DateTime::parse_from_rfc3339(&raw)
         .map(|value| value.with_timezone(&Utc))
         .map_err(|error| DomainError::InternalError(format!("invalid timestamp '{raw}': {error}")))
+}
+
+pub fn parse_uuid_for_row(raw: &str) -> Result<Uuid, rusqlite::Error> {
+    Uuid::parse_str(raw).map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(
+            0,
+            rusqlite::types::Type::Text,
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e.to_string(),
+            )),
+        )
+    })
+}
+
+pub fn parse_timestamp_for_row(raw: String) -> Result<DateTime<Utc>, rusqlite::Error> {
+    DateTime::parse_from_rfc3339(&raw)
+        .map(|value| value.with_timezone(&Utc))
+        .map_err(|e| {
+            rusqlite::Error::FromSqlConversionFailure(
+                0,
+                rusqlite::types::Type::Text,
+                Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    e.to_string(),
+                )),
+            )
+        })
 }

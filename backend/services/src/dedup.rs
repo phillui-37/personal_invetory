@@ -77,6 +77,28 @@ impl DedupService {
         keep_id: Uuid,
         discard_id: Uuid,
     ) -> Result<Resource, DomainError> {
+        if keep_id == discard_id {
+            return Err(DomainError::ValidationError(
+                "keep_id and discard_id must be different".to_string(),
+            ));
+        }
+
+        // Validate warning exists, is pending, and matches the submitted pair
+        let warning = self.dedup_repo.get_by_id(warning_id).await?;
+        if warning.status != domain::dedup::DedupWarningStatus::Pending {
+            return Err(DomainError::ValidationError(
+                "warning is not in pending state".to_string(),
+            ));
+        }
+        let pair_matches = (warning.resource_id_a == keep_id
+            && warning.resource_id_b == discard_id)
+            || (warning.resource_id_a == discard_id && warning.resource_id_b == keep_id);
+        if !pair_matches {
+            return Err(DomainError::ValidationError(
+                "keep_id/discard_id do not match the warning pair".to_string(),
+            ));
+        }
+
         let keep = self.resource_repo.get_by_id(keep_id).await?;
         let discard = self.resource_repo.get_by_id(discard_id).await?;
 
@@ -172,6 +194,15 @@ mod tests {
                 .filter(|w| w.status == domain::dedup::DedupWarningStatus::Pending)
                 .cloned()
                 .collect())
+        }
+        async fn get_by_id(&self, id: Uuid) -> Result<DedupWarning, DomainError> {
+            self.warnings
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|w| w.id == id)
+                .cloned()
+                .ok_or(DomainError::NotFound("warning not found".to_string()))
         }
         async fn dismiss(&self, id: Uuid) -> Result<(), DomainError> {
             let mut ws = self.warnings.lock().unwrap();
