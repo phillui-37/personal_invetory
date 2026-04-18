@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'blocs/ebook/ebook_bloc.dart';
+import 'blocs/game/game_bloc.dart';
+import 'blocs/image/image_bloc.dart';
+import 'blocs/video/video_bloc.dart';
 import 'blocs/web_reader/web_reader_bloc.dart';
 import 'repositories/in_memory_repositories.dart';
 import 'screens/bulk_import_screen.dart';
@@ -19,11 +22,17 @@ class PersonalInventoryApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final ebookRepository = InMemoryEbookRepository();
     final webReaderRepository = InMemoryWebReaderRepository();
+    final imageRepository = InMemoryImageRepository();
+    final videoRepository = InMemoryVideoRepository();
+    final gameRepository = InMemoryGameRepository();
 
     return MultiBlocProvider(
       providers: [
         BlocProvider<EbookBloc>(create: (_) => EbookBloc(ebookRepository)),
         BlocProvider<WebReaderBloc>(create: (_) => WebReaderBloc(webReaderRepository)),
+        BlocProvider<ImageBloc>(create: (_) => ImageBloc(imageRepository)),
+        BlocProvider<VideoBloc>(create: (_) => VideoBloc(videoRepository)),
+        BlocProvider<GameBloc>(create: (_) => GameBloc(gameRepository)),
       ],
       child: MaterialApp(
         home: _AppShell(ebookRepository: ebookRepository),

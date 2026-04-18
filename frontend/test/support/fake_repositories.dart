@@ -4,6 +4,9 @@ import 'package:personal_inventory_frontend/models/repository_inputs.dart';
 import 'package:personal_inventory_frontend/models/resources.dart';
 import 'package:personal_inventory_frontend/models/result.dart';
 import 'package:personal_inventory_frontend/repositories/ebook_repository.dart';
+import 'package:personal_inventory_frontend/repositories/game_repository.dart';
+import 'package:personal_inventory_frontend/repositories/image_repository.dart';
+import 'package:personal_inventory_frontend/repositories/video_repository.dart';
 import 'package:personal_inventory_frontend/repositories/web_reader_repository.dart';
 
 class FakeEbookRepository implements EbookRepository {
@@ -260,4 +263,250 @@ class FakeWebReaderRepository implements WebReaderRepository {
     lastUpdateInput = input;
     return updateResult ?? const Failure(ServerFailure(500));
   }
+}
+
+class FakeImageRepository implements ImageRepository {
+  FakeImageRepository({
+    this.listResult = const Success([]),
+    this.searchResult = const Success([]),
+    this.detailResult,
+    this.addResult,
+    this.updateResult,
+    this.deleteResult = const Success(null),
+    this.addLocationResult,
+    this.removeLocationResult = const Success(null),
+  });
+
+  Result<List<Resource>, AppFailure> listResult;
+  Result<List<Resource>, AppFailure> searchResult;
+  Result<ImageDetail, AppFailure>? detailResult;
+  Result<Resource, AppFailure>? addResult;
+  Result<Resource, AppFailure>? updateResult;
+  Result<void, AppFailure> deleteResult;
+  Result<ResourceLocation, AppFailure>? addLocationResult;
+  Result<void, AppFailure> removeLocationResult;
+
+  int listCalls = 0;
+  int addCalls = 0;
+  int updateCalls = 0;
+  int addLocationCalls = 0;
+  NewImageInput? lastAddInput;
+
+  @override
+  Future<Result<Resource, AppFailure>> addImage(NewImageInput input) async {
+    addCalls += 1;
+    lastAddInput = input;
+    return addResult ?? const Failure(ServerFailure(500));
+  }
+
+  @override
+  Future<Result<ResourceLocation, AppFailure>> addLocation(
+    String resourceId,
+    NewLocationInput input,
+  ) async {
+    addLocationCalls += 1;
+    return addLocationResult ??
+        Success(
+          ResourceLocation(
+            id: 'loc-new',
+            resourceId: resourceId,
+            deviceId: input.deviceId,
+            pathOrUrl: input.pathOrUrl,
+            storageType: input.storageType,
+          ),
+        );
+  }
+
+  @override
+  Future<Result<void, AppFailure>> deleteImage(String id) async => deleteResult;
+
+  @override
+  Future<Result<ImageDetail, AppFailure>> getImage(String id) async {
+    return detailResult ?? const Failure(NotFoundFailure('missing'));
+  }
+
+  @override
+  Future<Result<List<Resource>, AppFailure>> listImages() async {
+    listCalls += 1;
+    return listResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> removeLocation(
+    String resourceId,
+    String locationId,
+  ) async => removeLocationResult;
+
+  @override
+  Future<Result<List<Resource>, AppFailure>> searchImages(String query) async => searchResult;
+
+  @override
+  Future<Result<Resource, AppFailure>> updateImage(
+    String id,
+    UpdateImageInput input,
+  ) async => updateResult ?? const Failure(ServerFailure(500));
+}
+
+class FakeVideoRepository implements VideoRepository {
+  FakeVideoRepository({
+    this.listResult = const Success([]),
+    this.searchResult = const Success([]),
+    this.detailResult,
+    this.addResult,
+    this.updateResult,
+    this.deleteResult = const Success(null),
+    this.addLocationResult,
+    this.removeLocationResult = const Success(null),
+  });
+
+  Result<List<Resource>, AppFailure> listResult;
+  Result<List<Resource>, AppFailure> searchResult;
+  Result<VideoDetail, AppFailure>? detailResult;
+  Result<Resource, AppFailure>? addResult;
+  Result<Resource, AppFailure>? updateResult;
+  Result<void, AppFailure> deleteResult;
+  Result<ResourceLocation, AppFailure>? addLocationResult;
+  Result<void, AppFailure> removeLocationResult;
+
+  int listCalls = 0;
+  int addCalls = 0;
+  int updateCalls = 0;
+  int addLocationCalls = 0;
+  NewVideoInput? lastAddInput;
+
+  @override
+  Future<Result<Resource, AppFailure>> addVideo(NewVideoInput input) async {
+    addCalls += 1;
+    lastAddInput = input;
+    return addResult ?? const Failure(ServerFailure(500));
+  }
+
+  @override
+  Future<Result<ResourceLocation, AppFailure>> addLocation(
+    String resourceId,
+    NewLocationInput input,
+  ) async {
+    addLocationCalls += 1;
+    return addLocationResult ??
+        Success(
+          ResourceLocation(
+            id: 'loc-new',
+            resourceId: resourceId,
+            deviceId: input.deviceId,
+            pathOrUrl: input.pathOrUrl,
+            storageType: input.storageType,
+          ),
+        );
+  }
+
+  @override
+  Future<Result<void, AppFailure>> deleteVideo(String id) async => deleteResult;
+
+  @override
+  Future<Result<VideoDetail, AppFailure>> getVideo(String id) async {
+    return detailResult ?? const Failure(NotFoundFailure('missing'));
+  }
+
+  @override
+  Future<Result<List<Resource>, AppFailure>> listVideos() async {
+    listCalls += 1;
+    return listResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> removeLocation(
+    String resourceId,
+    String locationId,
+  ) async => removeLocationResult;
+
+  @override
+  Future<Result<List<Resource>, AppFailure>> searchVideos(String query) async => searchResult;
+
+  @override
+  Future<Result<Resource, AppFailure>> updateVideo(
+    String id,
+    UpdateVideoInput input,
+  ) async => updateResult ?? const Failure(ServerFailure(500));
+}
+
+class FakeGameRepository implements GameRepository {
+  FakeGameRepository({
+    this.listResult = const Success([]),
+    this.searchResult = const Success([]),
+    this.detailResult,
+    this.addResult,
+    this.updateResult,
+    this.deleteResult = const Success(null),
+    this.addLocationResult,
+    this.removeLocationResult = const Success(null),
+  });
+
+  Result<List<Resource>, AppFailure> listResult;
+  Result<List<Resource>, AppFailure> searchResult;
+  Result<GameDetail, AppFailure>? detailResult;
+  Result<Resource, AppFailure>? addResult;
+  Result<Resource, AppFailure>? updateResult;
+  Result<void, AppFailure> deleteResult;
+  Result<ResourceLocation, AppFailure>? addLocationResult;
+  Result<void, AppFailure> removeLocationResult;
+
+  int listCalls = 0;
+  int addCalls = 0;
+  int updateCalls = 0;
+  int addLocationCalls = 0;
+  NewGameInput? lastAddInput;
+
+  @override
+  Future<Result<Resource, AppFailure>> addGame(NewGameInput input) async {
+    addCalls += 1;
+    lastAddInput = input;
+    return addResult ?? const Failure(ServerFailure(500));
+  }
+
+  @override
+  Future<Result<ResourceLocation, AppFailure>> addLocation(
+    String resourceId,
+    NewLocationInput input,
+  ) async {
+    addLocationCalls += 1;
+    return addLocationResult ??
+        Success(
+          ResourceLocation(
+            id: 'loc-new',
+            resourceId: resourceId,
+            deviceId: input.deviceId,
+            pathOrUrl: input.pathOrUrl,
+            storageType: input.storageType,
+          ),
+        );
+  }
+
+  @override
+  Future<Result<void, AppFailure>> deleteGame(String id) async => deleteResult;
+
+  @override
+  Future<Result<GameDetail, AppFailure>> getGame(String id) async {
+    return detailResult ?? const Failure(NotFoundFailure('missing'));
+  }
+
+  @override
+  Future<Result<List<Resource>, AppFailure>> listGames() async {
+    listCalls += 1;
+    return listResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> removeLocation(
+    String resourceId,
+    String locationId,
+  ) async => removeLocationResult;
+
+  @override
+  Future<Result<List<Resource>, AppFailure>> searchGames(String query) async => searchResult;
+
+  @override
+  Future<Result<Resource, AppFailure>> updateGame(
+    String id,
+    UpdateGameInput input,
+  ) async => updateResult ?? const Failure(ServerFailure(500));
 }

@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../blocs/ebook/ebook_bloc.dart';
+import '../blocs/game/game_bloc.dart';
+import '../blocs/image/image_bloc.dart';
+import '../blocs/video/video_bloc.dart';
 import '../blocs/web_reader/web_reader_bloc.dart';
 import '../models/resources.dart';
 import 'resource_detail_screen.dart';
@@ -36,6 +39,9 @@ class _SearchScreenState extends State<SearchScreen> {
       }
       context.read<EbookBloc>().add(SearchEbooks(value));
       context.read<WebReaderBloc>().add(SearchWebReaders(value));
+      context.read<ImageBloc>().add(SearchImages(value));
+      context.read<VideoBloc>().add(SearchVideos(value));
+      context.read<GameBloc>().add(SearchGames(value));
     });
   }
 
@@ -67,40 +73,70 @@ class _SearchScreenState extends State<SearchScreen> {
                 builder: (context, ebookState) {
                   return BlocBuilder<WebReaderBloc, WebReaderState>(
                     builder: (context, webReaderState) {
-                      final loading =
-                          ebookState is EbookLoading ||
-                          webReaderState is WebReaderLoading;
-                      if (loading) {
-                        return const LinearProgressIndicator();
-                      }
+                      return BlocBuilder<ImageBloc, ImageState>(
+                        builder: (context, imageState) {
+                          return BlocBuilder<VideoBloc, VideoState>(
+                            builder: (context, videoState) {
+                              return BlocBuilder<GameBloc, GameState>(
+                                builder: (context, gameState) {
+                                  final loading =
+                                      ebookState is EbookLoading ||
+                                      webReaderState is WebReaderLoading ||
+                                      imageState is ImageLoading ||
+                                      videoState is VideoLoading ||
+                                      gameState is GameLoading;
+                                  if (loading) {
+                                    return const LinearProgressIndicator();
+                                  }
 
-                      final ebookResults = ebookState is EbookListLoaded
-                          ? ebookState.ebooks
-                          : const <Resource>[];
-                      final webReaderResults = webReaderState is WebReaderListLoaded
-                          ? webReaderState.webReaders
-                          : const <Resource>[];
-                      final all = [...ebookResults, ...webReaderResults];
+                                  final ebookResults = ebookState is EbookListLoaded
+                                      ? ebookState.ebooks
+                                      : const <Resource>[];
+                                  final webReaderResults = webReaderState is WebReaderListLoaded
+                                      ? webReaderState.webReaders
+                                      : const <Resource>[];
+                                  final imageResults = imageState is ImageListLoaded
+                                      ? imageState.images
+                                      : const <Resource>[];
+                                  final videoResults = videoState is VideoListLoaded
+                                      ? videoState.videos
+                                      : const <Resource>[];
+                                  final gameResults = gameState is GameListLoaded
+                                      ? gameState.games
+                                      : const <Resource>[];
+                                  final all = [
+                                    ...ebookResults,
+                                    ...webReaderResults,
+                                    ...imageResults,
+                                    ...videoResults,
+                                    ...gameResults,
+                                  ];
 
-                      if (all.isEmpty) {
-                        return const Center(child: Text('No results found'));
-                      }
+                                  if (all.isEmpty) {
+                                    return const Center(child: Text('No results found'));
+                                  }
 
-                      return ListView.builder(
-                        itemCount: all.length,
-                        itemBuilder: (context, index) {
-                          final resource = all[index];
-                          return ListTile(
-                            title: Text(resource.title),
-                            trailing: Chip(label: Text(resource.resourceType.name)),
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => ResourceDetailScreen(
-                                    resourceId: resource.id,
-                                    resourceType: resource.resourceType,
-                                  ),
-                                ),
+                                  return ListView.builder(
+                                    itemCount: all.length,
+                                    itemBuilder: (context, index) {
+                                      final resource = all[index];
+                                      return ListTile(
+                                        title: Text(resource.title),
+                                        trailing: Chip(label: Text(resource.resourceType.name)),
+                                        onTap: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute<void>(
+                                              builder: (_) => ResourceDetailScreen(
+                                                resourceId: resource.id,
+                                                resourceType: resource.resourceType,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
                               );
                             },
                           );

@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../blocs/ebook/ebook_bloc.dart';
+import '../blocs/game/game_bloc.dart';
+import '../blocs/image/image_bloc.dart';
+import '../blocs/video/video_bloc.dart';
 import '../blocs/web_reader/web_reader_bloc.dart';
 import '../models/failures.dart';
 import '../models/repository_inputs.dart';
@@ -41,6 +44,20 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
   final _siteNameController = TextEditingController();
   final _deviceIdController = TextEditingController();
   final _pathController = TextEditingController();
+  // Image fields
+  final _widthController = TextEditingController();
+  final _heightController = TextEditingController();
+  final _fileSizeBytesController = TextEditingController();
+  // Video fields
+  final _durationController = TextEditingController();
+  final _resolutionController = TextEditingController();
+  // Game fields
+  final _platformController = TextEditingController();
+  final _storeController = TextEditingController();
+  final _developerController = TextEditingController();
+  final _publisherController = TextEditingController();
+  final _manualNotesController = TextEditingController();
+
   ResourceType _resourceType = ResourceType.ebook;
   StorageType _storageType = StorageType.localFs;
   String? _fieldError;
@@ -61,10 +78,17 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
     super.initState();
     _resourceType = widget.initialResourceType;
     if (widget.resourceId != null) {
-      if (_resourceType == ResourceType.ebook) {
-        context.read<EbookBloc>().add(LoadEbookDetail(widget.resourceId!));
-      } else {
-        context.read<WebReaderBloc>().add(LoadWebReaderDetail(widget.resourceId!));
+      switch (_resourceType) {
+        case ResourceType.ebook:
+          context.read<EbookBloc>().add(LoadEbookDetail(widget.resourceId!));
+        case ResourceType.webReader:
+          context.read<WebReaderBloc>().add(LoadWebReaderDetail(widget.resourceId!));
+        case ResourceType.image:
+          context.read<ImageBloc>().add(LoadImageDetail(widget.resourceId!));
+        case ResourceType.video:
+          context.read<VideoBloc>().add(LoadVideoDetail(widget.resourceId!));
+        case ResourceType.game:
+          context.read<GameBloc>().add(LoadGameDetail(widget.resourceId!));
       }
     }
   }
@@ -79,6 +103,16 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
     _siteNameController.dispose();
     _deviceIdController.dispose();
     _pathController.dispose();
+    _widthController.dispose();
+    _heightController.dispose();
+    _fileSizeBytesController.dispose();
+    _durationController.dispose();
+    _resolutionController.dispose();
+    _platformController.dispose();
+    _storeController.dispose();
+    _developerController.dispose();
+    _publisherController.dispose();
+    _manualNotesController.dispose();
     super.dispose();
   }
 
