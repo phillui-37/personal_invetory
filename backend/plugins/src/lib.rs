@@ -1,3 +1,5 @@
+pub mod browser_session;
+
 use std::collections::HashMap;
 
 use domain::ResourceType;

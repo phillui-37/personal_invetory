@@ -1,10 +1,13 @@
 pub mod chapter_check;
+pub mod dedup;
 pub mod ebook_meta;
 pub mod game_meta;
 pub mod image_meta;
 pub mod location;
 pub mod notification;
 pub mod resource;
+pub mod sync_job;
+pub mod vault;
 pub mod video_meta;
 pub mod web_reader_meta;
 
@@ -15,7 +18,7 @@ use std::sync::{Arc, Mutex};
 
 pub type SharedSqliteConnection = Arc<Mutex<Connection>>;
 
-const SQLITE_MIGRATIONS: [&str; 12] = [
+const SQLITE_MIGRATIONS: [&str; 16] = [
     include_str!("../../migrations/0001_create_resources.sql"),
     include_str!("../../migrations/0002_create_ebook_metas.sql"),
     include_str!("../../migrations/0003_create_web_reader_metas.sql"),
@@ -28,6 +31,10 @@ const SQLITE_MIGRATIONS: [&str; 12] = [
     include_str!("../../migrations/0010_create_image_metas.sql"),
     include_str!("../../migrations/0011_create_video_metas.sql"),
     include_str!("../../migrations/0012_create_game_metas.sql"),
+    include_str!("../../migrations/0013_create_vault_config.sql"),
+    include_str!("../../migrations/0014_create_credentials.sql"),
+    include_str!("../../migrations/0015_create_sync_jobs.sql"),
+    include_str!("../../migrations/0016_create_dedup_warnings.sql"),
 ];
 
 pub fn open_sqlite_connection(database_url: &str) -> Result<Connection, DomainError> {

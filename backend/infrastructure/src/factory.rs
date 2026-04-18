@@ -25,6 +25,9 @@ pub struct AdapterBundle {
     pub image_meta_repo: Arc<dyn ImageMetaRepository>,
     pub video_meta_repo: Arc<dyn VideoMetaRepository>,
     pub game_meta_repo: Arc<dyn GameMetaRepository>,
+    pub vault_backend: Arc<dyn domain::vault::VaultBackend>,
+    pub sync_job_repo: Arc<dyn domain::sync::SyncJobRepository>,
+    pub dedup_warning_repo: Arc<dyn domain::dedup::DedupWarningRepository>,
 }
 
 pub struct AdapterFactory;
@@ -45,7 +48,10 @@ impl AdapterFactory {
                 notification_repo: Arc::new(sqlite::notification::SqliteNotificationRepository::new(shared.clone())),
                 image_meta_repo: Arc::new(sqlite::image_meta::SqliteImageMetaRepository::new(shared.clone())),
                 video_meta_repo: Arc::new(sqlite::video_meta::SqliteVideoMetaRepository::new(shared.clone())),
-                game_meta_repo: Arc::new(sqlite::game_meta::SqliteGameMetaRepository::new(shared)),
+                game_meta_repo: Arc::new(sqlite::game_meta::SqliteGameMetaRepository::new(shared.clone())),
+                vault_backend: Arc::new(sqlite::vault::SqliteVaultBackend::new(shared.clone())),
+                sync_job_repo: Arc::new(sqlite::sync_job::SqliteSyncJobRepository::new(shared.clone())),
+                dedup_warning_repo: Arc::new(sqlite::dedup::SqliteDedupWarningRepository::new(shared)),
             });
         }
 

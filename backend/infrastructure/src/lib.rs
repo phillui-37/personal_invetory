@@ -2,6 +2,7 @@ mod factory;
 mod portability;
 pub mod postgres;
 pub mod sqlite;
+pub mod crypto;
 
 #[cfg(feature = "firebase")]
 pub mod fcm;
@@ -107,6 +108,10 @@ mod tests {
         assert!(table_names.contains(&"image_metas".to_string()));
         assert!(table_names.contains(&"video_metas".to_string()));
         assert!(table_names.contains(&"game_metas".to_string()));
+        assert!(table_names.contains(&"vault_config".to_string()));
+        assert!(table_names.contains(&"credentials".to_string()));
+        assert!(table_names.contains(&"sync_jobs".to_string()));
+        assert!(table_names.contains(&"dedup_warnings".to_string()));
     }
 
     #[test]
