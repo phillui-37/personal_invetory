@@ -429,3 +429,459 @@ async fn batch_import_partial_success_with_invalid_entry() {
     assert_eq!(failed.len(), 1, "one invalid entry should fail");
     assert_eq!(failed[0]["index"], 1);
 }
+
+#[tokio::test]
+async fn image_handlers_cover_crud_and_location_routes() {
+    let app = app_with_openapi("{}");
+    let missing_id = "550e8400-e29b-41d4-a716-446655440000";
+
+    let list = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/inventory/images/list")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(list.status(), StatusCode::OK);
+
+    let search = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/inventory/images/search?q=photo")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(search.status(), StatusCode::OK);
+
+    let add = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/inventory/images/add")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({
+                        "title": "Photo",
+                        "file_format": "png",
+                        "width": 1920,
+                        "height": 1080
+                    })
+                    .to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(add.status(), StatusCode::OK);
+
+    let invalid_add = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/inventory/images/add")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"title": "Photo", "file_format": "exe"}).to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(invalid_add.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    let detail = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/inventory/images/{missing_id}/detail"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(detail.status(), StatusCode::NOT_FOUND);
+
+    let update = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/inventory/images/{missing_id}/update"))
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"title": "Updated"}).to_string()))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(update.status(), StatusCode::NOT_FOUND);
+
+    let delete = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/v1/inventory/images/{missing_id}/delete"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(delete.status(), StatusCode::OK);
+
+    let add_location = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/inventory/images/{missing_id}/locations/add"
+                ))
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({
+                        "device_id": "dev-1",
+                        "path_or_url": "/photos/image.png",
+                        "storage_type": "localfs"
+                    })
+                    .to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(add_location.status(), StatusCode::OK);
+
+    let remove_location = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/inventory/images/{missing_id}/locations/{missing_id}/remove"
+                ))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(remove_location.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn video_handlers_cover_crud_and_location_routes() {
+    let app = app_with_openapi("{}");
+    let missing_id = "550e8400-e29b-41d4-a716-446655440000";
+
+    let list = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/inventory/videos/list")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(list.status(), StatusCode::OK);
+
+    let search = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/inventory/videos/search?q=movie")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(search.status(), StatusCode::OK);
+
+    let add = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/inventory/videos/add")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({
+                        "title": "Movie",
+                        "file_format": "mkv",
+                        "duration_secs": 7200,
+                        "resolution": "1920x1080"
+                    })
+                    .to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(add.status(), StatusCode::OK);
+
+    let invalid_add = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/inventory/videos/add")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"title": "Movie", "file_format": "exe"}).to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(invalid_add.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    let detail = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/inventory/videos/{missing_id}/detail"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(detail.status(), StatusCode::NOT_FOUND);
+
+    let update = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/inventory/videos/{missing_id}/update"))
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"title": "Updated"}).to_string()))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(update.status(), StatusCode::NOT_FOUND);
+
+    let delete = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/v1/inventory/videos/{missing_id}/delete"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(delete.status(), StatusCode::OK);
+
+    let add_location = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/inventory/videos/{missing_id}/locations/add"
+                ))
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({
+                        "device_id": "dev-1",
+                        "path_or_url": "/videos/movie.mkv",
+                        "storage_type": "nas"
+                    })
+                    .to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(add_location.status(), StatusCode::OK);
+
+    let remove_location = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/inventory/videos/{missing_id}/locations/{missing_id}/remove"
+                ))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(remove_location.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn game_handlers_cover_crud_and_location_routes() {
+    let app = app_with_openapi("{}");
+    let missing_id = "550e8400-e29b-41d4-a716-446655440000";
+
+    let list = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/inventory/games/list")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(list.status(), StatusCode::OK);
+
+    let search = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/inventory/games/search?q=zelda")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(search.status(), StatusCode::OK);
+
+    let add = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/inventory/games/add")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({
+                        "title": "Zelda",
+                        "platform": "Switch",
+                        "store": "eShop"
+                    })
+                    .to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(add.status(), StatusCode::OK);
+
+    let invalid_add = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/inventory/games/add")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"title": ""}).to_string()))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(invalid_add.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    let detail = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/inventory/games/{missing_id}/detail"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(detail.status(), StatusCode::NOT_FOUND);
+
+    let update = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/inventory/games/{missing_id}/update"))
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"title": "Updated"}).to_string()))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(update.status(), StatusCode::NOT_FOUND);
+
+    let delete = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/v1/inventory/games/{missing_id}/delete"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(delete.status(), StatusCode::OK);
+
+    let add_location = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/inventory/games/{missing_id}/locations/add"
+                ))
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({
+                        "device_id": "switch-1",
+                        "path_or_url": "digital",
+                        "storage_type": "platform"
+                    })
+                    .to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(add_location.status(), StatusCode::OK);
+
+    let remove_location = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/inventory/games/{missing_id}/locations/{missing_id}/remove"
+                ))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(remove_location.status(), StatusCode::OK);
+}

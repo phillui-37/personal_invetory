@@ -30,10 +30,14 @@ impl VideoMetaRepository for SqliteVideoMetaRepository {
             |row| {
                 Ok(VideoMeta {
                     resource_id,
-                    duration_secs: row.get::<_, Option<i64>>(0)?.map(|v| v as u64),
+                    duration_secs: row
+                        .get::<_, Option<i64>>(0)?
+                        .map(|v| u64::try_from(v).unwrap_or(0)),
                     file_format: row.get(1)?,
                     resolution: row.get(2)?,
-                    file_size_bytes: row.get::<_, Option<i64>>(3)?.map(|v| v as u64),
+                    file_size_bytes: row
+                        .get::<_, Option<i64>>(3)?
+                        .map(|v| u64::try_from(v).unwrap_or(0)),
                 })
             },
         )
@@ -43,10 +47,14 @@ impl VideoMetaRepository for SqliteVideoMetaRepository {
     }
 
     async fn upsert(&self, resource_id: Uuid, input: NewVideoMeta) -> Result<VideoMeta, DomainError> {
-        let duration_secs = input.duration_secs.map(|v| v as i64);
+        let duration_secs = input
+            .duration_secs
+            .map(|v| i64::try_from(v).unwrap_or(i64::MAX));
         let file_format = input.file_format;
         let resolution = input.resolution;
-        let file_size_bytes = input.file_size_bytes.map(|v| v as i64);
+        let file_size_bytes = input
+            .file_size_bytes
+            .map(|v| i64::try_from(v).unwrap_or(i64::MAX));
         let conn = self
             .conn
             .lock()

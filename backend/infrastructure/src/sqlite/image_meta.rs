@@ -30,10 +30,16 @@ impl ImageMetaRepository for SqliteImageMetaRepository {
             |row| {
                 Ok(ImageMeta {
                     resource_id,
-                    width: row.get::<_, Option<i64>>(0)?.map(|v| v as u32),
-                    height: row.get::<_, Option<i64>>(1)?.map(|v| v as u32),
+                    width: row
+                        .get::<_, Option<i64>>(0)?
+                        .map(|v| u32::try_from(v).unwrap_or(0)),
+                    height: row
+                        .get::<_, Option<i64>>(1)?
+                        .map(|v| u32::try_from(v).unwrap_or(0)),
                     file_format: row.get(2)?,
-                    file_size_bytes: row.get::<_, Option<i64>>(3)?.map(|v| v as u64),
+                    file_size_bytes: row
+                        .get::<_, Option<i64>>(3)?
+                        .map(|v| u64::try_from(v).unwrap_or(0)),
                 })
             },
         )
@@ -43,10 +49,12 @@ impl ImageMetaRepository for SqliteImageMetaRepository {
     }
 
     async fn upsert(&self, resource_id: Uuid, input: NewImageMeta) -> Result<ImageMeta, DomainError> {
-        let width = input.width.map(|v| v as i64);
-        let height = input.height.map(|v| v as i64);
+        let width = input.width.map(i64::from);
+        let height = input.height.map(i64::from);
         let file_format = input.file_format;
-        let file_size_bytes = input.file_size_bytes.map(|v| v as i64);
+        let file_size_bytes = input
+            .file_size_bytes
+            .map(|v| i64::try_from(v).unwrap_or(i64::MAX));
         let conn = self
             .conn
             .lock()

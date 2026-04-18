@@ -34,7 +34,9 @@ impl WebReaderMetaRepository for SqliteWebReaderMetaRepository {
                     url: row.get(0)?,
                     site_name: row.get(1)?,
                     last_checked_chapter: row.get(2)?,
-                    check_interval_secs: row.get::<_, Option<i64>>(3)?.map(|v| v as u64),
+                    check_interval_secs: row
+                        .get::<_, Option<i64>>(3)?
+                        .map(|v| u64::try_from(v).unwrap_or(0)),
                     last_checked_at: row
                         .get::<_, Option<String>>(4)?
                         .and_then(|s| {
@@ -59,7 +61,9 @@ impl WebReaderMetaRepository for SqliteWebReaderMetaRepository {
         let url = input.url;
         let site_name = input.site_name;
         let last_checked_chapter = input.last_checked_chapter;
-        let check_interval_secs = input.check_interval_secs.map(|v| v as i64);
+        let check_interval_secs = input
+            .check_interval_secs
+            .map(|v| i64::try_from(v).unwrap_or(i64::MAX));
         let last_checked_at = input.last_checked_at.map(|dt| dt.to_rfc3339());
         let progress_css_selector = input.progress_css_selector;
         let conn = self

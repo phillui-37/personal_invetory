@@ -388,6 +388,42 @@ fn sqlite_missing_image_meta_returns_not_found() {
 }
 
 #[test]
+fn sqlite_missing_video_meta_returns_not_found() {
+    let bundle = sqlite_bundle();
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "No Meta Video".to_string(),
+                notes: None,
+                resource_type: ResourceType::Video,
+            })
+            .await
+            .expect("create resource");
+        let result = bundle.video_meta_repo.get(resource.id).await;
+        assert!(matches!(result, Err(DomainError::NotFound(_))));
+    });
+}
+
+#[test]
+fn sqlite_missing_game_meta_returns_not_found() {
+    let bundle = sqlite_bundle();
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "No Meta Game".to_string(),
+                notes: None,
+                resource_type: ResourceType::Game,
+            })
+            .await
+            .expect("create resource");
+        let result = bundle.game_meta_repo.get(resource.id).await;
+        assert!(matches!(result, Err(DomainError::NotFound(_))));
+    });
+}
+
+#[test]
 fn sqlite_notification_repository_create_list_and_mark_read() {
     let bundle = sqlite_bundle();
 
