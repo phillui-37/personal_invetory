@@ -1,10 +1,10 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-18 (Phase 2 review fixes complete)
+2026-04-18 (Phase 3 complete)
 
 ## Summary
-Personal inventory system for Phil to track resources (ebooks, web-readers; images/videos/games deferred) across devices, platforms, and storage locations.
+Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
 
 ## Key Decisions
 
@@ -18,7 +18,7 @@ Personal inventory system for Phil to track resources (ebooks, web-readers; imag
 - **Device IDs**: UUID for known devices; free-text ID in `ResourceLocation` for portable storage
 
 ### Data Model
-- Polymorphic: `resources` base + `ebook_metas`/`web_reader_metas` (1:1 FK)
+- Polymorphic: `resources` base + `ebook_metas`/`web_reader_metas`/`image_metas`/`video_metas`/`game_metas` (1:1 FK)
 - `resource_locations` (1:N FK): `device_id`, `path_or_url`, `storage_type` (LocalFs|Nas|Platform|Portable)
 - Case-insensitive unique index on `resources(LOWER(title))`
 - Multiple locations per resource; dedup deferred
@@ -91,7 +91,7 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 ## Phases Overview
 - **Phase 1 (MVP+)**: Ebook + WebReader CRUD/search, ResourceLocation, auth, plugin skeleton, OpenAPI, SQLite/PG portability, fuzzy-search seam, Flutter shell + WebView progress + batch ops. **✅ Implemented.**
 - **Phase 2**: Real plugin implementations, scheduler, notifications, batch import, OpenAPI refresh, and Flutter metadata/check-history UX. **✅ Implemented.**
-- **Phase 3**: Image/video/game resource types.
+- **Phase 3**: Image/video/game resource types. **✅ Implemented.**
 - **Phase 4**: Ecosystem integrations (BookWalker, Kindle, Steam/DLSite/FANZA).
 - **Phase 5**: Optimization and hardening.
 
@@ -99,7 +99,6 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - Tags and tag-based search
 - Device management API (register/list/delink)
 - Deduplication warnings
-- Resource types: image, video, game
 - Real plugin implementations
 - Full metadata extraction auto-fill UX
 
@@ -179,6 +178,24 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - Kickoff implementation follows the Phase 3 task sheet order instead of jumping straight into one slice.
 - Shared foundation work starts first: scope lock, shared type expansion, repository/validation seams, then SQLite persistence.
 - The first Red step targets shared resource-type expansion in backend/domain and frontend/models before adding slice-specific services or screens.
+
+## Phase 3 Implementation Summary
+
+### Backend
+- **Domain**: `ResourceType` enum expanded with `Image`, `Video`, `Game` variants. Six new structs: `ImageMeta`, `VideoMeta`, `GameMeta` + corresponding `New*Meta` inputs. Three new repository traits: `ImageMetaRepository`, `VideoMetaRepository`, `GameMetaRepository`.
+- **Use Cases**: Validation modules (`image.rs`, `video.rs`, `game.rs`) with title, format, and field rules. Image formats: png/jpg/jpeg/gif/bmp/webp/svg/tiff. Video formats: mp4/mkv/avi/webm/mov/wmv/flv. Games: no format restriction.
+- **Infrastructure**: Three new migrations (0010–0012) for `image_metas`, `video_metas`, `game_metas` tables. SQLite repository implementations with upsert semantics. `AdapterBundle` extended with three new repo fields.
+- **Services**: `ImageService`, `VideoService`, `GameService` — same pattern as `EbookService` (list, search, detail, add, update, delete, add_location, remove_location).
+- **Adapters**: 24 new HTTP handler endpoints with utoipa annotations. Routes registered under `/api/v1/inventory/{images,videos,games}/*`. OpenAPI spec updated with all new paths and schemas.
+- **App**: Runtime wires new services from `AdapterBundle`. `AppState` holds 5 services. Integration tests verify all type-specific routes.
+- **Tests**: 168 backend tests green.
+
+### Frontend
+- **Models**: `ImageMeta`, `VideoMeta`, `GameMeta`, `ImageDetail`, `VideoDetail`, `GameDetail` added. Six new input DTOs.
+- **Repositories**: Abstract interfaces for image, video, game. In-memory implementations for offline/test use.
+- **BLoCs**: `ImageBloc`, `VideoBloc`, `GameBloc` with full event/state coverage (Load, Search, Add, Update, Delete, LoadDetail, AddLocation, RemoveLocation).
+- **Screens**: `ResourceListScreen` expanded to 5 tabs. `ResourceDetailScreen` handles all 5 types with MultiBlocListener. `SearchScreen` merges results from all 5 types. `AddResourceScreen` supports forms for all 5 types.
+- **Tests**: 110 frontend tests green.
 
 ## References
 - Requirements: `TODO.md`
