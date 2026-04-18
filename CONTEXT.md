@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-19 (Phase 4 Plan 1 complete)
+2026-04-19 (Phase 4 Plan 2 complete)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
@@ -92,7 +92,7 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - **Phase 1 (MVP+)**: Ebook + WebReader CRUD/search, ResourceLocation, auth, plugin skeleton, OpenAPI, SQLite/PG portability, fuzzy-search seam, Flutter shell + WebView progress + batch ops. **✅ Implemented.**
 - **Phase 2**: Real plugin implementations, scheduler, notifications, batch import, OpenAPI refresh, and Flutter metadata/check-history UX. **✅ Implemented.**
 - **Phase 3**: Image/video/game resource types. **✅ Implemented.**
-- **Phase 4**: Ecosystem integrations (BookWalker, Kindle, Steam/DLSite/FANZA). **Plan 1 (Foundations + Steam) ✅ Implemented.**
+- **Phase 4**: Ecosystem integrations (BookWalker, Kindle, Steam/DLSite/FANZA). **Plan 1 (Foundations + Steam) ✅ Implemented. Plan 2 (Frontend Ecosystem UX) ✅ Implemented.**
 - **Phase 5**: Optimization and hardening.
 
 ## Phase 1 Deferred Items
@@ -171,7 +171,7 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - `flutter test integration_test -d macos` produces harmless "Failed to foreground app" warning.
 
 ## Open Questions
-- Plans 2 & 3 of Phase 4 remain: DLSite/FANZA connectors, BookWalker/Kindle connectors, frontend ecosystem management screens.
+- Remaining Phase 4 work: DLSite/FANZA connectors, BookWalker/Kindle connectors, ecosystem sync backend routes, sync dashboard + ecosystem settings screens.
 - Android/iOS/desktop frontend build setup deferred.
 
 ## Phase 3 Kickoff Notes
@@ -213,10 +213,33 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - `/api/v1/vault/credentials/store` (POST), `/api/v1/vault/credentials/retrieve` (POST), `/api/v1/vault/credentials/delete` (POST), `/api/v1/vault/platforms` (GET)
 - `/api/v1/dedup/scan` (POST), `/api/v1/dedup/warnings` (GET), `/api/v1/dedup/warnings/:id/dismiss` (POST), `/api/v1/dedup/warnings/:id/merge` (POST)
 
+## Phase 4 Plan 2 Implementation Summary (Frontend Ecosystem UX)
+
+### Frontend
+- **Models**: `Vault` (VaultStatus, StoreCredentialInput, RetrieveCredentialInput) and `Dedup` (DedupWarning, DedupWarningStatus, MergeInput) domain models with Equatable + JSON serialization.
+- **Repositories**: Abstract interfaces — `VaultRepository` (8 methods), `DedupRepository` (4 methods). HTTP implementations: `HttpVaultRepository`, `HttpDedupRepository`. Fake implementations for testing.
+- **BLoCs**: `VaultBloc` (5 event handlers: CheckStatus, Initialize, Unlock, StoreCredential, DeleteCredential) and `DedupBloc` (4 handlers: Scan, LoadWarnings, Dismiss, Merge). Sealed events/states with Equatable.
+- **Screens**: `VaultScreen` (BlocConsumer, status-driven UI with password fields), `DedupReviewScreen` (warning cards with dismiss/merge), `EcosystemScreen` (hub with cards linking to Vault and Dedup).
+- **Navigation**: main.dart wired with 4th "Ecosystem" bottom nav tab, VaultBloc + DedupBloc providers via MultiBlocProvider.
+- **Tests**: 159 frontend tests green (49 new tests: 10 model, 15 repo, 15 bloc, 9 widget).
+
+### Commits (9 commits, 71032fc → ef4f098)
+- `71032fc` domain models
+- `165c570` repo interfaces + fakes
+- `8f390a4` VaultBloc + tests
+- `2b80e36` DedupBloc + tests
+- `2a041fd` HttpVaultRepository + tests
+- `2f01ec4` HttpDedupRepository + tests
+- `2712f47` VaultScreen + widget tests
+- `a3bf67f` DedupReviewScreen + widget tests
+- `ef4f098` EcosystemScreen + navigation wiring
+
 ## References
 - Requirements: `TODO.md`
 - Agent rules: `AGENTS.md`
 - Phase 1 tasks: `tasks/phase1.md`
+- Phase 4 tasks: `tasks/phase4.md`
 - Requirements matrix: `tasks/phase1-requirements-matrix.json`
 - Phase 4 design spec: `docs/superpowers/specs/2026-04-18-phase4-ecosystem-integrations-design.md`
 - Phase 4 Plan 1: `docs/superpowers/plans/2026-04-18-phase4-plan1-foundations-steam.md`
+- Phase 4 Plan 2: `docs/superpowers/plans/2026-04-19-phase4-plan2-frontend-ecosystem-ux.md`
