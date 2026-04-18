@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-18 (Phase 3 complete)
+2026-04-19 (Phase 4 Plan 1 complete)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
@@ -92,7 +92,7 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - **Phase 1 (MVP+)**: Ebook + WebReader CRUD/search, ResourceLocation, auth, plugin skeleton, OpenAPI, SQLite/PG portability, fuzzy-search seam, Flutter shell + WebView progress + batch ops. **✅ Implemented.**
 - **Phase 2**: Real plugin implementations, scheduler, notifications, batch import, OpenAPI refresh, and Flutter metadata/check-history UX. **✅ Implemented.**
 - **Phase 3**: Image/video/game resource types. **✅ Implemented.**
-- **Phase 4**: Ecosystem integrations (BookWalker, Kindle, Steam/DLSite/FANZA).
+- **Phase 4**: Ecosystem integrations (BookWalker, Kindle, Steam/DLSite/FANZA). **Plan 1 (Foundations + Steam) ✅ Implemented.**
 - **Phase 5**: Optimization and hardening.
 
 ## Phase 1 Deferred Items
@@ -171,8 +171,8 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - `flutter test integration_test -d macos` produces harmless "Failed to foreground app" warning.
 
 ## Open Questions
-- Phase 3 planning direction is set: add image, video, and game as end-to-end vertical slices over the existing backend/frontend architecture.
-- Android/iOS/desktop frontend build setup is explicitly deferred to Phase 4 as cross-cutting platform work, not Phase 3 implementation scope.
+- Plans 2 & 3 of Phase 4 remain: DLSite/FANZA connectors, BookWalker/Kindle connectors, frontend ecosystem management screens.
+- Android/iOS/desktop frontend build setup deferred.
 
 ## Phase 3 Kickoff Notes
 - Kickoff implementation follows the Phase 3 task sheet order instead of jumping straight into one slice.
@@ -197,8 +197,26 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - **Screens**: `ResourceListScreen` expanded to 5 tabs. `ResourceDetailScreen` handles all 5 types with MultiBlocListener. `SearchScreen` merges results from all 5 types. `AddResourceScreen` supports forms for all 5 types.
 - **Tests**: 110 frontend tests green.
 
+## Phase 4 Plan 1 Implementation Summary (Foundations + Steam)
+
+### Backend
+- **Domain**: `vault.rs` (VaultConfig, VaultBackend trait, CredentialVault trait), `sync.rs` (SyncJob, SyncJobRepository trait), `dedup.rs` (DedupWarning, DedupWarningRepository trait), `ecosystem.rs` (EcosystemConnector trait, DiscoveredItem).
+- **Infrastructure**: `crypto.rs` (AES-256-GCM encryption, Argon2id key derivation). 4 new migrations (0013–0016): vault_config, credentials, sync_jobs, dedup_warnings. SQLite repos: SqliteVaultBackend, SqliteSyncJobRepository, SqliteDedupWarningRepository.
+- **Plugins**: `browser_session.rs` (BrowserPage trait, NoopBrowserPage). `ecosystem/steam.rs` (Steam API client, SteamOwnedGame deserialization).
+- **Services**: `VaultService` (implements CredentialVault with in-memory derived key), `DedupService` (Jaro-Winkler similarity scan, warning management, resource merge), `SyncService` (Steam game import with duplicate-title skipping).
+- **Adapters**: 12 new HTTP routes — vault (status/init/unlock/lock/store/retrieve/delete/platforms) + dedup (scan/warnings/dismiss/merge). AppState extended with optional vault_service and dedup_service.
+- **App**: Runtime wires VaultService, DedupService, SyncService from AdapterBundle.
+- **Tests**: 213 backend tests green (40 new tests added).
+
+### Phase 4 API Endpoints
+- `/api/v1/vault/status` (GET), `/api/v1/vault/initialize` (POST), `/api/v1/vault/unlock` (POST), `/api/v1/vault/lock` (POST)
+- `/api/v1/vault/credentials/store` (POST), `/api/v1/vault/credentials/retrieve` (POST), `/api/v1/vault/credentials/delete` (POST), `/api/v1/vault/platforms` (GET)
+- `/api/v1/dedup/scan` (POST), `/api/v1/dedup/warnings` (GET), `/api/v1/dedup/warnings/:id/dismiss` (POST), `/api/v1/dedup/warnings/:id/merge` (POST)
+
 ## References
 - Requirements: `TODO.md`
 - Agent rules: `AGENTS.md`
 - Phase 1 tasks: `tasks/phase1.md`
 - Requirements matrix: `tasks/phase1-requirements-matrix.json`
+- Phase 4 design spec: `docs/superpowers/specs/2026-04-18-phase4-ecosystem-integrations-design.md`
+- Phase 4 Plan 1: `docs/superpowers/plans/2026-04-18-phase4-plan1-foundations-steam.md`
