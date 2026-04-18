@@ -1,11 +1,15 @@
+import 'package:personal_inventory_frontend/models/dedup.dart';
 import 'package:personal_inventory_frontend/models/failures.dart';
 import 'package:personal_inventory_frontend/models/batch_operations.dart';
 import 'package:personal_inventory_frontend/models/repository_inputs.dart';
 import 'package:personal_inventory_frontend/models/resources.dart';
 import 'package:personal_inventory_frontend/models/result.dart';
+import 'package:personal_inventory_frontend/models/vault.dart';
+import 'package:personal_inventory_frontend/repositories/dedup_repository.dart';
 import 'package:personal_inventory_frontend/repositories/ebook_repository.dart';
 import 'package:personal_inventory_frontend/repositories/game_repository.dart';
 import 'package:personal_inventory_frontend/repositories/image_repository.dart';
+import 'package:personal_inventory_frontend/repositories/vault_repository.dart';
 import 'package:personal_inventory_frontend/repositories/video_repository.dart';
 import 'package:personal_inventory_frontend/repositories/web_reader_repository.dart';
 
@@ -509,4 +513,141 @@ class FakeGameRepository implements GameRepository {
     String id,
     UpdateGameInput input,
   ) async => updateResult ?? const Failure(ServerFailure(500));
+}
+
+class FakeVaultRepository implements VaultRepository {
+  FakeVaultRepository({
+    this.statusResult = const Success(
+      VaultStatus(initialized: false, unlocked: false),
+    ),
+    this.initializeResult = const Success(null),
+    this.unlockResult = const Success(null),
+    this.lockResult = const Success(null),
+    this.storeCredentialResult = const Success(null),
+    this.retrieveCredentialResult = const Success('plaintext'),
+    this.deleteCredentialResult = const Success(null),
+    this.listPlatformsResult = const Success([]),
+  });
+
+  Result<VaultStatus, AppFailure> statusResult;
+  Result<void, AppFailure> initializeResult;
+  Result<void, AppFailure> unlockResult;
+  Result<void, AppFailure> lockResult;
+  Result<void, AppFailure> storeCredentialResult;
+  Result<String, AppFailure> retrieveCredentialResult;
+  Result<void, AppFailure> deleteCredentialResult;
+  Result<List<String>, AppFailure> listPlatformsResult;
+
+  int statusCalls = 0;
+  int initializeCalls = 0;
+  int unlockCalls = 0;
+  int lockCalls = 0;
+  int storeCredentialCalls = 0;
+  int retrieveCredentialCalls = 0;
+  int deleteCredentialCalls = 0;
+  int listPlatformsCalls = 0;
+  String? lastMasterPassword;
+  StoreCredentialInput? lastStoreInput;
+  RetrieveCredentialInput? lastRetrieveInput;
+
+  @override
+  Future<Result<VaultStatus, AppFailure>> getStatus() async {
+    statusCalls += 1;
+    return statusResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> initialize(String masterPassword) async {
+    initializeCalls += 1;
+    lastMasterPassword = masterPassword;
+    return initializeResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> unlock(String masterPassword) async {
+    unlockCalls += 1;
+    lastMasterPassword = masterPassword;
+    return unlockResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> lock() async {
+    lockCalls += 1;
+    return lockResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> storeCredential(StoreCredentialInput input) async {
+    storeCredentialCalls += 1;
+    lastStoreInput = input;
+    return storeCredentialResult;
+  }
+
+  @override
+  Future<Result<String, AppFailure>> retrieveCredential(RetrieveCredentialInput input) async {
+    retrieveCredentialCalls += 1;
+    lastRetrieveInput = input;
+    return retrieveCredentialResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> deleteCredential(RetrieveCredentialInput input) async {
+    deleteCredentialCalls += 1;
+    return deleteCredentialResult;
+  }
+
+  @override
+  Future<Result<List<String>, AppFailure>> listPlatforms() async {
+    listPlatformsCalls += 1;
+    return listPlatformsResult;
+  }
+}
+
+class FakeDedupRepository implements DedupRepository {
+  FakeDedupRepository({
+    this.scanResult = const Success([]),
+    this.listPendingResult = const Success([]),
+    this.dismissResult = const Success(null),
+    this.mergeResult = const Success(null),
+  });
+
+  Result<List<DedupWarning>, AppFailure> scanResult;
+  Result<List<DedupWarning>, AppFailure> listPendingResult;
+  Result<void, AppFailure> dismissResult;
+  Result<void, AppFailure> mergeResult;
+
+  int scanCalls = 0;
+  int listPendingCalls = 0;
+  int dismissCalls = 0;
+  int mergeCalls = 0;
+  String? lastDismissId;
+  String? lastMergeWarningId;
+  MergeInput? lastMergeInput;
+
+  @override
+  Future<Result<List<DedupWarning>, AppFailure>> scanDuplicates() async {
+    scanCalls += 1;
+    return scanResult;
+  }
+
+  @override
+  Future<Result<List<DedupWarning>, AppFailure>> listPendingWarnings() async {
+    listPendingCalls += 1;
+    return listPendingResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> dismissWarning(String id) async {
+    dismissCalls += 1;
+    lastDismissId = id;
+    return dismissResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> mergeResources(String warningId, MergeInput input) async {
+    mergeCalls += 1;
+    lastMergeWarningId = warningId;
+    lastMergeInput = input;
+    return mergeResult;
+  }
 }
