@@ -104,6 +104,9 @@ mod tests {
         assert!(table_names.contains(&"web_reader_metas".to_string()));
         assert!(table_names.contains(&"resource_locations".to_string()));
         assert!(table_names.contains(&"devices".to_string()));
+        assert!(table_names.contains(&"image_metas".to_string()));
+        assert!(table_names.contains(&"video_metas".to_string()));
+        assert!(table_names.contains(&"game_metas".to_string()));
     }
 
     #[test]

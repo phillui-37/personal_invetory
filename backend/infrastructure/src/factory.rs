@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use crate::sqlite;
 use domain::{
-    ChapterCheckRepository, DomainError, EbookMetaRepository, LocationRepository,
-    NotificationRepository, ResourceRepository, WebReaderMetaRepository,
+    ChapterCheckRepository, DomainError, EbookMetaRepository, GameMetaRepository,
+    ImageMetaRepository, LocationRepository, NotificationRepository, ResourceRepository,
+    VideoMetaRepository, WebReaderMetaRepository,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,6 +22,9 @@ pub struct AdapterBundle {
     pub location_repo: Arc<dyn LocationRepository>,
     pub chapter_check_repo: Arc<dyn ChapterCheckRepository>,
     pub notification_repo: Arc<dyn NotificationRepository>,
+    pub image_meta_repo: Arc<dyn ImageMetaRepository>,
+    pub video_meta_repo: Arc<dyn VideoMetaRepository>,
+    pub game_meta_repo: Arc<dyn GameMetaRepository>,
 }
 
 pub struct AdapterFactory;
@@ -38,7 +42,10 @@ impl AdapterFactory {
                 web_reader_meta_repo: Arc::new(sqlite::web_reader_meta::SqliteWebReaderMetaRepository::new(shared.clone())),
                 location_repo: Arc::new(sqlite::location::SqliteLocationRepository::new(shared.clone())),
                 chapter_check_repo: Arc::new(sqlite::chapter_check::SqliteChapterCheckRepository::new(shared.clone())),
-                notification_repo: Arc::new(sqlite::notification::SqliteNotificationRepository::new(shared)),
+                notification_repo: Arc::new(sqlite::notification::SqliteNotificationRepository::new(shared.clone())),
+                image_meta_repo: Arc::new(sqlite::image_meta::SqliteImageMetaRepository::new(shared.clone())),
+                video_meta_repo: Arc::new(sqlite::video_meta::SqliteVideoMetaRepository::new(shared.clone())),
+                game_meta_repo: Arc::new(sqlite::game_meta::SqliteGameMetaRepository::new(shared)),
             });
         }
 

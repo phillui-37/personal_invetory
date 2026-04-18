@@ -2,6 +2,7 @@ use domain::{
     DomainError, NewEbookMeta, NewResource, NewResourceLocation, NewWebReaderMeta, ResourceType,
     StorageType, UpdateResource,
 };
+use domain::{NewImageMeta, NewVideoMeta, NewGameMeta};
 use futures::executor::block_on;
 use infrastructure::{AdapterFactory, DatabaseAdapter};
 
@@ -249,6 +250,140 @@ fn sqlite_chapter_check_repository_create_and_list() {
         // ordered by checked_at DESC, so err_check was inserted last
         assert_eq!(listed[0].id, err_check.id);
         assert_eq!(listed[1].id, check.id);
+    });
+}
+
+#[test]
+fn sqlite_image_meta_repository_upsert_and_get() {
+    let bundle = sqlite_bundle();
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Test Image".to_string(),
+                notes: None,
+                resource_type: ResourceType::Image,
+            })
+            .await
+            .expect("create resource");
+
+        let meta = bundle
+            .image_meta_repo
+            .upsert(
+                resource.id,
+                NewImageMeta {
+                    width: Some(1920),
+                    height: Some(1080),
+                    file_format: Some("png".to_string()),
+                    file_size_bytes: Some(204800),
+                },
+            )
+            .await
+            .expect("upsert image meta");
+        assert_eq!(meta.width, Some(1920));
+
+        let fetched = bundle
+            .image_meta_repo
+            .get(resource.id)
+            .await
+            .expect("get image meta");
+        assert_eq!(fetched.file_format.as_deref(), Some("png"));
+        assert_eq!(fetched.file_size_bytes, Some(204800));
+    });
+}
+
+#[test]
+fn sqlite_video_meta_repository_upsert_and_get() {
+    let bundle = sqlite_bundle();
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Test Video".to_string(),
+                notes: None,
+                resource_type: ResourceType::Video,
+            })
+            .await
+            .expect("create resource");
+
+        let meta = bundle
+            .video_meta_repo
+            .upsert(
+                resource.id,
+                NewVideoMeta {
+                    duration_secs: Some(3600),
+                    file_format: Some("mkv".to_string()),
+                    resolution: Some("1920x1080".to_string()),
+                    file_size_bytes: Some(1_000_000),
+                },
+            )
+            .await
+            .expect("upsert video meta");
+        assert_eq!(meta.duration_secs, Some(3600));
+
+        let fetched = bundle
+            .video_meta_repo
+            .get(resource.id)
+            .await
+            .expect("get video meta");
+        assert_eq!(fetched.resolution.as_deref(), Some("1920x1080"));
+    });
+}
+
+#[test]
+fn sqlite_game_meta_repository_upsert_and_get() {
+    let bundle = sqlite_bundle();
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Test Game".to_string(),
+                notes: None,
+                resource_type: ResourceType::Game,
+            })
+            .await
+            .expect("create resource");
+
+        let meta = bundle
+            .game_meta_repo
+            .upsert(
+                resource.id,
+                NewGameMeta {
+                    platform: Some("Nintendo Switch".to_string()),
+                    store: Some("eShop".to_string()),
+                    developer: None,
+                    publisher: None,
+                    manual_notes: Some("physical cartridge".to_string()),
+                },
+            )
+            .await
+            .expect("upsert game meta");
+        assert_eq!(meta.platform.as_deref(), Some("Nintendo Switch"));
+
+        let fetched = bundle
+            .game_meta_repo
+            .get(resource.id)
+            .await
+            .expect("get game meta");
+        assert_eq!(fetched.manual_notes.as_deref(), Some("physical cartridge"));
+    });
+}
+
+#[test]
+fn sqlite_missing_image_meta_returns_not_found() {
+    let bundle = sqlite_bundle();
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "No Meta Image".to_string(),
+                notes: None,
+                resource_type: ResourceType::Image,
+            })
+            .await
+            .expect("create resource");
+        let result = bundle.image_meta_repo.get(resource.id).await;
+        assert!(matches!(result, Err(DomainError::NotFound(_))));
     });
 }
 
