@@ -1,15 +1,18 @@
 mod chapter_check;
+mod dedup;
 mod ebook;
 mod game;
 mod image;
 mod search;
 mod video;
+mod vault;
 mod web_reader;
 
 use domain::DomainError;
 use use_cases::ValidationError;
 
 pub use chapter_check::{ChapterCheckOps, ChapterCheckService};
+pub use dedup::DedupService;
 pub use domain::SearchStrategyKind;
 pub use ebook::{EbookDetail, EbookService};
 pub use game::{GameDetail, GameService};
@@ -21,6 +24,7 @@ pub use use_cases::image::{NewImageInput, UpdateImageInput};
 pub use use_cases::location::NewLocationInput;
 pub use use_cases::video::{NewVideoInput, UpdateVideoInput};
 pub use use_cases::web_reader::{NewWebReaderInput, UpdateWebReaderInput};
+pub use vault::VaultService;
 pub use video::{VideoDetail, VideoService};
 pub use web_reader::{WebReaderDetail, WebReaderService};
 
