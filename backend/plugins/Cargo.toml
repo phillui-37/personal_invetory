@@ -6,7 +6,7 @@ edition = "2021"
 [features]
 default = []
 stub-plugins = []
-real-plugins = ["dep:chromiumoxide", "dep:tokio", "dep:futures"]
+real-plugins = ["dep:chromiumoxide", "dep:tokio", "dep:futures", "dep:reqwest", "dep:serde_json"]
 
 [dependencies]
 domain = { path = "../domain" }
@@ -16,3 +16,11 @@ regex = "1"
 chromiumoxide = { version = "0.9", optional = true, features = ["rustls", "zip8"] }
 futures = { version = "0.3", optional = true }
 tokio = { version = "1", features = ["full"], optional = true }
+reqwest = { version = "0.12", features = ["json", "cookies"], optional = true }
+serde_json = { version = "1", optional = true }
+async-trait = "0.1"
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["json", "cookies"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }

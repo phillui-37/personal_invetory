@@ -11,6 +11,8 @@ use_cases = { path = "../use_cases" }
 plugins = { path = "../plugins" }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 uuid = { version = "=1.8.0", default-features = false, features = ["v4"] }
+strsim = "0.11"
+infrastructure = { path = "../infrastructure" }
 
 [dev-dependencies]
 async-trait = "0.1"

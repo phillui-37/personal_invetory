@@ -1,3 +1,7 @@
+pub mod dedup;
+pub mod sync;
+pub mod vault;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
