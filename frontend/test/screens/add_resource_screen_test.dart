@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_inventory_frontend/blocs/ebook/ebook_bloc.dart';
+import 'package:personal_inventory_frontend/blocs/game/game_bloc.dart';
+import 'package:personal_inventory_frontend/blocs/image/image_bloc.dart';
+import 'package:personal_inventory_frontend/blocs/video/video_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/web_reader/web_reader_bloc.dart';
 import 'package:personal_inventory_frontend/models/failures.dart';
 import 'package:personal_inventory_frontend/models/resources.dart';
@@ -32,6 +35,9 @@ void main() {
         providers: [
           BlocProvider(create: (_) => EbookBloc(ebookRepo)),
           BlocProvider(create: (_) => WebReaderBloc(webReaderRepo)),
+          BlocProvider(create: (_) => ImageBloc(FakeImageRepository())),
+          BlocProvider(create: (_) => VideoBloc(FakeVideoRepository())),
+          BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
         ],
         child: const MaterialApp(
           home: AddResourceScreen(),
@@ -66,6 +72,9 @@ void main() {
         providers: [
           BlocProvider(create: (_) => EbookBloc(ebookRepo)),
           BlocProvider(create: (_) => WebReaderBloc(webReaderRepo)),
+          BlocProvider(create: (_) => ImageBloc(FakeImageRepository())),
+          BlocProvider(create: (_) => VideoBloc(FakeVideoRepository())),
+          BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
         ],
         child: const MaterialApp(
           home: AddResourceScreen(),
@@ -94,6 +103,9 @@ void main() {
         providers: [
           BlocProvider(create: (_) => EbookBloc(ebookRepo)),
           BlocProvider(create: (_) => WebReaderBloc(webReaderRepo)),
+          BlocProvider(create: (_) => ImageBloc(FakeImageRepository())),
+          BlocProvider(create: (_) => VideoBloc(FakeVideoRepository())),
+          BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
         ],
         child: const MaterialApp(
           home: AddResourceScreen(resourceId: 'e1'),
@@ -125,6 +137,9 @@ void main() {
         providers: [
           BlocProvider(create: (_) => EbookBloc(ebookRepo)),
           BlocProvider(create: (_) => WebReaderBloc(webReaderRepo)),
+          BlocProvider(create: (_) => ImageBloc(FakeImageRepository())),
+          BlocProvider(create: (_) => VideoBloc(FakeVideoRepository())),
+          BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
         ],
         child: const MaterialApp(
           home: AddResourceScreen(initialResourceType: ResourceType.webReader),
@@ -176,6 +191,9 @@ void main() {
         providers: [
           BlocProvider(create: (_) => EbookBloc(ebookRepo)),
           BlocProvider(create: (_) => WebReaderBloc(webReaderRepo)),
+          BlocProvider(create: (_) => ImageBloc(FakeImageRepository())),
+          BlocProvider(create: (_) => VideoBloc(FakeVideoRepository())),
+          BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
         ],
         child: const MaterialApp(
           home: AddResourceScreen(resourceId: 'e1'),
@@ -199,6 +217,9 @@ void main() {
         providers: [
           BlocProvider(create: (_) => EbookBloc(ebookRepo)),
           BlocProvider(create: (_) => WebReaderBloc(webReaderRepo)),
+          BlocProvider(create: (_) => ImageBloc(FakeImageRepository())),
+          BlocProvider(create: (_) => VideoBloc(FakeVideoRepository())),
+          BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
         ],
         child: const MaterialApp(home: AddResourceScreen()),
       ),
@@ -217,6 +238,9 @@ void main() {
         providers: [
           BlocProvider(create: (_) => EbookBloc(ebookRepo)),
           BlocProvider(create: (_) => WebReaderBloc(webReaderRepo)),
+          BlocProvider(create: (_) => ImageBloc(FakeImageRepository())),
+          BlocProvider(create: (_) => VideoBloc(FakeVideoRepository())),
+          BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
         ],
         child: const MaterialApp(
           home: AddResourceScreen(initialResourceType: ResourceType.webReader),

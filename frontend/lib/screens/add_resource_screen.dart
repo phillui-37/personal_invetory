@@ -222,67 +222,195 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
     _pendingResourceId = id;
     _pendingLocation = _hasLocationInput() ? location : null;
 
-    if (_resourceType == ResourceType.ebook) {
-      if (widget.resourceId != null) {
-        context.read<EbookBloc>().add(
-          UpdateEbook(
-            id,
-            UpdateEbookInput(
-              title: _titleController.text,
-              author: _authorController.text.isEmpty ? null : _authorController.text,
-              fileFormat: _fileFormatController.text.isEmpty
-                  ? null
-                  : _fileFormatController.text,
-            ),
-          ),
-        );
-      } else {
-        context.read<EbookBloc>().add(
-          AddEbook(
-            NewEbookInput(
-              resource: resource,
-              meta: EbookMeta(
-                resourceId: id,
-                author: _authorController.text.isEmpty
-                    ? null
-                    : _authorController.text,
+    switch (_resourceType) {
+      case ResourceType.ebook:
+        if (widget.resourceId != null) {
+          context.read<EbookBloc>().add(
+            UpdateEbook(
+              id,
+              UpdateEbookInput(
+                title: _titleController.text,
+                author: _authorController.text.isEmpty ? null : _authorController.text,
                 fileFormat: _fileFormatController.text.isEmpty
                     ? null
                     : _fileFormatController.text,
               ),
             ),
-          ),
-        );
-      }
-      return;
-    }
-
-    if (widget.resourceId != null) {
-      context.read<WebReaderBloc>().add(
-        UpdateWebReader(
-          id,
-          UpdateWebReaderInput(
-            title: _titleController.text,
-            url: _urlController.text,
-            siteName: _siteNameController.text.isEmpty ? null : _siteNameController.text,
-          ),
-        ),
-      );
-    } else {
-      context.read<WebReaderBloc>().add(
-        AddWebReader(
-          NewWebReaderInput(
-            resource: resource,
-            meta: WebReaderMeta(
-              resourceId: id,
-              url: _urlController.text,
-              siteName: _siteNameController.text.isEmpty
-                  ? null
-                  : _siteNameController.text,
+          );
+        } else {
+          context.read<EbookBloc>().add(
+            AddEbook(
+              NewEbookInput(
+                resource: resource,
+                meta: EbookMeta(
+                  resourceId: id,
+                  author: _authorController.text.isEmpty
+                      ? null
+                      : _authorController.text,
+                  fileFormat: _fileFormatController.text.isEmpty
+                      ? null
+                      : _fileFormatController.text,
+                ),
+              ),
             ),
-          ),
-        ),
-      );
+          );
+        }
+
+      case ResourceType.webReader:
+        if (widget.resourceId != null) {
+          context.read<WebReaderBloc>().add(
+            UpdateWebReader(
+              id,
+              UpdateWebReaderInput(
+                title: _titleController.text,
+                url: _urlController.text,
+                siteName: _siteNameController.text.isEmpty ? null : _siteNameController.text,
+              ),
+            ),
+          );
+        } else {
+          context.read<WebReaderBloc>().add(
+            AddWebReader(
+              NewWebReaderInput(
+                resource: resource,
+                meta: WebReaderMeta(
+                  resourceId: id,
+                  url: _urlController.text,
+                  siteName: _siteNameController.text.isEmpty
+                      ? null
+                      : _siteNameController.text,
+                ),
+              ),
+            ),
+          );
+        }
+
+      case ResourceType.image:
+        if (widget.resourceId != null) {
+          context.read<ImageBloc>().add(
+            UpdateImage(
+              id,
+              UpdateImageInput(
+                title: _titleController.text,
+                width: int.tryParse(_widthController.text),
+                height: int.tryParse(_heightController.text),
+                fileFormat: _fileFormatController.text.isEmpty
+                    ? null
+                    : _fileFormatController.text,
+                fileSizeBytes: int.tryParse(_fileSizeBytesController.text),
+              ),
+            ),
+          );
+        } else {
+          context.read<ImageBloc>().add(
+            AddImage(
+              NewImageInput(
+                resource: resource,
+                meta: ImageMeta(
+                  resourceId: id,
+                  width: int.tryParse(_widthController.text),
+                  height: int.tryParse(_heightController.text),
+                  fileFormat: _fileFormatController.text.isEmpty
+                      ? null
+                      : _fileFormatController.text,
+                  fileSizeBytes: int.tryParse(_fileSizeBytesController.text),
+                ),
+              ),
+            ),
+          );
+        }
+
+      case ResourceType.video:
+        if (widget.resourceId != null) {
+          context.read<VideoBloc>().add(
+            UpdateVideo(
+              id,
+              UpdateVideoInput(
+                title: _titleController.text,
+                durationSecs: int.tryParse(_durationController.text),
+                fileFormat: _fileFormatController.text.isEmpty
+                    ? null
+                    : _fileFormatController.text,
+                resolution: _resolutionController.text.isEmpty
+                    ? null
+                    : _resolutionController.text,
+                fileSizeBytes: int.tryParse(_fileSizeBytesController.text),
+              ),
+            ),
+          );
+        } else {
+          context.read<VideoBloc>().add(
+            AddVideo(
+              NewVideoInput(
+                resource: resource,
+                meta: VideoMeta(
+                  resourceId: id,
+                  durationSecs: int.tryParse(_durationController.text),
+                  fileFormat: _fileFormatController.text.isEmpty
+                      ? null
+                      : _fileFormatController.text,
+                  resolution: _resolutionController.text.isEmpty
+                      ? null
+                      : _resolutionController.text,
+                  fileSizeBytes: int.tryParse(_fileSizeBytesController.text),
+                ),
+              ),
+            ),
+          );
+        }
+
+      case ResourceType.game:
+        if (widget.resourceId != null) {
+          context.read<GameBloc>().add(
+            UpdateGame(
+              id,
+              UpdateGameInput(
+                title: _titleController.text,
+                platform: _platformController.text.isEmpty
+                    ? null
+                    : _platformController.text,
+                store: _storeController.text.isEmpty
+                    ? null
+                    : _storeController.text,
+                developer: _developerController.text.isEmpty
+                    ? null
+                    : _developerController.text,
+                publisher: _publisherController.text.isEmpty
+                    ? null
+                    : _publisherController.text,
+                manualNotes: _manualNotesController.text.isEmpty
+                    ? null
+                    : _manualNotesController.text,
+              ),
+            ),
+          );
+        } else {
+          context.read<GameBloc>().add(
+            AddGame(
+              NewGameInput(
+                resource: resource,
+                meta: GameMeta(
+                  resourceId: id,
+                  platform: _platformController.text.isEmpty
+                      ? null
+                      : _platformController.text,
+                  store: _storeController.text.isEmpty
+                      ? null
+                      : _storeController.text,
+                  developer: _developerController.text.isEmpty
+                      ? null
+                      : _developerController.text,
+                  publisher: _publisherController.text.isEmpty
+                      ? null
+                      : _publisherController.text,
+                  manualNotes: _manualNotesController.text.isEmpty
+                      ? null
+                      : _manualNotesController.text,
+                ),
+              ),
+            ),
+          );
+        }
     }
   }
 
@@ -354,6 +482,90 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
     }
   }
 
+  void _onImageOperationSuccess(ImageOperationSuccess state) {
+    if (state.operationType == ImageOperationType.added ||
+        state.operationType == ImageOperationType.updated) {
+      final pendingResourceId = _pendingResourceId;
+      final pendingLocation = _pendingLocation;
+      if (pendingResourceId != null && pendingLocation != null) {
+        context.read<ImageBloc>().add(AddImageLocation(pendingResourceId, pendingLocation));
+        return;
+      }
+      _pendingResourceId = null;
+      _pendingLocation = null;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.resourceId == null ? 'Image added' : 'Image updated')),
+      );
+      return;
+    }
+
+    if (state.operationType == ImageOperationType.locationAdded) {
+      _pendingResourceId = null;
+      _pendingLocation = null;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.resourceId == null ? 'Image added' : 'Image updated')),
+      );
+    }
+  }
+
+  void _onVideoOperationSuccess(VideoOperationSuccess state) {
+    if (state.operationType == VideoOperationType.added ||
+        state.operationType == VideoOperationType.updated) {
+      final pendingResourceId = _pendingResourceId;
+      final pendingLocation = _pendingLocation;
+      if (pendingResourceId != null && pendingLocation != null) {
+        context.read<VideoBloc>().add(AddVideoLocation(pendingResourceId, pendingLocation));
+        return;
+      }
+      _pendingResourceId = null;
+      _pendingLocation = null;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.resourceId == null ? 'Video added' : 'Video updated')),
+      );
+      return;
+    }
+
+    if (state.operationType == VideoOperationType.locationAdded) {
+      _pendingResourceId = null;
+      _pendingLocation = null;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.resourceId == null ? 'Video added' : 'Video updated')),
+      );
+    }
+  }
+
+  void _onGameOperationSuccess(GameOperationSuccess state) {
+    if (state.operationType == GameOperationType.added ||
+        state.operationType == GameOperationType.updated) {
+      final pendingResourceId = _pendingResourceId;
+      final pendingLocation = _pendingLocation;
+      if (pendingResourceId != null && pendingLocation != null) {
+        context.read<GameBloc>().add(AddGameLocation(pendingResourceId, pendingLocation));
+        return;
+      }
+      _pendingResourceId = null;
+      _pendingLocation = null;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.resourceId == null ? 'Game added' : 'Game updated')),
+      );
+      return;
+    }
+
+    if (state.operationType == GameOperationType.locationAdded) {
+      _pendingResourceId = null;
+      _pendingLocation = null;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.resourceId == null ? 'Game added' : 'Game updated')),
+      );
+    }
+  }
+
   bool _hasLocationInput() {
     return _deviceIdController.text.trim().isNotEmpty && _pathController.text.trim().isNotEmpty;
   }
@@ -383,6 +595,64 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
     _notesController.text = detail.resource.notes ?? '';
     _urlController.text = detail.meta.url;
     _siteNameController.text = detail.meta.siteName ?? '';
+    if (detail.locations.isNotEmpty) {
+      _deviceIdController.text = detail.locations.first.deviceId;
+      _pathController.text = detail.locations.first.pathOrUrl;
+      _storageType = detail.locations.first.storageType;
+    }
+    _prefilled = true;
+    setState(() {});
+  }
+
+  void _prefillFromImageDetail(ImageDetail detail) {
+    if (_prefilled) {
+      return;
+    }
+    _titleController.text = detail.resource.title;
+    _notesController.text = detail.resource.notes ?? '';
+    _widthController.text = detail.meta.width?.toString() ?? '';
+    _heightController.text = detail.meta.height?.toString() ?? '';
+    _fileFormatController.text = detail.meta.fileFormat ?? '';
+    _fileSizeBytesController.text = detail.meta.fileSizeBytes?.toString() ?? '';
+    if (detail.locations.isNotEmpty) {
+      _deviceIdController.text = detail.locations.first.deviceId;
+      _pathController.text = detail.locations.first.pathOrUrl;
+      _storageType = detail.locations.first.storageType;
+    }
+    _prefilled = true;
+    setState(() {});
+  }
+
+  void _prefillFromVideoDetail(VideoDetail detail) {
+    if (_prefilled) {
+      return;
+    }
+    _titleController.text = detail.resource.title;
+    _notesController.text = detail.resource.notes ?? '';
+    _durationController.text = detail.meta.durationSecs?.toString() ?? '';
+    _fileFormatController.text = detail.meta.fileFormat ?? '';
+    _resolutionController.text = detail.meta.resolution ?? '';
+    _fileSizeBytesController.text = detail.meta.fileSizeBytes?.toString() ?? '';
+    if (detail.locations.isNotEmpty) {
+      _deviceIdController.text = detail.locations.first.deviceId;
+      _pathController.text = detail.locations.first.pathOrUrl;
+      _storageType = detail.locations.first.storageType;
+    }
+    _prefilled = true;
+    setState(() {});
+  }
+
+  void _prefillFromGameDetail(GameDetail detail) {
+    if (_prefilled) {
+      return;
+    }
+    _titleController.text = detail.resource.title;
+    _notesController.text = detail.resource.notes ?? '';
+    _platformController.text = detail.meta.platform ?? '';
+    _storeController.text = detail.meta.store ?? '';
+    _developerController.text = detail.meta.developer ?? '';
+    _publisherController.text = detail.meta.publisher ?? '';
+    _manualNotesController.text = detail.meta.manualNotes ?? '';
     if (detail.locations.isNotEmpty) {
       _deviceIdController.text = detail.locations.first.deviceId;
       _pathController.text = detail.locations.first.pathOrUrl;
@@ -427,6 +697,51 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
             }
           },
         ),
+        BlocListener<ImageBloc, ImageState>(
+          listener: (context, state) {
+            if (state is ImageDetailLoaded && widget.resourceId == state.image.resource.id) {
+              _prefillFromImageDetail(state.image);
+            }
+            if (state is ImageOperationSuccess) {
+              _onImageOperationSuccess(state);
+            }
+            if (state is ImageError) {
+              _pendingResourceId = null;
+              _pendingLocation = null;
+              _showFailure(state.failure);
+            }
+          },
+        ),
+        BlocListener<VideoBloc, VideoState>(
+          listener: (context, state) {
+            if (state is VideoDetailLoaded && widget.resourceId == state.video.resource.id) {
+              _prefillFromVideoDetail(state.video);
+            }
+            if (state is VideoOperationSuccess) {
+              _onVideoOperationSuccess(state);
+            }
+            if (state is VideoError) {
+              _pendingResourceId = null;
+              _pendingLocation = null;
+              _showFailure(state.failure);
+            }
+          },
+        ),
+        BlocListener<GameBloc, GameState>(
+          listener: (context, state) {
+            if (state is GameDetailLoaded && widget.resourceId == state.game.resource.id) {
+              _prefillFromGameDetail(state.game);
+            }
+            if (state is GameOperationSuccess) {
+              _onGameOperationSuccess(state);
+            }
+            if (state is GameError) {
+              _pendingResourceId = null;
+              _pendingLocation = null;
+              _showFailure(state.failure);
+            }
+          },
+        ),
       ],
       child: Scaffold(
         appBar: AppBar(title: const Text('Add Resource')),
@@ -445,6 +760,18 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
                 DropdownMenuItem(
                   value: ResourceType.webReader,
                   child: Text('Web Reader'),
+                ),
+                DropdownMenuItem(
+                  value: ResourceType.image,
+                  child: Text('Image'),
+                ),
+                DropdownMenuItem(
+                  value: ResourceType.video,
+                  child: Text('Video'),
+                ),
+                DropdownMenuItem(
+                  value: ResourceType.game,
+                  child: Text('Game'),
                 ),
               ],
               onChanged: (value) {
@@ -489,7 +816,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
                 controller: _fileFormatController,
                 decoration: const InputDecoration(labelText: 'File format'),
               ),
-            ] else ...[
+            ] else if (_resourceType == ResourceType.webReader) ...[
               TextField(
                 key: const Key('web-reader-url'),
                 controller: _urlController,
@@ -504,6 +831,79 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
                 key: const Key('web-reader-site-name'),
                 controller: _siteNameController,
                 decoration: const InputDecoration(labelText: 'Site Name'),
+              ),
+            ] else if (_resourceType == ResourceType.image) ...[
+              TextField(
+                key: const Key('image-width'),
+                controller: _widthController,
+                decoration: const InputDecoration(labelText: 'Width'),
+                keyboardType: TextInputType.number,
+              ),
+              TextField(
+                key: const Key('image-height'),
+                controller: _heightController,
+                decoration: const InputDecoration(labelText: 'Height'),
+                keyboardType: TextInputType.number,
+              ),
+              TextField(
+                key: const Key('image-file-format'),
+                controller: _fileFormatController,
+                decoration: const InputDecoration(labelText: 'File format'),
+              ),
+              TextField(
+                key: const Key('image-file-size'),
+                controller: _fileSizeBytesController,
+                decoration: const InputDecoration(labelText: 'File size (bytes)'),
+                keyboardType: TextInputType.number,
+              ),
+            ] else if (_resourceType == ResourceType.video) ...[
+              TextField(
+                key: const Key('video-duration'),
+                controller: _durationController,
+                decoration: const InputDecoration(labelText: 'Duration (secs)'),
+                keyboardType: TextInputType.number,
+              ),
+              TextField(
+                key: const Key('video-file-format'),
+                controller: _fileFormatController,
+                decoration: const InputDecoration(labelText: 'File format'),
+              ),
+              TextField(
+                key: const Key('video-resolution'),
+                controller: _resolutionController,
+                decoration: const InputDecoration(labelText: 'Resolution'),
+              ),
+              TextField(
+                key: const Key('video-file-size'),
+                controller: _fileSizeBytesController,
+                decoration: const InputDecoration(labelText: 'File size (bytes)'),
+                keyboardType: TextInputType.number,
+              ),
+            ] else if (_resourceType == ResourceType.game) ...[
+              TextField(
+                key: const Key('game-platform'),
+                controller: _platformController,
+                decoration: const InputDecoration(labelText: 'Platform'),
+              ),
+              TextField(
+                key: const Key('game-store'),
+                controller: _storeController,
+                decoration: const InputDecoration(labelText: 'Store'),
+              ),
+              TextField(
+                key: const Key('game-developer'),
+                controller: _developerController,
+                decoration: const InputDecoration(labelText: 'Developer'),
+              ),
+              TextField(
+                key: const Key('game-publisher'),
+                controller: _publisherController,
+                decoration: const InputDecoration(labelText: 'Publisher'),
+              ),
+              TextField(
+                key: const Key('game-manual-notes'),
+                controller: _manualNotesController,
+                decoration: const InputDecoration(labelText: 'Manual notes'),
               ),
             ],
             const SizedBox(height: 12),
