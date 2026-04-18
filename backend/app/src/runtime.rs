@@ -5,7 +5,7 @@ use adapters::{build_router, generate_openapi_json, AppState, BroadcastNotifier}
 use axum::Router;
 use infrastructure::{resolve_search_strategy, AdapterFactory};
 use plugins::{PluginRegistry, PluginsConfig, PluginsToml, WebChecker, WebCheckerConfig};
-use services::{ChapterCheckService, EbookService, GameService, ImageService, SearchConfig, VideoService, WebReaderService};
+use services::{ChapterCheckService, DedupService, EbookService, GameService, ImageService, SearchConfig, SyncService, VaultService, VideoService, WebReaderService};
 use tokio_util::sync::CancellationToken;
 
 use crate::config::AppConfig;
@@ -48,10 +48,24 @@ pub fn build_app_router(config: &AppConfig, api_key: String) -> Result<Router, d
     ));
     let game_service = Arc::new(GameService::new_with_search_config(
         resource_repo.clone(),
-        bundle.game_meta_repo,
-        location_repo,
+        bundle.game_meta_repo.clone(),
+        location_repo.clone(),
         search_config,
     ));
+
+    let vault_service: Arc<dyn domain::vault::CredentialVault> = Arc::new(
+        VaultService::new(bundle.vault_backend),
+    );
+    let dedup_service = Arc::new(DedupService::new(
+        resource_repo.clone(),
+        location_repo,
+        bundle.dedup_warning_repo,
+    ));
+    let _sync_service = SyncService::new(
+        resource_repo.clone(),
+        bundle.game_meta_repo,
+        bundle.sync_job_repo,
+    );
 
     let mut state = AppState::new(
         ebook_service,
@@ -84,6 +98,8 @@ pub fn build_app_router(config: &AppConfig, api_key: String) -> Result<Router, d
         .with_broadcaster(broadcaster),
     );
     state = state.with_chapter_check_service(chapter_check_service.clone());
+    state = state.with_vault_service(vault_service);
+    state = state.with_dedup_service(dedup_service);
     state.plugin_registry = Arc::new(plugin_registry);
     state.openapi_json = generate_openapi_json();
     if config.scheduler_enabled {
@@ -249,6 +265,42 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/inventory/games/list")
+                    .header("authorization", "Bearer secret")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn app_router_wires_vault_service() {
+        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/vault/status")
+                    .header("authorization", "Bearer secret")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn app_router_wires_dedup_service() {
+        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/dedup/warnings")
                     .header("authorization", "Bearer secret")
                     .body(Body::empty())
                     .expect("request"),
