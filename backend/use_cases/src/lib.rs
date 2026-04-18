@@ -1,5 +1,8 @@
 pub mod ebook;
+pub mod game;
+pub mod image;
 pub mod location;
+pub mod video;
 pub mod web_reader;
 
 use std::collections::BTreeMap;
