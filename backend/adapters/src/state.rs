@@ -3,14 +3,17 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use chrono::Utc;
 use domain::{
-    ChapterCheck, DomainError, EbookMeta, EbookMetaRepository,
-    LocationRepository, NewEbookMeta, NewResource, NewResourceLocation, NewWebReaderMeta,
-    Notification, Resource, ResourceLocation, ResourceRepository,
-    UpdateResource, WebReaderMeta, WebReaderMetaRepository,
+    ChapterCheck, DomainError, EbookMeta, EbookMetaRepository, GameMeta, GameMetaRepository,
+    ImageMeta, ImageMetaRepository, LocationRepository, NewEbookMeta, NewGameMeta, NewImageMeta,
+    NewResource, NewResourceLocation, NewVideoMeta, NewWebReaderMeta, Notification, Resource,
+    ResourceLocation, ResourceRepository, UpdateResource, VideoMeta, VideoMetaRepository,
+    WebReaderMeta, WebReaderMetaRepository,
 };
 use plugins::PluginRegistry;
 use serde::Serialize;
-use services::{ChapterCheckOps, EbookService, WebReaderService};
+use services::{
+    ChapterCheckOps, EbookService, GameService, ImageService, VideoService, WebReaderService,
+};
 use tokio::sync::broadcast;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -25,6 +28,9 @@ pub struct NotificationEvent {
 pub struct AppState {
     pub ebook_service: Arc<EbookService>,
     pub web_reader_service: Arc<WebReaderService>,
+    pub image_service: Arc<ImageService>,
+    pub video_service: Arc<VideoService>,
+    pub game_service: Arc<GameService>,
     pub chapter_check_service: Option<Arc<dyn ChapterCheckOps>>,
     pub plugin_registry: Arc<PluginRegistry>,
     pub api_key: String,
@@ -36,12 +42,18 @@ impl AppState {
     pub fn new(
         ebook_service: Arc<EbookService>,
         web_reader_service: Arc<WebReaderService>,
+        image_service: Arc<ImageService>,
+        video_service: Arc<VideoService>,
+        game_service: Arc<GameService>,
         api_key: String,
     ) -> Self {
         let (notification_tx, _) = broadcast::channel(64);
         Self {
             ebook_service,
             web_reader_service,
+            image_service,
+            video_service,
+            game_service,
             chapter_check_service: None,
             plugin_registry: Arc::new(PluginRegistry::default()),
             api_key,
@@ -65,12 +77,34 @@ impl AppState {
             location_repo.clone(),
         ));
         let web_reader_service = Arc::new(WebReaderService::new(
-            resource_repo,
+            resource_repo.clone(),
             Arc::new(NoopWebReaderMetaRepository::default()),
+            location_repo.clone(),
+        ));
+        let image_service = Arc::new(ImageService::new(
+            resource_repo.clone(),
+            Arc::new(NoopImageMetaRepository::default()),
+            location_repo.clone(),
+        ));
+        let video_service = Arc::new(VideoService::new(
+            resource_repo.clone(),
+            Arc::new(NoopVideoMetaRepository::default()),
+            location_repo.clone(),
+        ));
+        let game_service = Arc::new(GameService::new(
+            resource_repo,
+            Arc::new(NoopGameMetaRepository::default()),
             location_repo,
         ));
 
-        let mut state = Self::new(ebook_service, web_reader_service, api_key);
+        let mut state = Self::new(
+            ebook_service,
+            web_reader_service,
+            image_service,
+            video_service,
+            game_service,
+            api_key,
+        );
         state.chapter_check_service = Some(Arc::new(NoopChapterCheckOps));
         state
     }
@@ -231,5 +265,84 @@ impl domain::NotificationBroadcaster for BroadcastNotifier {
             message: notification.message.clone(),
         };
         let _ = self.0.send(event);
+    }
+}
+
+#[derive(Default)]
+struct NoopImageMetaRepository;
+
+#[async_trait]
+impl ImageMetaRepository for NoopImageMetaRepository {
+    async fn get(&self, resource_id: Uuid) -> Result<ImageMeta, DomainError> {
+        Err(DomainError::NotFound(format!(
+            "image meta for {resource_id} not found"
+        )))
+    }
+
+    async fn upsert(
+        &self,
+        resource_id: Uuid,
+        input: NewImageMeta,
+    ) -> Result<ImageMeta, DomainError> {
+        Ok(ImageMeta {
+            resource_id,
+            width: input.width,
+            height: input.height,
+            file_format: input.file_format,
+            file_size_bytes: input.file_size_bytes,
+        })
+    }
+}
+
+#[derive(Default)]
+struct NoopVideoMetaRepository;
+
+#[async_trait]
+impl VideoMetaRepository for NoopVideoMetaRepository {
+    async fn get(&self, resource_id: Uuid) -> Result<VideoMeta, DomainError> {
+        Err(DomainError::NotFound(format!(
+            "video meta for {resource_id} not found"
+        )))
+    }
+
+    async fn upsert(
+        &self,
+        resource_id: Uuid,
+        input: NewVideoMeta,
+    ) -> Result<VideoMeta, DomainError> {
+        Ok(VideoMeta {
+            resource_id,
+            duration_secs: input.duration_secs,
+            file_format: input.file_format,
+            resolution: input.resolution,
+            file_size_bytes: input.file_size_bytes,
+        })
+    }
+}
+
+#[derive(Default)]
+struct NoopGameMetaRepository;
+
+#[async_trait]
+impl GameMetaRepository for NoopGameMetaRepository {
+    async fn get(&self, resource_id: Uuid) -> Result<GameMeta, DomainError> {
+        Err(DomainError::NotFound(format!(
+            "game meta for {resource_id} not found"
+        )))
+    }
+
+    async fn upsert(
+        &self,
+        resource_id: Uuid,
+        input: NewGameMeta,
+    ) -> Result<GameMeta, DomainError> {
+        Ok(GameMeta {
+            resource_id,
+            platform: input.platform,
+            store: input.store,
+            developer: input.developer,
+            publisher: input.publisher,
+            manual_notes: input.manual_notes,
+        })
     }
 }

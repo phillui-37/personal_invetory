@@ -1,6 +1,6 @@
 use domain::{
-    ChapterCheck, EbookMeta, Notification, Resource, ResourceLocation, ResourceType, StorageType,
-    WebReaderMeta,
+    ChapterCheck, EbookMeta, GameMeta, ImageMeta, Notification, Resource, ResourceLocation,
+    ResourceType, StorageType, VideoMeta, WebReaderMeta,
 };
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -11,7 +11,10 @@ use crate::{
         BatchImportSuccess,
     },
     ebook::{AddEbookRequest, AddLocationRequest as EbookAddLocationRequest, EbookDetailResponse, UpdateEbookRequest},
+    game::{AddGameRequest, AddLocationRequest as GameAddLocationRequest, GameDetailResponse, UpdateGameRequest},
+    image::{AddImageRequest, AddLocationRequest as ImageAddLocationRequest, ImageDetailResponse, UpdateImageRequest},
     state::NotificationEvent,
+    video::{AddLocationRequest as VideoAddLocationRequest, AddVideoRequest, UpdateVideoRequest, VideoDetailResponse},
     web_reader::{
         AddLocationRequest as WebReaderAddLocationRequest, UpsertWebReaderRequest,
         UpdateWebReaderRequest, WebReaderDetailResponse,
@@ -56,6 +59,30 @@ impl Modify for SecurityAddon {
         crate::web_reader::delete_web_reader,
         crate::web_reader::add_web_reader_location,
         crate::web_reader::remove_web_reader_location,
+        crate::image::list_images,
+        crate::image::search_images,
+        crate::image::add_image,
+        crate::image::image_detail,
+        crate::image::update_image,
+        crate::image::delete_image,
+        crate::image::add_image_location,
+        crate::image::remove_image_location,
+        crate::video::list_videos,
+        crate::video::search_videos,
+        crate::video::add_video,
+        crate::video::video_detail,
+        crate::video::update_video,
+        crate::video::delete_video,
+        crate::video::add_video_location,
+        crate::video::remove_video_location,
+        crate::game::list_games,
+        crate::game::search_games,
+        crate::game::add_game,
+        crate::game::game_detail,
+        crate::game::update_game,
+        crate::game::delete_game,
+        crate::game::add_game_location,
+        crate::game::remove_game_location,
         crate::chapter_check::trigger_chapter_check,
         crate::chapter_check::list_chapter_checks,
         crate::notifications::list_notifications,
@@ -71,6 +98,9 @@ impl Modify for SecurityAddon {
             StorageType,
             EbookMeta,
             WebReaderMeta,
+            ImageMeta,
+            VideoMeta,
+            GameMeta,
             ChapterCheck,
             Notification,
             NotificationEvent,
@@ -82,6 +112,18 @@ impl Modify for SecurityAddon {
             UpsertWebReaderRequest,
             UpdateWebReaderRequest,
             WebReaderAddLocationRequest,
+            ImageDetailResponse,
+            AddImageRequest,
+            UpdateImageRequest,
+            ImageAddLocationRequest,
+            VideoDetailResponse,
+            AddVideoRequest,
+            UpdateVideoRequest,
+            VideoAddLocationRequest,
+            GameDetailResponse,
+            AddGameRequest,
+            UpdateGameRequest,
+            GameAddLocationRequest,
             BatchImportEbookEntry,
             BatchImportLocationInput,
             BatchImportSuccess,
@@ -92,7 +134,7 @@ impl Modify for SecurityAddon {
     info(
         title = "Personal Inventory API",
         version = "1.0.0",
-        description = "API for managing personal inventory resources (ebooks, web readers)"
+        description = "API for managing personal inventory resources (ebooks, web readers, images, videos, games)"
     )
 )]
 pub struct ApiDoc;

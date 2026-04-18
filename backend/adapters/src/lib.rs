@@ -3,11 +3,14 @@ mod batch_import;
 mod chapter_check;
 mod ebook;
 mod error;
+mod game;
+mod image;
 mod notifications;
 mod openapi;
 mod routes;
 mod state;
 mod system;
+mod video;
 mod web_reader;
 
 pub use auth::auth_middleware;

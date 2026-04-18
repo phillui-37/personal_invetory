@@ -5,7 +5,7 @@ use adapters::{build_router, generate_openapi_json, AppState, BroadcastNotifier}
 use axum::Router;
 use infrastructure::{resolve_search_strategy, AdapterFactory};
 use plugins::{PluginRegistry, PluginsConfig, PluginsToml, WebChecker, WebCheckerConfig};
-use services::{ChapterCheckService, EbookService, SearchConfig, WebReaderService};
+use services::{ChapterCheckService, EbookService, GameService, ImageService, SearchConfig, VideoService, WebReaderService};
 use tokio_util::sync::CancellationToken;
 
 use crate::config::AppConfig;
@@ -31,11 +31,36 @@ pub fn build_app_router(config: &AppConfig, api_key: String) -> Result<Router, d
     let web_reader_service = Arc::new(WebReaderService::new_with_search_config(
         resource_repo.clone(),
         web_reader_meta_repo.clone(),
+        location_repo.clone(),
+        search_config,
+    ));
+    let image_service = Arc::new(ImageService::new_with_search_config(
+        resource_repo.clone(),
+        bundle.image_meta_repo,
+        location_repo.clone(),
+        search_config,
+    ));
+    let video_service = Arc::new(VideoService::new_with_search_config(
+        resource_repo.clone(),
+        bundle.video_meta_repo,
+        location_repo.clone(),
+        search_config,
+    ));
+    let game_service = Arc::new(GameService::new_with_search_config(
+        resource_repo.clone(),
+        bundle.game_meta_repo,
         location_repo,
         search_config,
     ));
 
-    let mut state = AppState::new(ebook_service, web_reader_service, api_key);
+    let mut state = AppState::new(
+        ebook_service,
+        web_reader_service,
+        image_service,
+        video_service,
+        game_service,
+        api_key,
+    );
     let web_checker_config = load_web_checker_config(&config.plugins_config);
     let mut plugin_registry = PluginRegistry::from_config(&PluginsConfig {
         use_noop_metadata_extractor: false,
@@ -170,6 +195,60 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/notifications")
+                    .header("authorization", "Bearer secret")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn app_router_wires_image_service() {
+        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/inventory/images/list")
+                    .header("authorization", "Bearer secret")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn app_router_wires_video_service() {
+        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/inventory/videos/list")
+                    .header("authorization", "Bearer secret")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn app_router_wires_game_service() {
+        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/inventory/games/list")
                     .header("authorization", "Bearer secret")
                     .body(Body::empty())
                     .expect("request"),
