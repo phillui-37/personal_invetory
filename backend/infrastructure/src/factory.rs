@@ -28,6 +28,7 @@ pub struct AdapterBundle {
     pub vault_backend: Arc<dyn domain::vault::VaultBackend>,
     pub sync_job_repo: Arc<dyn domain::sync::SyncJobRepository>,
     pub dedup_warning_repo: Arc<dyn domain::dedup::DedupWarningRepository>,
+    pub device_repo: Arc<dyn domain::device::DeviceRepository>,
 }
 
 pub struct AdapterFactory;
@@ -40,18 +41,41 @@ impl AdapterFactory {
             return Ok(AdapterBundle {
                 database: DatabaseAdapter::Sqlite,
                 database_url: database_url.to_string(),
-                resource_repo: Arc::new(sqlite::resource::SqliteResourceRepository::new(shared.clone())),
-                ebook_meta_repo: Arc::new(sqlite::ebook_meta::SqliteEbookMetaRepository::new(shared.clone())),
-                web_reader_meta_repo: Arc::new(sqlite::web_reader_meta::SqliteWebReaderMetaRepository::new(shared.clone())),
-                location_repo: Arc::new(sqlite::location::SqliteLocationRepository::new(shared.clone())),
-                chapter_check_repo: Arc::new(sqlite::chapter_check::SqliteChapterCheckRepository::new(shared.clone())),
-                notification_repo: Arc::new(sqlite::notification::SqliteNotificationRepository::new(shared.clone())),
-                image_meta_repo: Arc::new(sqlite::image_meta::SqliteImageMetaRepository::new(shared.clone())),
-                video_meta_repo: Arc::new(sqlite::video_meta::SqliteVideoMetaRepository::new(shared.clone())),
-                game_meta_repo: Arc::new(sqlite::game_meta::SqliteGameMetaRepository::new(shared.clone())),
+                resource_repo: Arc::new(sqlite::resource::SqliteResourceRepository::new(
+                    shared.clone(),
+                )),
+                ebook_meta_repo: Arc::new(sqlite::ebook_meta::SqliteEbookMetaRepository::new(
+                    shared.clone(),
+                )),
+                web_reader_meta_repo: Arc::new(
+                    sqlite::web_reader_meta::SqliteWebReaderMetaRepository::new(shared.clone()),
+                ),
+                location_repo: Arc::new(sqlite::location::SqliteLocationRepository::new(
+                    shared.clone(),
+                )),
+                chapter_check_repo: Arc::new(
+                    sqlite::chapter_check::SqliteChapterCheckRepository::new(shared.clone()),
+                ),
+                notification_repo: Arc::new(
+                    sqlite::notification::SqliteNotificationRepository::new(shared.clone()),
+                ),
+                image_meta_repo: Arc::new(sqlite::image_meta::SqliteImageMetaRepository::new(
+                    shared.clone(),
+                )),
+                video_meta_repo: Arc::new(sqlite::video_meta::SqliteVideoMetaRepository::new(
+                    shared.clone(),
+                )),
+                game_meta_repo: Arc::new(sqlite::game_meta::SqliteGameMetaRepository::new(
+                    shared.clone(),
+                )),
                 vault_backend: Arc::new(sqlite::vault::SqliteVaultBackend::new(shared.clone())),
-                sync_job_repo: Arc::new(sqlite::sync_job::SqliteSyncJobRepository::new(shared.clone())),
-                dedup_warning_repo: Arc::new(sqlite::dedup::SqliteDedupWarningRepository::new(shared)),
+                sync_job_repo: Arc::new(sqlite::sync_job::SqliteSyncJobRepository::new(
+                    shared.clone(),
+                )),
+                dedup_warning_repo: Arc::new(sqlite::dedup::SqliteDedupWarningRepository::new(
+                    shared.clone(),
+                )),
+                device_repo: Arc::new(sqlite::device::SqliteDeviceRepository::new(shared)),
             });
         }
 

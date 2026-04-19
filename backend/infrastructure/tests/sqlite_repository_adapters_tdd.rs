@@ -1,9 +1,9 @@
+use domain::sync::SyncJob;
 use domain::{
     DomainError, NewEbookMeta, NewResource, NewResourceLocation, NewWebReaderMeta, ResourceType,
     StorageType, UpdateResource,
 };
-use domain::{NewImageMeta, NewVideoMeta, NewGameMeta};
-use domain::sync::SyncJob;
+use domain::{NewGameMeta, NewImageMeta, NewVideoMeta};
 use futures::executor::block_on;
 use infrastructure::{AdapterFactory, DatabaseAdapter};
 
@@ -504,9 +504,18 @@ fn sqlite_vault_backend_config_roundtrip() {
             key_check: vec![5, 6, 7, 8],
             key_check_nonce: vec![9, 10, 11],
         };
-        bundle.vault_backend.save_config(&vault_config).await.expect("save config");
+        bundle
+            .vault_backend
+            .save_config(&vault_config)
+            .await
+            .expect("save config");
 
-        let loaded = bundle.vault_backend.get_config().await.expect("get config").expect("some");
+        let loaded = bundle
+            .vault_backend
+            .get_config()
+            .await
+            .expect("get config")
+            .expect("some");
         assert_eq!(loaded.salt, vec![1, 2, 3, 4]);
         assert_eq!(loaded.key_check, vec![5, 6, 7, 8]);
         assert_eq!(loaded.key_check_nonce, vec![9, 10, 11]);
@@ -517,12 +526,14 @@ fn sqlite_vault_backend_config_roundtrip() {
 fn sqlite_vault_backend_blob_store_retrieve_delete() {
     let bundle = sqlite_bundle();
     block_on(async {
-        bundle.vault_backend
+        bundle
+            .vault_backend
             .store_blob("steam", "api_key", b"encrypted-data", b"nonce-12bytes")
             .await
             .expect("store");
 
-        let (blob, nonce) = bundle.vault_backend
+        let (blob, nonce) = bundle
+            .vault_backend
             .retrieve_blob("steam", "api_key")
             .await
             .expect("retrieve");
@@ -532,7 +543,11 @@ fn sqlite_vault_backend_blob_store_retrieve_delete() {
         let platforms = bundle.vault_backend.list_platforms().await.expect("list");
         assert_eq!(platforms, vec!["steam".to_string()]);
 
-        bundle.vault_backend.delete_credential("steam", "api_key").await.expect("delete");
+        bundle
+            .vault_backend
+            .delete_credential("steam", "api_key")
+            .await
+            .expect("delete");
         let result = bundle.vault_backend.retrieve_blob("steam", "api_key").await;
         assert!(matches!(result, Err(DomainError::NotFound(_))));
     });
@@ -542,16 +557,19 @@ fn sqlite_vault_backend_blob_store_retrieve_delete() {
 fn sqlite_vault_backend_upsert_overwrites() {
     let bundle = sqlite_bundle();
     block_on(async {
-        bundle.vault_backend
+        bundle
+            .vault_backend
             .store_blob("dlsite", "cookie_jar", b"old", b"nonce1-12byte")
             .await
             .expect("store 1");
-        bundle.vault_backend
+        bundle
+            .vault_backend
             .store_blob("dlsite", "cookie_jar", b"new", b"nonce2-12byte")
             .await
             .expect("store 2");
 
-        let (blob, nonce) = bundle.vault_backend
+        let (blob, nonce) = bundle
+            .vault_backend
             .retrieve_blob("dlsite", "cookie_jar")
             .await
             .expect("retrieve");
@@ -566,8 +584,11 @@ fn sqlite_sync_job_create_update_and_list() {
     block_on(async {
         use domain::sync::{NewSyncJob, SyncJobStatus};
 
-        let job = bundle.sync_job_repo
-            .create(NewSyncJob { platform: "steam".to_string() })
+        let job = bundle
+            .sync_job_repo
+            .create(NewSyncJob {
+                platform: "steam".to_string(),
+            })
             .await
             .expect("create");
         assert_eq!(job.platform, "steam");
@@ -595,7 +616,11 @@ fn sqlite_sync_job_create_update_and_list() {
         assert_eq!(loaded.items_created, 8);
         assert_eq!(loaded.items_skipped, 2);
 
-        let list = bundle.sync_job_repo.list_by_platform("steam").await.expect("list");
+        let list = bundle
+            .sync_job_repo
+            .list_by_platform("steam")
+            .await
+            .expect("list");
         assert_eq!(list.len(), 1);
     });
 }
@@ -606,32 +631,149 @@ fn sqlite_dedup_warning_create_dismiss_and_exists() {
     block_on(async {
         use domain::dedup::NewDedupWarning;
 
-        let res_a = bundle.resource_repo
-            .create(NewResource { title: "Zelda TOTK".to_string(), notes: None, resource_type: ResourceType::Game })
-            .await.expect("create a");
-        let res_b = bundle.resource_repo
-            .create(NewResource { title: "Zelda Tears".to_string(), notes: None, resource_type: ResourceType::Game })
-            .await.expect("create b");
+        let res_a = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Zelda TOTK".to_string(),
+                notes: None,
+                resource_type: ResourceType::Game,
+            })
+            .await
+            .expect("create a");
+        let res_b = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Zelda Tears".to_string(),
+                notes: None,
+                resource_type: ResourceType::Game,
+            })
+            .await
+            .expect("create b");
 
-        let warning = bundle.dedup_warning_repo
+        let warning = bundle
+            .dedup_warning_repo
             .create(NewDedupWarning {
                 resource_id_a: res_a.id,
                 resource_id_b: res_b.id,
                 similarity_score: 0.91,
             })
-            .await.expect("create warning");
+            .await
+            .expect("create warning");
 
-        let pending = bundle.dedup_warning_repo.list_pending().await.expect("list");
+        let pending = bundle
+            .dedup_warning_repo
+            .list_pending()
+            .await
+            .expect("list");
         assert_eq!(pending.len(), 1);
         assert!((pending[0].similarity_score - 0.91).abs() < f64::EPSILON);
 
-        let exists = bundle.dedup_warning_repo.exists_pair(res_a.id, res_b.id).await.expect("exists");
+        let exists = bundle
+            .dedup_warning_repo
+            .exists_pair(res_a.id, res_b.id)
+            .await
+            .expect("exists");
         assert!(exists);
-        let exists_reverse = bundle.dedup_warning_repo.exists_pair(res_b.id, res_a.id).await.expect("exists reverse");
+        let exists_reverse = bundle
+            .dedup_warning_repo
+            .exists_pair(res_b.id, res_a.id)
+            .await
+            .expect("exists reverse");
         assert!(exists_reverse);
 
-        bundle.dedup_warning_repo.dismiss(warning.id).await.expect("dismiss");
-        let pending_after = bundle.dedup_warning_repo.list_pending().await.expect("list after");
+        bundle
+            .dedup_warning_repo
+            .dismiss(warning.id)
+            .await
+            .expect("dismiss");
+        let pending_after = bundle
+            .dedup_warning_repo
+            .list_pending()
+            .await
+            .expect("list after");
         assert_eq!(pending_after.len(), 0);
+    });
+}
+
+#[test]
+fn sqlite_device_repository_register_list_and_delink() {
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        // Register two devices
+        let d1 = bundle
+            .device_repo
+            .register("desktop-home", Some("Home Desktop"))
+            .await
+            .expect("register desktop-home");
+        assert_eq!(d1.device_id, "desktop-home");
+        assert_eq!(d1.device_name.as_deref(), Some("Home Desktop"));
+        assert!(d1.delinked_at.is_none());
+        assert_eq!(d1.location_count, 0);
+
+        let d2 = bundle
+            .device_repo
+            .register("laptop-work", None)
+            .await
+            .expect("register laptop-work");
+        assert_eq!(d2.device_id, "laptop-work");
+        assert_eq!(d2.device_name, None);
+
+        // List returns both
+        let all = bundle
+            .device_repo
+            .all_with_counts()
+            .await
+            .expect("all_with_counts");
+        assert_eq!(all.len(), 2);
+
+        // Re-register same device_id delinks old, inserts new
+        let d1b = bundle
+            .device_repo
+            .register("desktop-home", Some("Home Desktop v2"))
+            .await
+            .expect("re-register desktop-home");
+        assert_eq!(d1b.device_name.as_deref(), Some("Home Desktop v2"));
+        let all2 = bundle
+            .device_repo
+            .all_with_counts()
+            .await
+            .expect("all_with_counts after re-register");
+        assert_eq!(all2.len(), 2, "re-register must not add a third row");
+
+        // active_by_device_id returns the live binding
+        let active = bundle
+            .device_repo
+            .active_by_device_id("desktop-home")
+            .await
+            .expect("active_by_device_id");
+        assert!(active.is_some());
+        assert_eq!(
+            active.unwrap().device_name.as_deref(),
+            Some("Home Desktop v2")
+        );
+
+        // Delink laptop-work
+        bundle
+            .device_repo
+            .delink("laptop-work", chrono::Utc::now())
+            .await
+            .expect("delink laptop-work");
+
+        // Double-delink returns Conflict
+        let err = bundle
+            .device_repo
+            .delink("laptop-work", chrono::Utc::now())
+            .await
+            .expect_err("second delink should fail");
+        assert!(matches!(err, domain::DomainError::Conflict(_)));
+
+        // Unknown device returns NotFound
+        let err2 = bundle
+            .device_repo
+            .delink("nonexistent", chrono::Utc::now())
+            .await
+            .expect_err("delink unknown should fail");
+        assert!(matches!(err2, domain::DomainError::NotFound(_)));
     });
 }
