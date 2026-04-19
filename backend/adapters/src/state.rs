@@ -40,6 +40,7 @@ pub struct AppState {
     pub vault_service: Option<Arc<dyn domain::vault::CredentialVault>>,
     pub dedup_service: Option<Arc<services::DedupService>>,
     pub sync_service: Option<Arc<SyncService>>,
+    pub device_service: Option<Arc<services::DeviceService>>,
 }
 
 impl AppState {
@@ -66,6 +67,7 @@ impl AppState {
             vault_service: None,
             dedup_service: None,
             sync_service: None,
+            device_service: None,
         }
     }
 
@@ -86,6 +88,11 @@ impl AppState {
 
     pub fn with_sync_service(mut self, svc: Arc<SyncService>) -> Self {
         self.sync_service = Some(svc);
+        self
+    }
+
+    pub fn with_device_service(mut self, svc: Arc<services::DeviceService>) -> Self {
+        self.device_service = Some(svc);
         self
     }
 
@@ -131,6 +138,7 @@ impl AppState {
         state.vault_service = None;
         state.dedup_service = None;
         state.sync_service = None;
+        state.device_service = None;
         state
     }
 }
