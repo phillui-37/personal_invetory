@@ -452,6 +452,28 @@ mod tests {
         };
         assert_eq!(input.platform.as_deref(), Some("Steam"));
     }
+
+    #[test]
+    fn resource_progress_struct_shape() {
+        use crate::progress::ResourceProgress;
+        
+        let now = Utc::now();
+        let progress = ResourceProgress {
+            resource_id: "res-123".to_string(),
+            progress: 0.5,
+            notes: Some("Half-way through".to_string()),
+            updated_at: now,
+        };
+        
+        assert_eq!(progress.resource_id, "res-123");
+        assert_eq!(progress.progress, 0.5);
+        assert_eq!(progress.notes, Some("Half-way through".to_string()));
+        assert_eq!(progress.updated_at, now);
+    }
+
+    // Type-witness to ensure ProgressRepository is object-safe at compile time.
+    #[allow(dead_code)]
+    fn _assert_progress_repo_is_object_safe(_: &dyn crate::progress::ProgressRepository) {}
 }
 
 #[cfg(test)]
@@ -1066,21 +1088,4 @@ mod repository_contract_tests {
         assert!(!deserialized.read);
     }
 
-    #[test]
-    fn resource_progress_struct_shape() {
-        use crate::progress::ResourceProgress;
-        
-        let now = Utc::now();
-        let progress = ResourceProgress {
-            resource_id: "res-123".to_string(),
-            progress: 0.5,
-            notes: Some("Half-way through".to_string()),
-            updated_at: now,
-        };
-        
-        assert_eq!(progress.resource_id, "res-123");
-        assert_eq!(progress.progress, 0.5);
-        assert_eq!(progress.notes, Some("Half-way through".to_string()));
-        assert_eq!(progress.updated_at, now);
-    }
 }

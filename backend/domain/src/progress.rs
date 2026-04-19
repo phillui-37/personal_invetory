@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 
 use crate::DomainError;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ResourceProgress {
     pub resource_id: String,
     pub progress: f64,        // 0.0 – 1.0
