@@ -1,4 +1,5 @@
 import 'package:personal_inventory_frontend/models/dedup.dart';
+import 'package:personal_inventory_frontend/models/device.dart';
 import 'package:personal_inventory_frontend/models/failures.dart';
 import 'package:personal_inventory_frontend/models/batch_operations.dart';
 import 'package:personal_inventory_frontend/models/repository_inputs.dart';
@@ -6,6 +7,7 @@ import 'package:personal_inventory_frontend/models/resources.dart';
 import 'package:personal_inventory_frontend/models/result.dart';
 import 'package:personal_inventory_frontend/models/vault.dart';
 import 'package:personal_inventory_frontend/repositories/dedup_repository.dart';
+import 'package:personal_inventory_frontend/repositories/device_repository.dart';
 import 'package:personal_inventory_frontend/repositories/ebook_repository.dart';
 import 'package:personal_inventory_frontend/repositories/game_repository.dart';
 import 'package:personal_inventory_frontend/repositories/image_repository.dart';
@@ -649,5 +651,58 @@ class FakeDedupRepository implements DedupRepository {
     lastMergeWarningId = warningId;
     lastMergeInput = input;
     return mergeResult;
+  }
+}
+
+class FakeDeviceRepository implements DeviceRepository {
+  FakeDeviceRepository({
+    this.listResult = const Success([]),
+    Result<Device, AppFailure>? currentResult,
+    Result<Device, AppFailure>? registerResult,
+    this.delinkResult = const Success(null),
+  })  : currentResult = currentResult ??
+            const Failure(NotFoundFailure('current device')),
+        registerResult = registerResult ??
+            const Failure(ServerFailure(500));
+
+  Result<List<Device>, AppFailure> listResult;
+  Result<Device, AppFailure> currentResult;
+  Result<Device, AppFailure> registerResult;
+  Result<void, AppFailure> delinkResult;
+
+  int listCalls = 0;
+  int currentCalls = 0;
+  int registerCalls = 0;
+  String? lastDelinkId;
+  String? lastRegisterDeviceId;
+  String? lastRegisterDeviceName;
+
+  @override
+  Future<Result<List<Device>, AppFailure>> listDevices() async {
+    listCalls += 1;
+    return listResult;
+  }
+
+  @override
+  Future<Result<Device, AppFailure>> currentDevice() async {
+    currentCalls += 1;
+    return currentResult;
+  }
+
+  @override
+  Future<Result<Device, AppFailure>> registerDevice({
+    required String deviceId,
+    String? deviceName,
+  }) async {
+    registerCalls += 1;
+    lastRegisterDeviceId = deviceId;
+    lastRegisterDeviceName = deviceName;
+    return registerResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> delinkDevice(String deviceId) async {
+    lastDelinkId = deviceId;
+    return delinkResult;
   }
 }

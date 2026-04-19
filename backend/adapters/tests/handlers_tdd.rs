@@ -885,3 +885,67 @@ async fn game_handlers_cover_crud_and_location_routes() {
         .expect("response");
     assert_eq!(remove_location.status(), StatusCode::OK);
 }
+
+#[tokio::test]
+async fn device_handlers_return_503_when_service_not_configured() {
+    let openapi = r#"{"paths":{"/api/v1/system/health":{}}}"#;
+    let app = app_with_openapi(openapi);
+
+    let list = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/devices")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(list.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+    let current = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/devices/current")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(current.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+    let register = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/devices/register")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"device_id": "desktop-home"}).to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(register.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+    let delink = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/devices/desktop-home/delink")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from("{}"))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(delink.status(), StatusCode::SERVICE_UNAVAILABLE);
+}

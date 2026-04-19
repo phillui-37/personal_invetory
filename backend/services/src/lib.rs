@@ -1,5 +1,6 @@
 mod chapter_check;
 mod dedup;
+mod device;
 mod ebook;
 mod game;
 mod image;
@@ -14,6 +15,7 @@ use use_cases::ValidationError;
 
 pub use chapter_check::{ChapterCheckOps, ChapterCheckService};
 pub use dedup::DedupService;
+pub use device::{DeviceInfo, DeviceService};
 pub use domain::SearchStrategyKind;
 pub use ebook::{EbookDetail, EbookService};
 pub use game::{GameDetail, GameService};

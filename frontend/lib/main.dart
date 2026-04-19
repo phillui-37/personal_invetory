@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'blocs/dedup/dedup_bloc.dart';
+import 'blocs/device/device_bloc.dart';
 import 'blocs/ebook/ebook_bloc.dart';
 import 'blocs/game/game_bloc.dart';
 import 'blocs/image/image_bloc.dart';
@@ -11,6 +12,7 @@ import 'blocs/video/video_bloc.dart';
 import 'blocs/web_reader/web_reader_bloc.dart';
 import 'config/app_config.dart';
 import 'repositories/http_dedup_repository.dart';
+import 'repositories/http_device_repository.dart';
 import 'repositories/http_sync_repository.dart';
 import 'repositories/http_vault_repository.dart';
 import 'repositories/in_memory_repositories.dart';
@@ -37,6 +39,7 @@ class PersonalInventoryApp extends StatelessWidget {
     final vaultRepository = HttpVaultRepository(config: config);
     final dedupRepository = HttpDedupRepository(config: config);
     final syncRepository = HttpSyncRepository(config: config);
+    final deviceRepository = HttpDeviceRepository(config: config);
 
     return MultiBlocProvider(
       providers: [
@@ -48,6 +51,7 @@ class PersonalInventoryApp extends StatelessWidget {
         BlocProvider<VaultBloc>(create: (_) => VaultBloc(vaultRepository)),
         BlocProvider<DedupBloc>(create: (_) => DedupBloc(dedupRepository)),
         BlocProvider<SyncBloc>(create: (_) => SyncBloc(syncRepository)),
+        BlocProvider<DeviceBloc>(create: (_) => DeviceBloc(deviceRepository)),
       ],
       child: MaterialApp(
         home: _AppShell(ebookRepository: ebookRepository),

@@ -2,6 +2,7 @@ mod auth;
 mod batch_import;
 mod chapter_check;
 mod dedup_handler;
+mod device_handler;
 mod ebook;
 mod error;
 mod game;

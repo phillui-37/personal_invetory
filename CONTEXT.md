@@ -245,6 +245,20 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - **Navigation**: `SyncBloc` provisioned in `main.dart`; passed via `BlocProvider.value` to nested screens
 - **Tests**: 159 frontend tests green (all existing tests pass unchanged)
 
+## Phase 5 — Device Management (completed)
+
+Implemented device management as a first-class feature:
+- **Backend**: `DeviceRepository` trait, `SqliteDeviceRepository` (migrations 0017+0018),
+  `DeviceService` (delink-self guard, hostname/DEVICE_NAME fallback),
+  4 HTTP endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/current`,
+  `POST /api/v1/devices/register`, `POST /api/v1/devices/:device_id/delink`).
+- **Config**: `DEVICE_ID` (required), `DEVICE_NAME` (optional, blank → None).
+- **Frontend**: `Device` model, `DeviceRepository` + `HttpDeviceRepository`,
+  `DeviceBloc`, `DeviceManagementScreen`, card in `EcosystemScreen`.
+- **API Error**: `ValidationError` (delink self) → HTTP 422 per existing `ApiError` mapping.
+- **Database**: `owner_id` legacy field: set to `device_id` value on all new inserts.
+- **Test Count**: Backend 261 (baseline 251). Flutter 174 (baseline 159).
+
 ## References
 - Requirements: `TODO.md`
 - Agent rules: `AGENTS.md`

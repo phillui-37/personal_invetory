@@ -11,6 +11,7 @@ use crate::{
     batch_import::batch_import_ebooks,
     chapter_check::{list_chapter_checks, trigger_chapter_check},
     dedup_handler::{dismiss_warning, list_pending_warnings, merge_resources, scan_duplicates},
+    device_handler::{current_device, delink_device, list_devices, register_device},
     ebook::{
         add_ebook, add_ebook_location, delete_ebook, ebook_detail, list_ebooks,
         remove_ebook_location, search_ebooks, update_ebook,
@@ -185,6 +186,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/ecosystem/:platform/sync", post(trigger_sync))
         .route("/api/v1/ecosystem/:platform/syncs", get(list_platform_syncs))
         .route("/api/v1/ecosystem/:platform/syncs/:id", get(get_sync_job))
+        // Device management
+        .route("/api/v1/devices", get(list_devices))
+        .route("/api/v1/devices/current", get(current_device))
+        .route("/api/v1/devices/register", post(register_device))
+        .route("/api/v1/devices/:device_id/delink", post(delink_device))
         .layer(from_fn_with_state(state.clone(), auth_middleware))
         .with_state(state)
 }

@@ -10,6 +10,8 @@ pub struct AppConfig {
     pub chromium_path: Option<String>,
     pub fcm_service_account: Option<String>,
     pub scheduler_enabled: bool,
+    pub device_id: String,
+    pub device_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +65,14 @@ impl AppConfig {
             .map(|v| v.trim().to_lowercase())
             .map(|v| v != "false" && v != "0")
             .unwrap_or(true);
+        let device_id = map
+            .get("DEVICE_ID")
+            .cloned()
+            .ok_or(ConfigError::MissingRequiredVar("DEVICE_ID"))?;
+        let device_name = map
+            .get("DEVICE_NAME")
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty());
 
         Ok(Self {
             database_url,
@@ -73,6 +83,8 @@ impl AppConfig {
             chromium_path,
             fcm_service_account,
             scheduler_enabled,
+            device_id,
+            device_name,
         })
     }
 }
@@ -84,10 +96,13 @@ mod tests {
     use super::{AppConfig, ConfigError};
 
     fn base_map() -> BTreeMap<String, String> {
-        BTreeMap::from([(
-            String::from("DATABASE_URL"),
-            String::from("sqlite://./inventory.db"),
-        )])
+        BTreeMap::from([
+            (
+                String::from("DATABASE_URL"),
+                String::from("sqlite://./inventory.db"),
+            ),
+            (String::from("DEVICE_ID"), String::from("test-device")),
+        ])
     }
 
     #[test]
@@ -109,6 +124,8 @@ mod tests {
         assert_eq!(config.chromium_path, None);
         assert_eq!(config.fcm_service_account, None);
         assert!(config.scheduler_enabled);
+        assert_eq!(config.device_id, "test-device");
+        assert_eq!(config.device_name, None);
     }
 
     #[test]
@@ -125,6 +142,7 @@ mod tests {
                 String::from("PLUGINS_CONFIG"),
                 String::from("custom-plugins.toml"),
             ),
+            (String::from("DEVICE_ID"), String::from("device-1")),
         ]);
 
         let config = AppConfig::from_map(&map).expect("config should load explicit values");
@@ -133,6 +151,7 @@ mod tests {
         assert_eq!(config.host, "127.0.0.1");
         assert_eq!(config.port, 9090);
         assert_eq!(config.plugins_config, "custom-plugins.toml");
+        assert_eq!(config.device_id, "device-1");
     }
 
     #[test]
@@ -210,5 +229,34 @@ mod tests {
         map.insert(String::from("SCHEDULER_ENABLED"), String::from("0"));
         let config = AppConfig::from_map(&map).expect("config should load");
         assert!(!config.scheduler_enabled);
+    }
+
+    #[test]
+    fn config_requires_device_id() {
+        let map = BTreeMap::from([(
+            String::from("DATABASE_URL"),
+            String::from("sqlite://./inventory.db"),
+        )]);
+        let err = AppConfig::from_map(&map).expect_err("DEVICE_ID should be required");
+        assert_eq!(err, ConfigError::MissingRequiredVar("DEVICE_ID"));
+    }
+
+    #[test]
+    fn config_reads_device_id_and_optional_device_name() {
+        let mut map = base_map();
+        map.insert(String::from("DEVICE_ID"), String::from("desktop-home"));
+        map.insert(String::from("DEVICE_NAME"), String::from("Home Desktop"));
+        let config = AppConfig::from_map(&map).expect("config loads");
+        assert_eq!(config.device_id, "desktop-home");
+        assert_eq!(config.device_name.as_deref(), Some("Home Desktop"));
+    }
+
+    #[test]
+    fn config_treats_blank_device_name_as_none() {
+        let mut map = base_map();
+        map.insert(String::from("DEVICE_ID"), String::from("desktop-home"));
+        map.insert(String::from("DEVICE_NAME"), String::from("  "));
+        let config = AppConfig::from_map(&map).expect("config loads");
+        assert_eq!(config.device_name, None);
     }
 }

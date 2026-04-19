@@ -1,4 +1,5 @@
 pub mod dedup;
+pub mod device;
 pub mod ecosystem;
 pub mod sync;
 pub mod vault;

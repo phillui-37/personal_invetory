@@ -10,6 +10,7 @@ use crate::{
         BatchImportEbookEntry, BatchImportFailure, BatchImportLocationInput, BatchImportResponse,
         BatchImportSuccess,
     },
+    device_handler::{DeviceResponse, RegisterDeviceRequest},
     ebook::{AddEbookRequest, AddLocationRequest as EbookAddLocationRequest, EbookDetailResponse, UpdateEbookRequest},
     game::{AddGameRequest, AddLocationRequest as GameAddLocationRequest, GameDetailResponse, UpdateGameRequest},
     image::{AddImageRequest, AddLocationRequest as ImageAddLocationRequest, ImageDetailResponse, UpdateImageRequest},
@@ -97,6 +98,10 @@ impl Modify for SecurityAddon {
         crate::sync_handler::list_platform_syncs,
         crate::sync_handler::get_sync_job,
         crate::sync_handler::ecosystem_status,
+        crate::device_handler::list_devices,
+        crate::device_handler::current_device,
+        crate::device_handler::register_device,
+        crate::device_handler::delink_device,
     ),
     components(
         schemas(
@@ -144,6 +149,8 @@ impl Modify for SecurityAddon {
             DiscoveredItemInput,
             EcosystemStatusResponse,
             PlatformStatus,
+            DeviceResponse,
+            RegisterDeviceRequest,
         )
     ),
     info(
