@@ -19,10 +19,7 @@ pub trait DeviceRepository: Send + Sync {
     async fn all_with_counts(&self) -> Result<Vec<Device>, DomainError>;
 
     /// Returns the currently active binding for a device_id, or None.
-    async fn active_by_device_id(
-        &self,
-        device_id: &str,
-    ) -> Result<Option<Device>, DomainError>;
+    async fn active_by_device_id(&self, device_id: &str) -> Result<Option<Device>, DomainError>;
 
     /// Delinks any existing active binding, then inserts a new binding.
     /// Returns the newly created Device with location_count = 0.
@@ -34,9 +31,5 @@ pub trait DeviceRepository: Send + Sync {
 
     /// Sets delinked_at on the active binding for device_id.
     /// Returns NotFound if device_id unknown, Conflict if already delinked.
-    async fn delink(
-        &self,
-        device_id: &str,
-        at: DateTime<Utc>,
-    ) -> Result<(), DomainError>;
+    async fn delink(&self, device_id: &str, at: DateTime<Utc>) -> Result<(), DomainError>;
 }
