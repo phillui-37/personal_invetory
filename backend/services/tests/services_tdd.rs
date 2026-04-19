@@ -8,10 +8,11 @@ use domain::{
     NewResourceLocation, NewWebReaderMeta, Resource, ResourceLocation, ResourceRepository,
     ResourceType, StorageType, UpdateResource, WebReaderMeta, WebReaderMetaRepository,
 };
+use domain::progress::{ProgressRepository, ResourceProgress};
 use futures::executor::block_on;
 use services::{
     EbookService, NewEbookInput, NewLocationInput, NewWebReaderInput, UpdateEbookInput,
-    WebReaderService,
+    WebReaderService, ProgressService,
 };
 use uuid::Uuid;
 
@@ -1140,4 +1141,107 @@ async fn device_service_delink_other_device_succeeds() {
     repo.register("dev2", None).await.unwrap();
     let svc = services::DeviceService::new(repo, "dev1".into(), "h".into());
     svc.delink("dev2").await.expect("delink other device");
+}
+
+// ── ProgressService mock & tests ─────────────────────────────────────────────
+
+#[derive(Default)]
+struct MockProgressRepository {
+    storage: Mutex<HashMap<String, ResourceProgress>>,
+    upsert_calls: Mutex<usize>,
+}
+
+#[async_trait]
+impl ProgressRepository for MockProgressRepository {
+    async fn get(&self, resource_id: &str) -> Result<Option<ResourceProgress>, DomainError> {
+        Ok(self
+            .storage
+            .lock()
+            .expect("progress storage lock")
+            .get(resource_id)
+            .cloned())
+    }
+
+    async fn upsert(
+        &self,
+        resource_id: &str,
+        progress: f64,
+        notes: Option<&str>,
+    ) -> Result<ResourceProgress, DomainError> {
+        *self.upsert_calls.lock().expect("upsert calls lock") += 1;
+        let record = ResourceProgress {
+            resource_id: resource_id.to_string(),
+            progress,
+            notes: notes.map(|s| s.to_string()),
+            updated_at: Utc::now(),
+        };
+        self.storage
+            .lock()
+            .expect("progress storage lock")
+            .insert(resource_id.to_string(), record.clone());
+        Ok(record)
+    }
+}
+
+#[tokio::test]
+async fn progress_service_get_returns_none_when_not_set() {
+    let repo = Arc::new(MockProgressRepository::default());
+    let svc = ProgressService::new(repo);
+    let result = svc.get("resource-1").await.expect("get must not error");
+    assert!(result.is_none());
+}
+
+#[tokio::test]
+async fn progress_service_upsert_validates_range() {
+    let repo = Arc::new(MockProgressRepository::default());
+    let svc = ProgressService::new(Arc::clone(&repo) as Arc<dyn ProgressRepository>);
+
+    let err_high = svc
+        .upsert("resource-1", 1.5, None)
+        .await
+        .expect_err("progress > 1.0 must fail");
+    assert!(matches!(err_high, DomainError::ValidationError(_)));
+
+    let err_low = svc
+        .upsert("resource-1", -0.1, None)
+        .await
+        .expect_err("progress < 0.0 must fail");
+    assert!(matches!(err_low, DomainError::ValidationError(_)));
+
+    let calls = *repo.upsert_calls.lock().expect("upsert calls lock");
+    assert_eq!(calls, 0, "repo.upsert must not be called for invalid values");
+}
+
+#[tokio::test]
+async fn progress_service_upsert_round_trips() {
+    let repo: Arc<dyn ProgressRepository> = Arc::new(MockProgressRepository::default());
+    let svc = ProgressService::new(Arc::clone(&repo));
+
+    let created = svc
+        .upsert("resource-1", 0.25, Some("start"))
+        .await
+        .expect("upsert must succeed");
+    assert_eq!(created.resource_id, "resource-1");
+    assert_eq!(created.progress, 0.25);
+    assert_eq!(created.notes, Some("start".to_string()));
+
+    let fetched = svc
+        .get("resource-1")
+        .await
+        .expect("get must not error")
+        .expect("must have value after upsert");
+    assert_eq!(fetched.progress, 0.25);
+    assert_eq!(fetched.notes, Some("start".to_string()));
+
+    svc.upsert("resource-1", 0.75, None)
+        .await
+        .expect("second upsert must succeed");
+
+    let updated = svc
+        .get("resource-1")
+        .await
+        .expect("get must not error")
+        .expect("must have value after second upsert");
+    assert_eq!(updated.progress, 0.75);
+    assert!(updated.notes.is_none());
 }
