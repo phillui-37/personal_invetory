@@ -1513,3 +1513,42 @@ async fn tag_service_filter_resource_ids_by_tag() {
         .expect_err("empty name must fail");
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
+
+#[tokio::test]
+async fn tag_service_list_returns_all_tags() {
+    let (tag_repo, _, svc) = make_tag_service();
+
+    let t1 = tag_repo.create("action").await.expect("seed t1");
+    let t2 = tag_repo.create("sci-fi").await.expect("seed t2");
+
+    let mut tags = svc.list().await.expect("list must succeed");
+    tags.sort_by(|a, b| a.name.cmp(&b.name));
+
+    assert_eq!(tags.len(), 2);
+    assert_eq!(tags[0].id, t1.id);
+    assert_eq!(tags[0].name, "action");
+    assert_eq!(tags[1].id, t2.id);
+    assert_eq!(tags[1].name, "sci-fi");
+}
+
+#[tokio::test]
+async fn tag_service_delete_propagates_not_found() {
+    let (tag_repo, _, svc) = make_tag_service();
+
+    let err = svc
+        .delete("missing-tag")
+        .await
+        .expect_err("delete of missing tag must fail");
+    assert!(matches!(err, DomainError::NotFound(_)));
+
+    let tag = tag_repo.create("action").await.expect("create tag");
+    svc.delete(&tag.id)
+        .await
+        .expect("delete of existing tag must succeed");
+
+    let fetched = tag_repo
+        .get_by_id(&tag.id)
+        .await
+        .expect("get_by_id must succeed");
+    assert!(fetched.is_none(), "tag must be deleted");
+}
