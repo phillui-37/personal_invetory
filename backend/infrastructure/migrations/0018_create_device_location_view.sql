@@ -1,4 +1,4 @@
-CREATE VIEW v_device_location_counts AS
+CREATE VIEW IF NOT EXISTS v_device_location_counts AS
 SELECT
     d.device_id,
     d.device_name,

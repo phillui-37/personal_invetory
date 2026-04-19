@@ -28,7 +28,7 @@ fn row_to_device(row: &rusqlite::Row<'_>) -> rusqlite::Result<Device> {
         device_name: row.get(2)?,
         linked_at: parse_timestamp_for_row(linked_at_str)?,
         delinked_at: delinked_at_str.map(parse_timestamp_for_row).transpose()?,
-        location_count: location_count as u64,
+        location_count: u64::try_from(location_count).unwrap_or(0),
     })
 }
 
@@ -83,21 +83,38 @@ impl DeviceRepository for SqliteDeviceRepository {
         let now_str = now.to_rfc3339();
         let id = Uuid::new_v4().to_string();
 
-        // Delink any existing active binding
-        conn.execute(
-            "UPDATE devices SET delinked_at = ?1
-             WHERE device_id = ?2 AND delinked_at IS NULL",
-            rusqlite::params![now_str, device_id],
-        )
-        .map_err(map_sqlite_error)?;
+        // Execute delink + insert atomically so a failed insert never leaves the
+        // device delinked without a replacement binding.
+        conn.execute_batch("BEGIN IMMEDIATE").map_err(map_sqlite_error)?;
 
-        // Insert new binding (owner_id = device_id: legacy field, same value)
-        conn.execute(
-            "INSERT INTO devices (id, device_id, owner_id, linked_at, device_name)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            rusqlite::params![id, device_id, device_id, now_str, device_name],
-        )
-        .map_err(map_sqlite_error)?;
+        let result = (|| -> Result<(), DomainError> {
+            // Delink any existing active binding
+            conn.execute(
+                "UPDATE devices SET delinked_at = ?1
+                 WHERE device_id = ?2 AND delinked_at IS NULL",
+                rusqlite::params![now_str, device_id],
+            )
+            .map_err(map_sqlite_error)?;
+
+            // Insert new binding (owner_id = device_id: legacy field, same value)
+            conn.execute(
+                "INSERT INTO devices (id, device_id, owner_id, linked_at, device_name)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                rusqlite::params![id, device_id, device_id, now_str, device_name],
+            )
+            .map_err(map_sqlite_error)?;
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => {
+                conn.execute_batch("COMMIT").map_err(map_sqlite_error)?;
+            }
+            Err(e) => {
+                let _ = conn.execute_batch("ROLLBACK");
+                return Err(e);
+            }
+        }
 
         Ok(Device {
             id,

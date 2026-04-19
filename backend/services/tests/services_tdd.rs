@@ -1107,6 +1107,24 @@ async fn device_service_register_returns_device_info() {
 }
 
 #[tokio::test]
+async fn device_service_register_rejects_empty_device_id() {
+    let repo = FakeDeviceRepo::empty();
+    let svc = services::DeviceService::new(repo, "dev1".into(), "h".into());
+    let err = svc
+        .register("", None)
+        .await
+        .expect_err("empty device_id must fail");
+    assert!(matches!(err, domain::DomainError::ValidationError(_)));
+
+    // whitespace-only should also fail
+    let err2 = svc
+        .register("   ", None)
+        .await
+        .expect_err("whitespace device_id must fail");
+    assert!(matches!(err2, domain::DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
 async fn device_service_delink_self_returns_validation_error() {
     let repo = FakeDeviceRepo::empty();
     repo.register("dev1", None).await.unwrap();

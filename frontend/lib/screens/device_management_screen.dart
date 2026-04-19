@@ -11,7 +11,12 @@ class DeviceManagementScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Device Management')),
-      body: BlocBuilder<DeviceBloc, DeviceState>(
+      body: BlocConsumer<DeviceBloc, DeviceState>(
+        listener: (context, state) {
+          if (state is DeviceOperationSuccess) {
+            context.read<DeviceBloc>().add(const LoadDevices());
+          }
+        },
         builder: (context, state) {
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -28,9 +33,7 @@ class DeviceManagementScreen extends StatelessWidget {
                 const Center(child: CircularProgressIndicator())
               else if (state is DeviceListLoaded)
                 ...state.devices.map((d) => _DeviceTile(device: d))
-              else if (state is DeviceOperationSuccess) ...[
-                const Text('Operation succeeded'),
-              ] else if (state is DeviceError)
+              else if (state is DeviceError)
                 Text(
                   'Error: ${state.failure}',
                   style: const TextStyle(color: Colors.red),
