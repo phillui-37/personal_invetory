@@ -30,6 +30,8 @@ pub struct AdapterBundle {
     pub dedup_warning_repo: Arc<dyn domain::dedup::DedupWarningRepository>,
     pub device_repo: Arc<dyn domain::device::DeviceRepository>,
     pub progress_repo: Arc<dyn domain::progress::ProgressRepository>,
+    pub tag_repo: Arc<dyn domain::tag::TagRepository>,
+    pub resource_tag_repo: Arc<dyn domain::tag::ResourceTagRepository>,
 }
 
 pub struct AdapterFactory;
@@ -79,7 +81,15 @@ impl AdapterFactory {
                 device_repo: Arc::new(sqlite::device::SqliteDeviceRepository::new(
                     shared.clone(),
                 )),
-                progress_repo: Arc::new(sqlite::progress::SqliteProgressRepository::new(shared)),
+                progress_repo: Arc::new(sqlite::progress::SqliteProgressRepository::new(shared.clone())),
+                tag_repo: {
+                    let tag = Arc::new(sqlite::tag::SqliteTagRepository::new(shared.clone()));
+                    tag as Arc<dyn domain::tag::TagRepository>
+                },
+                resource_tag_repo: {
+                    let tag = Arc::new(sqlite::tag::SqliteTagRepository::new(shared));
+                    tag as Arc<dyn domain::tag::ResourceTagRepository>
+                },
             });
         }
 

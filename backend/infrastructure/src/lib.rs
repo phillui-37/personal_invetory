@@ -9,6 +9,7 @@ pub mod fcm;
 
 pub use factory::{resolve_search_strategy, AdapterBundle, AdapterFactory, DatabaseAdapter};
 pub use sqlite::progress::SqliteProgressRepository;
+pub use sqlite::tag::SqliteTagRepository;
 pub use portability::{
     export_canonical_snapshot_sqlite, import_canonical_snapshot_sqlite, normalize_ebook_meta_rows,
     normalize_resource_location_rows, normalize_resource_rows, normalize_web_reader_meta_rows,

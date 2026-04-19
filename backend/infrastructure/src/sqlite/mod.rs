@@ -9,6 +9,7 @@ pub mod notification;
 pub mod progress;
 pub mod resource;
 pub mod sync_job;
+pub mod tag;
 pub mod vault;
 pub mod video_meta;
 pub mod web_reader_meta;
