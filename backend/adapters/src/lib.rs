@@ -9,6 +9,7 @@ mod game;
 mod image;
 mod notifications;
 mod openapi;
+mod progress_handler;
 mod routes;
 mod state;
 mod sync_handler;

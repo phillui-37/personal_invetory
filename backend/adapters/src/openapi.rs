@@ -14,6 +14,7 @@ use crate::{
     ebook::{AddEbookRequest, AddLocationRequest as EbookAddLocationRequest, EbookDetailResponse, UpdateEbookRequest},
     game::{AddGameRequest, AddLocationRequest as GameAddLocationRequest, GameDetailResponse, UpdateGameRequest},
     image::{AddImageRequest, AddLocationRequest as ImageAddLocationRequest, ImageDetailResponse, UpdateImageRequest},
+    progress_handler::{PatchProgressRequest, ProgressResponse},
     state::NotificationEvent,
     sync_handler::{
         DiscoveredItemInput, EcosystemStatusResponse, PlatformStatus, SyncJobListResponse,
@@ -102,6 +103,8 @@ impl Modify for SecurityAddon {
         crate::device_handler::current_device,
         crate::device_handler::register_device,
         crate::device_handler::delink_device,
+        crate::progress_handler::get_progress,
+        crate::progress_handler::patch_progress,
     ),
     components(
         schemas(
@@ -151,6 +154,8 @@ impl Modify for SecurityAddon {
             PlatformStatus,
             DeviceResponse,
             RegisterDeviceRequest,
+            ProgressResponse,
+            PatchProgressRequest,
         )
     ),
     info(

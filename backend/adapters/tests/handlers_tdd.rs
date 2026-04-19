@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use axum::{
@@ -6,7 +6,11 @@ use axum::{
     http::{Request, StatusCode},
 };
 use chrono::Utc;
-use domain::{device::{Device, DeviceRepository}, DomainError};
+use domain::{
+    device::{Device, DeviceRepository},
+    progress::{ProgressRepository, ResourceProgress},
+    DomainError,
+};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -1212,4 +1216,174 @@ async fn device_delink_handler_returns_200_for_other_device() {
         .await
         .expect("response");
     assert_eq!(resp.status(), StatusCode::OK);
+}
+
+// ── In-memory ProgressRepository for handler tests ────────────────────────
+
+struct FakeHandlerProgressRepo {
+    storage: std::sync::Mutex<HashMap<String, ResourceProgress>>,
+}
+
+impl FakeHandlerProgressRepo {
+    fn empty() -> Arc<Self> {
+        Arc::new(Self {
+            storage: std::sync::Mutex::new(HashMap::new()),
+        })
+    }
+
+    fn with_progress(resource_id: &str, progress: f64, notes: Option<&str>) -> Arc<Self> {
+        let repo = Self::empty();
+        repo.storage.lock().unwrap().insert(
+            resource_id.to_string(),
+            ResourceProgress {
+                resource_id: resource_id.to_string(),
+                progress,
+                notes: notes.map(str::to_string),
+                updated_at: Utc::now(),
+            },
+        );
+        repo
+    }
+}
+
+#[async_trait]
+impl ProgressRepository for FakeHandlerProgressRepo {
+    async fn get(&self, resource_id: &str) -> Result<Option<ResourceProgress>, DomainError> {
+        Ok(self.storage.lock().unwrap().get(resource_id).cloned())
+    }
+
+    async fn upsert(
+        &self,
+        resource_id: &str,
+        progress: f64,
+        notes: Option<&str>,
+    ) -> Result<ResourceProgress, DomainError> {
+        let record = ResourceProgress {
+            resource_id: resource_id.to_string(),
+            progress,
+            notes: notes.map(str::to_string),
+            updated_at: Utc::now(),
+        };
+        self.storage
+            .lock()
+            .unwrap()
+            .insert(resource_id.to_string(), record.clone());
+        Ok(record)
+    }
+}
+
+fn app_with_progress_service(repo: Arc<FakeHandlerProgressRepo>) -> axum::Router {
+    let openapi = r#"{"paths":{"/api/v1/system/health":{}}}"#;
+    let svc = Arc::new(services::ProgressService::new(
+        repo as Arc<dyn domain::progress::ProgressRepository>,
+    ));
+    let mut state = AppState::for_tests("secret-key".to_string());
+    state.openapi_json = openapi.to_string();
+    let state = state.with_progress_service(svc);
+    build_router(Arc::new(state))
+}
+
+#[tokio::test]
+async fn handler_get_progress_returns_404_when_none() {
+    let id = Uuid::new_v4();
+    let app = app_with_progress_service(FakeHandlerProgressRepo::empty());
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/inventory/ebooks/{id}/progress"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn handler_get_progress_returns_200_when_set() {
+    let id = Uuid::new_v4();
+    let repo = FakeHandlerProgressRepo::with_progress(&id.to_string(), 0.25, Some("start"));
+    let app = app_with_progress_service(repo);
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/inventory/ebooks/{id}/progress"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["resource_id"], id.to_string());
+    assert!((json["progress"].as_f64().unwrap() - 0.25).abs() < f64::EPSILON);
+    assert_eq!(json["notes"], "start");
+    assert!(json["updated_at"].is_string());
+}
+
+#[tokio::test]
+async fn handler_patch_progress_creates_and_returns_200() {
+    let id = Uuid::new_v4();
+    let repo = FakeHandlerProgressRepo::empty();
+    let app = app_with_progress_service(repo.clone());
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PATCH")
+                .uri(format!("/api/v1/inventory/ebooks/{id}/progress"))
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"progress": 0.75, "notes": "checkpoint"}).to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+    assert!((json["progress"].as_f64().unwrap() - 0.75).abs() < f64::EPSILON);
+    assert_eq!(json["notes"], "checkpoint");
+    assert!(json["updated_at"].is_string());
+
+    let stored = repo.storage.lock().unwrap();
+    assert!(stored.contains_key(&id.to_string()), "repo must have saved the record");
+}
+
+#[tokio::test]
+async fn handler_patch_progress_rejects_out_of_range() {
+    let id = Uuid::new_v4();
+    let app = app_with_progress_service(FakeHandlerProgressRepo::empty());
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PATCH")
+                .uri(format!("/api/v1/inventory/ebooks/{id}/progress"))
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"progress": 1.5}).to_string()))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+    assert!(
+        json["error"].as_str().unwrap_or("").contains("progress must be 0.0"),
+        "error body must mention range: {:?}",
+        json
+    );
 }

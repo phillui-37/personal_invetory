@@ -41,6 +41,7 @@ pub struct AppState {
     pub dedup_service: Option<Arc<services::DedupService>>,
     pub sync_service: Option<Arc<SyncService>>,
     pub device_service: Option<Arc<services::DeviceService>>,
+    pub progress_service: Option<Arc<services::ProgressService>>,
 }
 
 impl AppState {
@@ -68,6 +69,7 @@ impl AppState {
             dedup_service: None,
             sync_service: None,
             device_service: None,
+            progress_service: None,
         }
     }
 
@@ -93,6 +95,11 @@ impl AppState {
 
     pub fn with_device_service(mut self, svc: Arc<services::DeviceService>) -> Self {
         self.device_service = Some(svc);
+        self
+    }
+
+    pub fn with_progress_service(mut self, svc: Arc<services::ProgressService>) -> Self {
+        self.progress_service = Some(svc);
         self
     }
 
@@ -139,6 +146,7 @@ impl AppState {
         state.dedup_service = None;
         state.sync_service = None;
         state.device_service = None;
+        state.progress_service = None;
         state
     }
 }

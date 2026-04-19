@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     middleware::from_fn_with_state,
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
     Router,
 };
 
@@ -25,6 +25,7 @@ use crate::{
         remove_image_location, search_images, update_image,
     },
     notifications::{list_notifications, mark_notification_read, notifications_stream},
+    progress_handler::{get_progress, patch_progress},
     sync_handler::{ecosystem_status, get_sync_job, list_platform_syncs, trigger_sync},
     system::{health, openapi},
     vault_handler::{
@@ -191,6 +192,27 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/devices/current", get(current_device))
         .route("/api/v1/devices/register", post(register_device))
         .route("/api/v1/devices/:device_id/delink", post(delink_device))
+        // Progress
+        .route(
+            "/api/v1/inventory/ebooks/:id/progress",
+            get(get_progress).patch(patch_progress),
+        )
+        .route(
+            "/api/v1/inventory/web-readers/:id/progress",
+            get(get_progress).patch(patch_progress),
+        )
+        .route(
+            "/api/v1/inventory/images/:id/progress",
+            get(get_progress).patch(patch_progress),
+        )
+        .route(
+            "/api/v1/inventory/videos/:id/progress",
+            get(get_progress).patch(patch_progress),
+        )
+        .route(
+            "/api/v1/inventory/games/:id/progress",
+            get(get_progress).patch(patch_progress),
+        )
         .layer(from_fn_with_state(state.clone(), auth_middleware))
         .with_state(state)
 }
