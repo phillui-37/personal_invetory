@@ -1208,8 +1208,20 @@ async fn progress_service_upsert_validates_range() {
         .expect_err("progress < 0.0 must fail");
     assert!(matches!(err_low, DomainError::ValidationError(_)));
 
+    let success_min = svc
+        .upsert("resource-1", 0.0, None)
+        .await
+        .expect("progress = 0.0 must succeed");
+    assert_eq!(success_min.progress, 0.0);
+
+    let success_max = svc
+        .upsert("resource-1", 1.0, None)
+        .await
+        .expect("progress = 1.0 must succeed");
+    assert_eq!(success_max.progress, 1.0);
+
     let calls = *repo.upsert_calls.lock().expect("upsert calls lock");
-    assert_eq!(calls, 0, "repo.upsert must not be called for invalid values");
+    assert_eq!(calls, 2, "repo.upsert must be called twice for both valid boundary values");
 }
 
 #[tokio::test]
