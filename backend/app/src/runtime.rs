@@ -5,13 +5,19 @@ use adapters::{build_router, generate_openapi_json, AppState, BroadcastNotifier}
 use axum::Router;
 use infrastructure::{resolve_search_strategy, AdapterFactory};
 use plugins::{PluginRegistry, PluginsConfig, PluginsToml, WebChecker, WebCheckerConfig};
-use services::{ChapterCheckService, DedupService, EbookService, GameService, ImageService, SearchConfig, SyncService, VaultService, VideoService, WebReaderService};
+use services::{
+    ChapterCheckService, DedupService, EbookService, GameService, ImageService, SearchConfig,
+    SyncService, VaultService, VideoService, WebReaderService,
+};
 use tokio_util::sync::CancellationToken;
 
 use crate::config::AppConfig;
 use crate::scheduler::{OpsCheckRunner, Scheduler};
 
-pub fn build_app_router(config: &AppConfig, api_key: String) -> Result<Router, domain::DomainError> {
+pub fn build_app_router(
+    config: &AppConfig,
+    api_key: String,
+) -> Result<Router, domain::DomainError> {
     let bundle = AdapterFactory::from_url(&config.database_url)?;
     let strategy = resolve_search_strategy(&bundle.database, None);
     let search_config = SearchConfig { strategy };
@@ -53,9 +59,8 @@ pub fn build_app_router(config: &AppConfig, api_key: String) -> Result<Router, d
         search_config,
     ));
 
-    let vault_service: Arc<dyn domain::vault::CredentialVault> = Arc::new(
-        VaultService::new(bundle.vault_backend),
-    );
+    let vault_service: Arc<dyn domain::vault::CredentialVault> =
+        Arc::new(VaultService::new(bundle.vault_backend));
     let dedup_service = Arc::new(DedupService::new(
         resource_repo.clone(),
         location_repo,
@@ -87,7 +92,9 @@ pub fn build_app_router(config: &AppConfig, api_key: String) -> Result<Router, d
     let checker: Arc<dyn WebChecker> = plugin_registry
         .web_checkers
         .pop()
-        .ok_or_else(|| domain::DomainError::InternalError("no web checker plugin configured".to_string()))?
+        .ok_or_else(|| {
+            domain::DomainError::InternalError("no web checker plugin configured".to_string())
+        })?
         .into();
     let broadcaster = Arc::new(BroadcastNotifier(state.notification_tx.clone()));
     let chapter_check_service = Arc::new(
@@ -176,6 +183,8 @@ mod tests {
             chromium_path: None,
             fcm_service_account: None,
             scheduler_enabled: false,
+            device_id: "test-device".to_string(),
+            device_name: None,
         }
     }
 
@@ -201,9 +210,9 @@ mod tests {
                     .uri("/api/v1/inventory/ebooks/list")
                     .body(Body::empty())
                     .expect("request"),
-        )
-        .await
-        .expect("response");
+            )
+            .await
+            .expect("response");
         assert_eq!(protected_response.status(), StatusCode::UNAUTHORIZED);
     }
 
