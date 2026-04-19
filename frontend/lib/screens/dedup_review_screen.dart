@@ -96,7 +96,9 @@ class _WarningCard extends StatelessWidget {
             Text('Resource A: ${warning.resourceIdA}'),
             Text('Resource B: ${warning.resourceIdB}'),
             const SizedBox(height: 12),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 OutlinedButton(
                   onPressed: () => context.read<DedupBloc>().add(
@@ -104,7 +106,6 @@ class _WarningCard extends StatelessWidget {
                       ),
                   child: const Text('Dismiss'),
                 ),
-                const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: () => context.read<DedupBloc>().add(
                         MergeResources(
@@ -113,7 +114,17 @@ class _WarningCard extends StatelessWidget {
                           discardId: warning.resourceIdB,
                         ),
                       ),
-                  child: const Text('Merge'),
+                  child: const Text('Keep A'),
+                ),
+                ElevatedButton(
+                  onPressed: () => context.read<DedupBloc>().add(
+                        MergeResources(
+                          warningId: warning.id,
+                          keepId: warning.resourceIdB,
+                          discardId: warning.resourceIdA,
+                        ),
+                      ),
+                  child: const Text('Keep B'),
                 ),
               ],
             ),

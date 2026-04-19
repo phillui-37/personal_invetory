@@ -12,7 +12,8 @@ use domain::{
 use plugins::PluginRegistry;
 use serde::Serialize;
 use services::{
-    ChapterCheckOps, EbookService, GameService, ImageService, VideoService, WebReaderService,
+    ChapterCheckOps, EbookService, GameService, ImageService, SyncService, VideoService,
+    WebReaderService,
 };
 use tokio::sync::broadcast;
 use utoipa::ToSchema;
@@ -38,6 +39,7 @@ pub struct AppState {
     pub notification_tx: broadcast::Sender<NotificationEvent>,
     pub vault_service: Option<Arc<dyn domain::vault::CredentialVault>>,
     pub dedup_service: Option<Arc<services::DedupService>>,
+    pub sync_service: Option<Arc<SyncService>>,
 }
 
 impl AppState {
@@ -63,6 +65,7 @@ impl AppState {
             notification_tx,
             vault_service: None,
             dedup_service: None,
+            sync_service: None,
         }
     }
 
@@ -78,6 +81,11 @@ impl AppState {
 
     pub fn with_dedup_service(mut self, svc: Arc<services::DedupService>) -> Self {
         self.dedup_service = Some(svc);
+        self
+    }
+
+    pub fn with_sync_service(mut self, svc: Arc<SyncService>) -> Self {
+        self.sync_service = Some(svc);
         self
     }
 
@@ -122,6 +130,7 @@ impl AppState {
         state.chapter_check_service = Some(Arc::new(NoopChapterCheckOps));
         state.vault_service = None;
         state.dedup_service = None;
+        state.sync_service = None;
         state
     }
 }

@@ -29,6 +29,12 @@ pub struct StoreCredentialRequest {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub struct RetrieveCredentialRequest {
+    pub platform: String,
+    pub credential_type: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct DeleteCredentialRequest {
     pub platform: String,
     pub credential_type: String,
@@ -102,7 +108,7 @@ pub async fn store_credential(
 
 pub async fn retrieve_credential(
     State(state): State<Arc<AppState>>,
-    Json(body): Json<DeleteCredentialRequest>,
+    Json(body): Json<RetrieveCredentialRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let svc = state.vault_service.as_ref()
         .ok_or_else(|| ApiError::from(domain::DomainError::InternalError("vault not configured".into())))?;

@@ -24,6 +24,7 @@ use crate::{
         remove_image_location, search_images, update_image,
     },
     notifications::{list_notifications, mark_notification_read, notifications_stream},
+    sync_handler::{ecosystem_status, get_sync_job, list_platform_syncs, trigger_sync},
     system::{health, openapi},
     vault_handler::{
         delete_credential, initialize_vault, list_vault_platforms, lock_vault,
@@ -179,6 +180,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/dedup/warnings", get(list_pending_warnings))
         .route("/api/v1/dedup/warnings/:id/dismiss", post(dismiss_warning))
         .route("/api/v1/dedup/warnings/:id/merge", post(merge_resources))
+        // Ecosystem sync
+        .route("/api/v1/ecosystem/status", get(ecosystem_status))
+        .route("/api/v1/ecosystem/:platform/sync", post(trigger_sync))
+        .route("/api/v1/ecosystem/:platform/syncs", get(list_platform_syncs))
+        .route("/api/v1/ecosystem/:platform/syncs/:id", get(get_sync_job))
         .layer(from_fn_with_state(state.clone(), auth_middleware))
         .with_state(state)
 }

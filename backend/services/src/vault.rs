@@ -65,9 +65,12 @@ impl CredentialVault for VaultService {
     }
 
     fn lock(&self) {
-        if let Ok(mut guard) = self.derived_key.lock() {
-            *guard = None;
-        }
+        // Recover from poison so the key is always cleared even after a panic.
+        let mut guard = match self.derived_key.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        *guard = None;
     }
 
     fn is_unlocked(&self) -> bool {

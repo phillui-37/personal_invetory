@@ -22,14 +22,14 @@ final class InitializeVault extends VaultEvent {
   const InitializeVault(this.masterPassword);
   final String masterPassword;
   @override
-  List<Object?> get props => [masterPassword];
+  List<Object?> get props => [];
 }
 
 final class UnlockVault extends VaultEvent {
   const UnlockVault(this.masterPassword);
   final String masterPassword;
   @override
-  List<Object?> get props => [masterPassword];
+  List<Object?> get props => [];
 }
 
 final class LockVault extends VaultEvent {
@@ -44,9 +44,22 @@ final class LoadPlatforms extends VaultEvent {
   List<Object?> get props => [];
 }
 
+final class StoreCredential extends VaultEvent {
+  const StoreCredential({
+    required this.platform,
+    required this.credentialType,
+    required this.plaintext,
+  });
+  final String platform;
+  final String credentialType;
+  final String plaintext;
+  @override
+  List<Object?> get props => [platform, credentialType];
+}
+
 // --- States ---
 
-enum VaultOperationType { initialize, unlock, lock }
+enum VaultOperationType { initialize, unlock, lock, storeCredential }
 
 sealed class VaultState extends Equatable {
   const VaultState();
@@ -101,6 +114,7 @@ final class VaultBloc extends Bloc<VaultEvent, VaultState> {
     on<UnlockVault>(_onUnlock);
     on<LockVault>(_onLock);
     on<LoadPlatforms>(_onLoadPlatforms);
+    on<StoreCredential>(_onStoreCredential);
   }
 
   final VaultRepository _repository;
@@ -154,6 +168,21 @@ final class VaultBloc extends Bloc<VaultEvent, VaultState> {
       success: (platforms) => emit(VaultPlatformsLoaded(platforms)),
       failure: (failure) => emit(VaultError(failure)),
     );
+  }
+
+  Future<void> _onStoreCredential(
+    StoreCredential event,
+    Emitter<VaultState> emit,
+  ) async {
+    emit(const VaultLoading());
+    final result = await _repository.storeCredential(
+      StoreCredentialInput(
+        platform: event.platform,
+        credentialType: event.credentialType,
+        plaintext: event.plaintext,
+      ),
+    );
+    _emitVoidResult(result, emit, VaultOperationType.storeCredential);
   }
 
   void _emitVoidResult(

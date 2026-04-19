@@ -44,7 +44,8 @@ void main() {
 
       expect(find.text('92%'), findsOneWidget);
       expect(find.text('Dismiss'), findsOneWidget);
-      expect(find.text('Merge'), findsOneWidget);
+      expect(find.text('Keep A'), findsOneWidget);
+      expect(find.text('Keep B'), findsOneWidget);
     });
 
     testWidgets('shows empty state when no warnings', (tester) async {

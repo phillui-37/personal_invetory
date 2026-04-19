@@ -14,6 +14,10 @@ use crate::{
     game::{AddGameRequest, AddLocationRequest as GameAddLocationRequest, GameDetailResponse, UpdateGameRequest},
     image::{AddImageRequest, AddLocationRequest as ImageAddLocationRequest, ImageDetailResponse, UpdateImageRequest},
     state::NotificationEvent,
+    sync_handler::{
+        DiscoveredItemInput, EcosystemStatusResponse, PlatformStatus, SyncJobListResponse,
+        SyncJobResponse, TriggerSyncRequest, TriggerSyncResponse,
+    },
     video::{AddLocationRequest as VideoAddLocationRequest, AddVideoRequest, UpdateVideoRequest, VideoDetailResponse},
     web_reader::{
         AddLocationRequest as WebReaderAddLocationRequest, UpsertWebReaderRequest,
@@ -89,6 +93,10 @@ impl Modify for SecurityAddon {
         crate::notifications::mark_notification_read,
         crate::notifications::notifications_stream,
         crate::batch_import::batch_import_ebooks,
+        crate::sync_handler::trigger_sync,
+        crate::sync_handler::list_platform_syncs,
+        crate::sync_handler::get_sync_job,
+        crate::sync_handler::ecosystem_status,
     ),
     components(
         schemas(
@@ -129,6 +137,13 @@ impl Modify for SecurityAddon {
             BatchImportSuccess,
             BatchImportFailure,
             BatchImportResponse,
+            SyncJobResponse,
+            SyncJobListResponse,
+            TriggerSyncRequest,
+            TriggerSyncResponse,
+            DiscoveredItemInput,
+            EcosystemStatusResponse,
+            PlatformStatus,
         )
     ),
     info(

@@ -31,15 +31,27 @@ pub async fn fetch_owned_games(
     api_key: &str,
     steam_id: &str,
 ) -> Result<Vec<SteamOwnedGame>, DomainError> {
-    let url = format!(
-        "{STEAM_API_BASE}/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&include_appinfo=true&include_played_free_games=true&format=json"
-    );
-    let client = reqwest::Client::new();
+    let url = reqwest::Url::parse_with_params(
+        &format!("{STEAM_API_BASE}/IPlayerService/GetOwnedGames/v0001/"),
+        &[
+            ("key", api_key),
+            ("steamid", steam_id),
+            ("include_appinfo", "true"),
+            ("include_played_free_games", "true"),
+            ("format", "json"),
+        ],
+    )
+    .map_err(|e| DomainError::InternalError(format!("Invalid Steam URL: {e}")))?;
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| DomainError::InternalError(format!("HTTP client error: {e}")))?;
     let resp = client
-        .get(&url)
+        .get(url)
         .send()
         .await
-        .map_err(|e| DomainError::InternalError(format!("Steam API request failed: {e}")))?;
+        .map_err(|_| DomainError::InternalError("Steam API request failed".to_string()))?;
 
     if !resp.status().is_success() {
         return Err(DomainError::InternalError(format!(

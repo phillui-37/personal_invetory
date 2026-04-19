@@ -120,7 +120,9 @@ class HttpVaultRepository implements VaultRepository {
         headers: _headers,
         body: jsonEncode(body),
       );
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (response.statusCode == 200 ||
+          response.statusCode == 201 ||
+          response.statusCode == 204) {
         return const Success(null);
       }
       return Failure(ServerFailure(response.statusCode));

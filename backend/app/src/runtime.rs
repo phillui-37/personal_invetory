@@ -24,7 +24,7 @@ pub fn build_app_router(config: &AppConfig, api_key: String) -> Result<Router, d
 
     let ebook_service = Arc::new(EbookService::new_with_search_config(
         resource_repo.clone(),
-        bundle.ebook_meta_repo,
+        bundle.ebook_meta_repo.clone(),
         location_repo.clone(),
         search_config,
     ));
@@ -36,13 +36,13 @@ pub fn build_app_router(config: &AppConfig, api_key: String) -> Result<Router, d
     ));
     let image_service = Arc::new(ImageService::new_with_search_config(
         resource_repo.clone(),
-        bundle.image_meta_repo,
+        bundle.image_meta_repo.clone(),
         location_repo.clone(),
         search_config,
     ));
     let video_service = Arc::new(VideoService::new_with_search_config(
         resource_repo.clone(),
-        bundle.video_meta_repo,
+        bundle.video_meta_repo.clone(),
         location_repo.clone(),
         search_config,
     ));
@@ -61,11 +61,14 @@ pub fn build_app_router(config: &AppConfig, api_key: String) -> Result<Router, d
         location_repo,
         bundle.dedup_warning_repo,
     ));
-    let _sync_service = SyncService::new(
+    let sync_service = Arc::new(SyncService::new(
         resource_repo.clone(),
-        bundle.game_meta_repo,
+        bundle.game_meta_repo.clone(),
+        bundle.ebook_meta_repo.clone(),
+        bundle.image_meta_repo.clone(),
+        bundle.video_meta_repo.clone(),
         bundle.sync_job_repo,
-    );
+    ));
 
     let mut state = AppState::new(
         ebook_service,
@@ -100,6 +103,7 @@ pub fn build_app_router(config: &AppConfig, api_key: String) -> Result<Router, d
     state = state.with_chapter_check_service(chapter_check_service.clone());
     state = state.with_vault_service(vault_service);
     state = state.with_dedup_service(dedup_service);
+    state = state.with_sync_service(sync_service);
     state.plugin_registry = Arc::new(plugin_registry);
     state.openapi_json = generate_openapi_json();
     if config.scheduler_enabled {

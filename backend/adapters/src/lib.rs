@@ -10,6 +10,7 @@ mod notifications;
 mod openapi;
 mod routes;
 mod state;
+mod sync_handler;
 mod system;
 mod vault_handler;
 mod video;

@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-19 (Phase 4 Plan 2 complete)
+2026-04-19 (Phase 4 complete — all P4-A through P4-H done)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
@@ -92,7 +92,7 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - **Phase 1 (MVP+)**: Ebook + WebReader CRUD/search, ResourceLocation, auth, plugin skeleton, OpenAPI, SQLite/PG portability, fuzzy-search seam, Flutter shell + WebView progress + batch ops. **✅ Implemented.**
 - **Phase 2**: Real plugin implementations, scheduler, notifications, batch import, OpenAPI refresh, and Flutter metadata/check-history UX. **✅ Implemented.**
 - **Phase 3**: Image/video/game resource types. **✅ Implemented.**
-- **Phase 4**: Ecosystem integrations (BookWalker, Kindle, Steam/DLSite/FANZA). **Plan 1 (Foundations + Steam) ✅ Implemented. Plan 2 (Frontend Ecosystem UX) ✅ Implemented.**
+- **Phase 4**: Ecosystem integrations (BookWalker, Kindle, Steam/DLSite/FANZA). **✅ Complete.** All Plans 1–3 implemented: vault, dedup, Steam connector, 4 additional connectors (DLSite/FANZA/BookWalker/Kindle), multi-platform SyncService, sync API, Flutter sync dashboard + ecosystem settings.
 - **Phase 5**: Optimization and hardening.
 
 ## Phase 1 Deferred Items
@@ -171,8 +171,8 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - `flutter test integration_test -d macos` produces harmless "Failed to foreground app" warning.
 
 ## Open Questions
-- Remaining Phase 4 work: DLSite/FANZA connectors, BookWalker/Kindle connectors, ecosystem sync backend routes, sync dashboard + ecosystem settings screens.
-- Android/iOS/desktop frontend build setup deferred.
+- Android/iOS/desktop frontend build setup deferred to Phase 5.
+- Ecosystem connector real API URLs require manual network inspection (marked with `TODO(network-inspection)` in connector code).
 
 ## Phase 3 Kickoff Notes
 - Kickoff implementation follows the Phase 3 task sheet order instead of jumping straight into one slice.
@@ -223,16 +223,27 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - **Navigation**: main.dart wired with 4th "Ecosystem" bottom nav tab, VaultBloc + DedupBloc providers via MultiBlocProvider.
 - **Tests**: 159 frontend tests green (49 new tests: 10 model, 15 repo, 15 bloc, 9 widget).
 
-### Commits (9 commits, 71032fc → ef4f098)
-- `71032fc` domain models
-- `165c570` repo interfaces + fakes
-- `8f390a4` VaultBloc + tests
-- `2b80e36` DedupBloc + tests
-- `2a041fd` HttpVaultRepository + tests
-- `2f01ec4` HttpDedupRepository + tests
-- `2712f47` VaultScreen + widget tests
-- `a3bf67f` DedupReviewScreen + widget tests
-- `ef4f098` EcosystemScreen + navigation wiring
+## Phase 4 Plan 3 Implementation Summary (Additional Connectors + Sync Dashboard)
+
+### Backend
+- **Plugins**: 4 new connectors in `backend/plugins/src/ecosystem/`:
+  - `dlsite.rs` — browser-auth, `detect_resource_type` (GAM/MNG/CG/MOV codes → ResourceType), fixture-tested (11 tests)
+  - `fanza.rs` — same pattern, content_type string mapping (9 tests)
+  - `bookwalker.rs` — parses `{"books":[...]}` wrapper, Ebook type (8 tests)
+  - `kindle.rs` — parses `{"items":[...]}` + CSV import path (8 tests)
+  - `csv = "1"` added to plugins Cargo.toml; `serde_json` made always-on
+- **Services**: `SyncService` extended with `ebook_meta_repo`, `image_meta_repo`, `video_meta_repo` fields; `sync_discovered_items(platform, items)` method dispatches on `ResourceType`; `parse_resource_type` helper; 7 sync tests green
+- **Adapters**: `sync_handler.rs` with 4 endpoints (trigger, list, get, status); `AppState` extended with `sync_service`; `StoreCredential` added to VaultBloc; routes registered; OpenAPI coverage added
+- **App**: runtime.rs wires 6-arg `SyncService::new`; `bundle.*_meta_repo` cloned for multiple consumers
+- **Tests**: 251 backend tests green
+
+### Frontend
+- **Models**: `sync.dart` (`SyncJob`, `PlatformStatus`, `SyncJobStatus`)
+- **Repositories**: `SyncRepository` interface + `HttpSyncRepository`
+- **Blocs**: `SyncBloc` (LoadEcosystemStatus, LoadPlatformSyncs, TriggerSync); `StoreCredential` event added to `VaultBloc`
+- **Screens**: `SyncDashboardScreen` (per-platform cards, trigger, history drill-down), `EcosystemSettingsScreen` (credential entry sheet → vault), `EcosystemScreen` updated with navigation to both new screens
+- **Navigation**: `SyncBloc` provisioned in `main.dart`; passed via `BlocProvider.value` to nested screens
+- **Tests**: 159 frontend tests green (all existing tests pass unchanged)
 
 ## References
 - Requirements: `TODO.md`

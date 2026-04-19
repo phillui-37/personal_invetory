@@ -162,8 +162,9 @@ impl DedupWarningRepository for SqliteDedupWarningRepository {
         let count: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM dedup_warnings
-                 WHERE (resource_id_a = ?1 AND resource_id_b = ?2)
-                    OR (resource_id_a = ?2 AND resource_id_b = ?1)",
+                 WHERE ((resource_id_a = ?1 AND resource_id_b = ?2)
+                     OR (resource_id_a = ?2 AND resource_id_b = ?1))
+                   AND status = 'pending'",
                 rusqlite::params![a_str, b_str],
                 |row| row.get(0),
             )

@@ -87,9 +87,12 @@ class _StatusViewState extends State<_StatusView> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () => context.read<VaultBloc>().add(
-                  InitializeVault(_passwordController.text),
-                ),
+            onPressed: () {
+              if (_passwordController.text.isEmpty) return;
+              context.read<VaultBloc>().add(
+                    InitializeVault(_passwordController.text),
+                  );
+            },
             child: const Text('Initialize Vault'),
           ),
         ],
@@ -109,9 +112,12 @@ class _StatusViewState extends State<_StatusView> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () => context.read<VaultBloc>().add(
-                  UnlockVault(_passwordController.text),
-                ),
+            onPressed: () {
+              if (_passwordController.text.isEmpty) return;
+              context.read<VaultBloc>().add(
+                    UnlockVault(_passwordController.text),
+                  );
+            },
             child: const Text('Unlock'),
           ),
         ],

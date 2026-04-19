@@ -21,6 +21,11 @@ pub struct DedupWarningResponse {
     pub status: String,
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MergeResponse {
+    pub kept_resource_id: Uuid,
+}
+
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct MergeRequest {
     pub keep_id: Uuid,
@@ -85,5 +90,5 @@ pub async fn merge_resources(
         .ok_or_else(|| ApiError::from(domain::DomainError::InternalError("dedup not configured".into())))?;
     let merged = svc.merge(id, body.keep_id, body.discard_id)
         .await.map_err(ApiError::from)?;
-    Ok((StatusCode::OK, Json(merged)))
+    Ok((StatusCode::OK, Json(MergeResponse { kept_resource_id: merged.id })))
 }
