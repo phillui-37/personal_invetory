@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -9,9 +9,10 @@ use domain::{
     ResourceType, StorageType, UpdateResource, WebReaderMeta, WebReaderMetaRepository,
 };
 use domain::progress::{ProgressRepository, ResourceProgress};
+use domain::tag::{ResourceTagRepository, Tag, TagRepository};
 use futures::executor::block_on;
 use services::{
-    EbookService, NewEbookInput, NewLocationInput, NewWebReaderInput, UpdateEbookInput,
+    EbookService, NewEbookInput, NewLocationInput, NewWebReaderInput, TagService, UpdateEbookInput,
     WebReaderService, ProgressService,
 };
 use uuid::Uuid;
@@ -1256,4 +1257,259 @@ async fn progress_service_upsert_round_trips() {
         .expect("must have value after second upsert");
     assert_eq!(updated.progress, 0.75);
     assert!(updated.notes.is_none());
+}
+
+// ── TagService mocks & tests ──────────────────────────────────────────────────
+
+#[derive(Default)]
+struct MockTagRepository {
+    tags: Mutex<HashMap<String, Tag>>,
+    create_calls: Mutex<usize>,
+    created_names: Mutex<Vec<String>>,
+}
+
+#[async_trait]
+impl TagRepository for MockTagRepository {
+    async fn list(&self) -> Result<Vec<Tag>, DomainError> {
+        Ok(self.tags.lock().unwrap().values().cloned().collect())
+    }
+
+    async fn get_by_id(&self, id: &str) -> Result<Option<Tag>, DomainError> {
+        Ok(self
+            .tags
+            .lock()
+            .unwrap()
+            .values()
+            .find(|t| t.id == id)
+            .cloned())
+    }
+
+    async fn get_by_name(&self, name: &str) -> Result<Option<Tag>, DomainError> {
+        Ok(self
+            .tags
+            .lock()
+            .unwrap()
+            .values()
+            .find(|t| t.name == name)
+            .cloned())
+    }
+
+    async fn create(&self, name: &str) -> Result<Tag, DomainError> {
+        *self.create_calls.lock().unwrap() += 1;
+        self.created_names.lock().unwrap().push(name.to_string());
+        let tag = Tag {
+            id: Uuid::new_v4().to_string(),
+            name: name.to_string(),
+            created_at: Utc::now(),
+        };
+        self.tags
+            .lock()
+            .unwrap()
+            .insert(tag.id.clone(), tag.clone());
+        Ok(tag)
+    }
+
+    async fn delete(&self, id: &str) -> Result<(), DomainError> {
+        self.tags
+            .lock()
+            .unwrap()
+            .remove(id)
+            .map(|_| ())
+            .ok_or_else(|| DomainError::NotFound(id.to_string()))
+    }
+}
+
+#[derive(Default)]
+struct MockResourceTagRepository {
+    associations: Mutex<HashSet<(String, String)>>,
+    tag_store: Arc<MockTagRepository>,
+}
+
+impl MockResourceTagRepository {
+    fn with_tags(tag_store: Arc<MockTagRepository>) -> Self {
+        Self {
+            associations: Mutex::default(),
+            tag_store,
+        }
+    }
+}
+
+#[async_trait]
+impl ResourceTagRepository for MockResourceTagRepository {
+    async fn tags_for_resource(&self, resource_id: &str) -> Result<Vec<Tag>, DomainError> {
+        let assocs = self.associations.lock().unwrap();
+        let tag_ids: Vec<String> = assocs
+            .iter()
+            .filter(|(rid, _)| rid == resource_id)
+            .map(|(_, tid)| tid.clone())
+            .collect();
+        let tags_map = self.tag_store.tags.lock().unwrap();
+        Ok(tag_ids
+            .iter()
+            .filter_map(|id| tags_map.get(id).cloned())
+            .collect())
+    }
+
+    async fn attach(&self, resource_id: &str, tag_id: &str) -> Result<(), DomainError> {
+        self.associations
+            .lock()
+            .unwrap()
+            .insert((resource_id.to_string(), tag_id.to_string()));
+        Ok(())
+    }
+
+    async fn detach(&self, resource_id: &str, tag_id: &str) -> Result<(), DomainError> {
+        let removed = self
+            .associations
+            .lock()
+            .unwrap()
+            .remove(&(resource_id.to_string(), tag_id.to_string()));
+        if removed {
+            Ok(())
+        } else {
+            Err(DomainError::NotFound(format!(
+                "association ({resource_id}, {tag_id}) not found"
+            )))
+        }
+    }
+
+    async fn resource_ids_with_tag_id(&self, tag_id: &str) -> Result<Vec<String>, DomainError> {
+        Ok(self
+            .associations
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, tid)| tid == tag_id)
+            .map(|(rid, _)| rid.clone())
+            .collect())
+    }
+}
+
+fn make_tag_service() -> (Arc<MockTagRepository>, Arc<MockResourceTagRepository>, TagService) {
+    let tag_repo = Arc::new(MockTagRepository::default());
+    let resource_tag_repo = Arc::new(MockResourceTagRepository::with_tags(Arc::clone(&tag_repo)));
+    let svc = TagService::new(
+        Arc::clone(&tag_repo) as Arc<dyn TagRepository>,
+        Arc::clone(&resource_tag_repo) as Arc<dyn ResourceTagRepository>,
+    );
+    (tag_repo, resource_tag_repo, svc)
+}
+
+#[tokio::test]
+async fn tag_service_create_normalises_name() {
+    let (tag_repo, _, svc) = make_tag_service();
+
+    let tag = svc.create("  Sci-Fi  ").await.expect("create must succeed");
+    assert_eq!(tag.name, "sci-fi");
+
+    let created_names = tag_repo.created_names.lock().unwrap();
+    assert_eq!(created_names.as_slice(), &["sci-fi"]);
+}
+
+#[tokio::test]
+async fn tag_service_create_rejects_empty_name() {
+    let (tag_repo, _, svc) = make_tag_service();
+
+    let err = svc
+        .create("   ")
+        .await
+        .expect_err("whitespace-only must fail");
+    assert!(matches!(err, DomainError::ValidationError(_)));
+
+    let calls = *tag_repo.create_calls.lock().unwrap();
+    assert_eq!(calls, 0, "repo.create must NOT be called on validation failure");
+}
+
+#[tokio::test]
+async fn tag_service_attach_tag_to_resource() {
+    let (tag_repo, resource_tag_repo, svc) = make_tag_service();
+
+    let tag = tag_repo.create("action").await.expect("seed tag");
+    svc.attach_tag("res-1", &tag.id)
+        .await
+        .expect("attach must succeed");
+
+    let assocs = resource_tag_repo.associations.lock().unwrap();
+    assert!(assocs.contains(&("res-1".to_string(), tag.id.clone())));
+}
+
+#[tokio::test]
+async fn tag_service_detach_tag_from_resource() {
+    let (tag_repo, resource_tag_repo, svc) = make_tag_service();
+
+    let tag = tag_repo.create("action").await.expect("seed tag");
+    resource_tag_repo
+        .associations
+        .lock()
+        .unwrap()
+        .insert(("res-1".to_string(), tag.id.clone()));
+
+    svc.detach_tag("res-1", &tag.id)
+        .await
+        .expect("detach must succeed");
+
+    let assocs = resource_tag_repo.associations.lock().unwrap();
+    assert!(!assocs.contains(&("res-1".to_string(), tag.id.clone())));
+}
+
+#[tokio::test]
+async fn tag_service_tags_for_resource() {
+    let (tag_repo, resource_tag_repo, svc) = make_tag_service();
+
+    let t1 = tag_repo.create("sci-fi").await.expect("seed t1");
+    let t2 = tag_repo.create("action").await.expect("seed t2");
+    {
+        let mut assocs = resource_tag_repo.associations.lock().unwrap();
+        assocs.insert(("res-1".to_string(), t1.id.clone()));
+        assocs.insert(("res-1".to_string(), t2.id.clone()));
+    }
+
+    let mut tags = svc
+        .tags_for_resource("res-1")
+        .await
+        .expect("tags_for_resource must succeed");
+    tags.sort_by(|a, b| a.name.cmp(&b.name));
+
+    assert_eq!(tags.len(), 2);
+    assert_eq!(tags[0].name, "action");
+    assert_eq!(tags[1].name, "sci-fi");
+}
+
+#[tokio::test]
+async fn tag_service_filter_resource_ids_by_tag() {
+    let (tag_repo, resource_tag_repo, svc) = make_tag_service();
+
+    // Seed via service so normalization is exercised end-to-end
+    let tag = svc
+        .create("  Sci-Fi  ")
+        .await
+        .expect("create must succeed");
+    assert_eq!(tag.name, "sci-fi");
+
+    {
+        let mut assocs = resource_tag_repo.associations.lock().unwrap();
+        assocs.insert(("res-a".to_string(), tag.id.clone()));
+        assocs.insert(("res-b".to_string(), tag.id.clone()));
+    }
+
+    let mut ids = svc
+        .resource_ids_for_tag_name(" sci-fi ")
+        .await
+        .expect("lookup must succeed");
+    ids.sort();
+    assert_eq!(ids, vec!["res-a".to_string(), "res-b".to_string()]);
+
+    // Unknown tag → empty vec, not an error
+    let empty = svc
+        .resource_ids_for_tag_name("unknown")
+        .await
+        .expect("unknown tag must return empty vec");
+    assert!(empty.is_empty());
+
+    // Whitespace-only → ValidationError
+    let err = svc
+        .resource_ids_for_tag_name("   ")
+        .await
+        .expect_err("empty name must fail");
+    assert!(matches!(err, DomainError::ValidationError(_)));
 }
