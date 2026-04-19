@@ -41,6 +41,7 @@ impl AdapterFactory {
         if database_url.starts_with("sqlite://") {
             let conn = sqlite::open_sqlite_connection(database_url)?;
             let shared = Arc::new(std::sync::Mutex::new(conn));
+            let tag_repo = Arc::new(sqlite::tag::SqliteTagRepository::new(shared.clone()));
             return Ok(AdapterBundle {
                 database: DatabaseAdapter::Sqlite,
                 database_url: database_url.to_string(),
@@ -82,14 +83,8 @@ impl AdapterFactory {
                     shared.clone(),
                 )),
                 progress_repo: Arc::new(sqlite::progress::SqliteProgressRepository::new(shared.clone())),
-                tag_repo: {
-                    let tag = Arc::new(sqlite::tag::SqliteTagRepository::new(shared.clone()));
-                    tag as Arc<dyn domain::tag::TagRepository>
-                },
-                resource_tag_repo: {
-                    let tag = Arc::new(sqlite::tag::SqliteTagRepository::new(shared));
-                    tag as Arc<dyn domain::tag::ResourceTagRepository>
-                },
+                tag_repo: tag_repo.clone() as Arc<dyn domain::tag::TagRepository>,
+                resource_tag_repo: tag_repo as Arc<dyn domain::tag::ResourceTagRepository>,
             });
         }
 

@@ -1123,5 +1123,16 @@ fn sqlite_resource_tag_repository_attach_detach_and_filter() {
 
         // re-attach existing association is idempotent
         bundle.resource_tag_repo.attach(&r1_id, &tag_a.id).await.expect("re-attach tag-a to r1 must be idempotent");
+
+        // Verify no duplicate association was created
+        let r1_tags_after_reattach = bundle.resource_tag_repo.tags_for_resource(&r1_id).await.expect("tags for r1 after reattach");
+        assert_eq!(r1_tags_after_reattach.len(), 1, "re-attach should not create duplicate");
+        assert_eq!(r1_tags_after_reattach[0].name, "tag-a");
+
+        // Stronger check: verify resource_ids_with_tag_id still has exactly 2 unique resource IDs for tag_a
+        let with_tag_a_after = bundle.resource_tag_repo.resource_ids_with_tag_id(&tag_a.id).await.expect("resource_ids_with_tag_id after reattach");
+        assert_eq!(with_tag_a_after.len(), 2, "tag-a should still be attached to exactly 2 resources");
+        assert!(with_tag_a_after.contains(&r1_id));
+        assert!(with_tag_a_after.contains(&r2_id));
     });
 }
