@@ -25,7 +25,11 @@ use crate::{
         remove_image_location, search_images, update_image,
     },
     notifications::{list_notifications, mark_notification_read, notifications_stream},
-    progress_handler::{get_progress, patch_progress},
+    progress_handler::{
+        get_ebook_progress, get_game_progress, get_image_progress, get_video_progress,
+        get_web_reader_progress, patch_ebook_progress, patch_game_progress, patch_image_progress,
+        patch_video_progress, patch_web_reader_progress,
+    },
     sync_handler::{ecosystem_status, get_sync_job, list_platform_syncs, trigger_sync},
     system::{health, openapi},
     vault_handler::{
@@ -195,23 +199,23 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Progress
         .route(
             "/api/v1/inventory/ebooks/:id/progress",
-            get(get_progress).patch(patch_progress),
+            get(get_ebook_progress).patch(patch_ebook_progress),
         )
         .route(
             "/api/v1/inventory/web-readers/:id/progress",
-            get(get_progress).patch(patch_progress),
+            get(get_web_reader_progress).patch(patch_web_reader_progress),
         )
         .route(
             "/api/v1/inventory/images/:id/progress",
-            get(get_progress).patch(patch_progress),
+            get(get_image_progress).patch(patch_image_progress),
         )
         .route(
             "/api/v1/inventory/videos/:id/progress",
-            get(get_progress).patch(patch_progress),
+            get(get_video_progress).patch(patch_video_progress),
         )
         .route(
             "/api/v1/inventory/games/:id/progress",
-            get(get_progress).patch(patch_progress),
+            get(get_game_progress).patch(patch_game_progress),
         )
         .layer(from_fn_with_state(state.clone(), auth_middleware))
         .with_state(state)

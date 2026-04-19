@@ -103,8 +103,16 @@ impl Modify for SecurityAddon {
         crate::device_handler::current_device,
         crate::device_handler::register_device,
         crate::device_handler::delink_device,
-        crate::progress_handler::get_progress,
-        crate::progress_handler::patch_progress,
+        crate::progress_handler::get_ebook_progress,
+        crate::progress_handler::patch_ebook_progress,
+        crate::progress_handler::get_web_reader_progress,
+        crate::progress_handler::patch_web_reader_progress,
+        crate::progress_handler::get_image_progress,
+        crate::progress_handler::patch_image_progress,
+        crate::progress_handler::get_video_progress,
+        crate::progress_handler::patch_video_progress,
+        crate::progress_handler::get_game_progress,
+        crate::progress_handler::patch_game_progress,
     ),
     components(
         schemas(

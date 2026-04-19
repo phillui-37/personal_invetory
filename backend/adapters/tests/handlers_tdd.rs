@@ -9,9 +9,14 @@ use chrono::Utc;
 use domain::{
     device::{Device, DeviceRepository},
     progress::{ProgressRepository, ResourceProgress},
-    DomainError,
+    DomainError, EbookMeta, EbookMetaRepository, GameMeta, GameMetaRepository, ImageMeta,
+    ImageMetaRepository, LocationRepository, NewEbookMeta, NewGameMeta, NewImageMeta,
+    NewResourceLocation, NewVideoMeta, NewWebReaderMeta, Resource, ResourceLocation,
+    ResourceRepository, ResourceType, VideoMeta, VideoMetaRepository, WebReaderMeta,
+    WebReaderMetaRepository,
 };
 use serde_json::{json, Value};
+use services::{EbookService, GameService, ImageService, VideoService, WebReaderService};
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -1272,21 +1277,370 @@ impl ProgressRepository for FakeHandlerProgressRepo {
     }
 }
 
-fn app_with_progress_service(repo: Arc<FakeHandlerProgressRepo>) -> axum::Router {
+// ── Fake repos for type-check tests ──────────────────────────────────────
+
+struct FakeHandlerResourceRepo {
+    resources: std::sync::Mutex<Vec<domain::Resource>>,
+}
+
+impl FakeHandlerResourceRepo {
+    fn with_resource(id: Uuid, resource_type: ResourceType) -> Arc<Self> {
+        let now = Utc::now();
+        let resource = domain::Resource {
+            id,
+            title: "Test Resource".to_string(),
+            notes: None,
+            resource_type,
+            created_at: now,
+            updated_at: now,
+        };
+        Arc::new(Self {
+            resources: std::sync::Mutex::new(vec![resource]),
+        })
+    }
+}
+
+#[async_trait]
+impl ResourceRepository for FakeHandlerResourceRepo {
+    async fn list(&self) -> Result<Vec<Resource>, DomainError> {
+        Ok(self.resources.lock().unwrap().clone())
+    }
+    async fn search(&self, _query: &str) -> Result<Vec<Resource>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_by_id(&self, id: Uuid) -> Result<Resource, DomainError> {
+        self.resources
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|r| r.id == id)
+            .cloned()
+            .ok_or_else(|| DomainError::NotFound(format!("resource {id} not found")))
+    }
+    async fn create(&self, input: domain::NewResource) -> Result<Resource, DomainError> {
+        let now = Utc::now();
+        Ok(Resource {
+            id: Uuid::new_v4(),
+            title: input.title,
+            notes: input.notes,
+            resource_type: input.resource_type,
+            created_at: now,
+            updated_at: now,
+        })
+    }
+    async fn update(&self, id: Uuid, _input: domain::UpdateResource) -> Result<Resource, DomainError> {
+        Err(DomainError::NotFound(format!("resource {id} not found")))
+    }
+    async fn delete(&self, _id: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+struct FakeHandlerEbookMetaRepo {
+    seeded_id: Option<Uuid>,
+}
+
+impl FakeHandlerEbookMetaRepo {
+    fn for_id(id: Uuid) -> Arc<Self> {
+        Arc::new(Self { seeded_id: Some(id) })
+    }
+    fn empty() -> Arc<Self> {
+        Arc::new(Self { seeded_id: None })
+    }
+}
+
+#[async_trait]
+impl EbookMetaRepository for FakeHandlerEbookMetaRepo {
+    async fn get(&self, resource_id: Uuid) -> Result<EbookMeta, DomainError> {
+        if self.seeded_id == Some(resource_id) {
+            Ok(EbookMeta {
+                resource_id,
+                author: None,
+                isbn: None,
+                publisher: None,
+                language: None,
+                file_format: None,
+            })
+        } else {
+            Err(DomainError::NotFound(format!("ebook meta for {resource_id} not found")))
+        }
+    }
+    async fn upsert(&self, resource_id: Uuid, input: NewEbookMeta) -> Result<EbookMeta, DomainError> {
+        Ok(EbookMeta {
+            resource_id,
+            author: input.author,
+            isbn: input.isbn,
+            publisher: input.publisher,
+            language: input.language,
+            file_format: input.file_format,
+        })
+    }
+}
+
+struct FakeHandlerWebReaderMetaRepo {
+    seeded_id: Option<Uuid>,
+}
+
+impl FakeHandlerWebReaderMetaRepo {
+    fn for_id(id: Uuid) -> Arc<Self> {
+        Arc::new(Self { seeded_id: Some(id) })
+    }
+    fn empty() -> Arc<Self> {
+        Arc::new(Self { seeded_id: None })
+    }
+}
+
+#[async_trait]
+impl WebReaderMetaRepository for FakeHandlerWebReaderMetaRepo {
+    async fn get(&self, resource_id: Uuid) -> Result<WebReaderMeta, DomainError> {
+        if self.seeded_id == Some(resource_id) {
+            Ok(WebReaderMeta {
+                resource_id,
+                url: "https://example.com".to_string(),
+                site_name: None,
+                last_checked_chapter: None,
+                check_interval_secs: None,
+                last_checked_at: None,
+                progress_css_selector: None,
+            })
+        } else {
+            Err(DomainError::NotFound(format!("web reader meta for {resource_id} not found")))
+        }
+    }
+    async fn upsert(&self, resource_id: Uuid, input: NewWebReaderMeta) -> Result<WebReaderMeta, DomainError> {
+        Ok(WebReaderMeta {
+            resource_id,
+            url: input.url,
+            site_name: input.site_name,
+            last_checked_chapter: input.last_checked_chapter,
+            check_interval_secs: input.check_interval_secs,
+            last_checked_at: input.last_checked_at,
+            progress_css_selector: input.progress_css_selector,
+        })
+    }
+}
+
+struct FakeHandlerImageMetaRepo {
+    seeded_id: Option<Uuid>,
+}
+
+impl FakeHandlerImageMetaRepo {
+    fn for_id(id: Uuid) -> Arc<Self> {
+        Arc::new(Self { seeded_id: Some(id) })
+    }
+    fn empty() -> Arc<Self> {
+        Arc::new(Self { seeded_id: None })
+    }
+}
+
+#[async_trait]
+impl ImageMetaRepository for FakeHandlerImageMetaRepo {
+    async fn get(&self, resource_id: Uuid) -> Result<ImageMeta, DomainError> {
+        if self.seeded_id == Some(resource_id) {
+            Ok(ImageMeta {
+                resource_id,
+                width: None,
+                height: None,
+                file_format: None,
+                file_size_bytes: None,
+            })
+        } else {
+            Err(DomainError::NotFound(format!("image meta for {resource_id} not found")))
+        }
+    }
+    async fn upsert(&self, resource_id: Uuid, input: NewImageMeta) -> Result<ImageMeta, DomainError> {
+        Ok(ImageMeta {
+            resource_id,
+            width: input.width,
+            height: input.height,
+            file_format: input.file_format,
+            file_size_bytes: input.file_size_bytes,
+        })
+    }
+}
+
+struct FakeHandlerVideoMetaRepo {
+    seeded_id: Option<Uuid>,
+}
+
+impl FakeHandlerVideoMetaRepo {
+    fn for_id(id: Uuid) -> Arc<Self> {
+        Arc::new(Self { seeded_id: Some(id) })
+    }
+    fn empty() -> Arc<Self> {
+        Arc::new(Self { seeded_id: None })
+    }
+}
+
+#[async_trait]
+impl VideoMetaRepository for FakeHandlerVideoMetaRepo {
+    async fn get(&self, resource_id: Uuid) -> Result<VideoMeta, DomainError> {
+        if self.seeded_id == Some(resource_id) {
+            Ok(VideoMeta {
+                resource_id,
+                duration_secs: None,
+                file_format: None,
+                resolution: None,
+                file_size_bytes: None,
+            })
+        } else {
+            Err(DomainError::NotFound(format!("video meta for {resource_id} not found")))
+        }
+    }
+    async fn upsert(&self, resource_id: Uuid, input: NewVideoMeta) -> Result<VideoMeta, DomainError> {
+        Ok(VideoMeta {
+            resource_id,
+            duration_secs: input.duration_secs,
+            file_format: input.file_format,
+            resolution: input.resolution,
+            file_size_bytes: input.file_size_bytes,
+        })
+    }
+}
+
+struct FakeHandlerGameMetaRepo {
+    seeded_id: Option<Uuid>,
+}
+
+impl FakeHandlerGameMetaRepo {
+    fn for_id(id: Uuid) -> Arc<Self> {
+        Arc::new(Self { seeded_id: Some(id) })
+    }
+    fn empty() -> Arc<Self> {
+        Arc::new(Self { seeded_id: None })
+    }
+}
+
+#[async_trait]
+impl GameMetaRepository for FakeHandlerGameMetaRepo {
+    async fn get(&self, resource_id: Uuid) -> Result<GameMeta, DomainError> {
+        if self.seeded_id == Some(resource_id) {
+            Ok(GameMeta {
+                resource_id,
+                platform: None,
+                store: None,
+                developer: None,
+                publisher: None,
+                manual_notes: None,
+            })
+        } else {
+            Err(DomainError::NotFound(format!("game meta for {resource_id} not found")))
+        }
+    }
+    async fn upsert(&self, resource_id: Uuid, input: NewGameMeta) -> Result<GameMeta, DomainError> {
+        Ok(GameMeta {
+            resource_id,
+            platform: input.platform,
+            store: input.store,
+            developer: input.developer,
+            publisher: input.publisher,
+            manual_notes: input.manual_notes,
+        })
+    }
+}
+
+struct FakeHandlerLocationRepo;
+
+#[async_trait]
+impl LocationRepository for FakeHandlerLocationRepo {
+    async fn list(&self, _resource_id: Uuid) -> Result<Vec<ResourceLocation>, DomainError> {
+        Ok(vec![])
+    }
+    async fn add(&self, resource_id: Uuid, input: NewResourceLocation) -> Result<ResourceLocation, DomainError> {
+        Ok(ResourceLocation {
+            id: Uuid::new_v4(),
+            resource_id,
+            device_id: input.device_id,
+            path_or_url: input.path_or_url,
+            storage_type: input.storage_type,
+        })
+    }
+    async fn remove(&self, _resource_id: Uuid, _location_id: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+fn app_with_progress_service_for_resource(
+    resource_type: ResourceType,
+    id: Uuid,
+    progress_repo: Arc<FakeHandlerProgressRepo>,
+) -> axum::Router {
     let openapi = r#"{"paths":{"/api/v1/system/health":{}}}"#;
-    let svc = Arc::new(services::ProgressService::new(
-        repo as Arc<dyn domain::progress::ProgressRepository>,
+    let resource_repo = FakeHandlerResourceRepo::with_resource(id, resource_type.clone());
+    let location_repo = Arc::new(FakeHandlerLocationRepo);
+
+    let ebook_meta = match resource_type {
+        ResourceType::Ebook => FakeHandlerEbookMetaRepo::for_id(id),
+        _ => FakeHandlerEbookMetaRepo::empty(),
+    };
+    let web_reader_meta = match resource_type {
+        ResourceType::WebReader => FakeHandlerWebReaderMetaRepo::for_id(id),
+        _ => FakeHandlerWebReaderMetaRepo::empty(),
+    };
+    let image_meta = match resource_type {
+        ResourceType::Image => FakeHandlerImageMetaRepo::for_id(id),
+        _ => FakeHandlerImageMetaRepo::empty(),
+    };
+    let video_meta = match resource_type {
+        ResourceType::Video => FakeHandlerVideoMetaRepo::for_id(id),
+        _ => FakeHandlerVideoMetaRepo::empty(),
+    };
+    let game_meta = match resource_type {
+        ResourceType::Game => FakeHandlerGameMetaRepo::for_id(id),
+        _ => FakeHandlerGameMetaRepo::empty(),
+    };
+
+    let ebook_service = Arc::new(EbookService::new(
+        resource_repo.clone(),
+        ebook_meta,
+        location_repo.clone(),
     ));
-    let mut state = AppState::for_tests("secret-key".to_string());
+    let web_reader_service = Arc::new(WebReaderService::new(
+        resource_repo.clone(),
+        web_reader_meta,
+        location_repo.clone(),
+    ));
+    let image_service = Arc::new(ImageService::new(
+        resource_repo.clone(),
+        image_meta,
+        location_repo.clone(),
+    ));
+    let video_service = Arc::new(VideoService::new(
+        resource_repo.clone(),
+        video_meta,
+        location_repo.clone(),
+    ));
+    let game_service = Arc::new(GameService::new(
+        resource_repo,
+        game_meta,
+        location_repo,
+    ));
+
+    let progress_svc = Arc::new(services::ProgressService::new(
+        progress_repo as Arc<dyn domain::progress::ProgressRepository>,
+    ));
+
+    let mut state = AppState::new(
+        ebook_service,
+        web_reader_service,
+        image_service,
+        video_service,
+        game_service,
+        "secret-key".to_string(),
+    );
     state.openapi_json = openapi.to_string();
-    let state = state.with_progress_service(svc);
+    let state = state.with_progress_service(progress_svc);
     build_router(Arc::new(state))
 }
 
 #[tokio::test]
 async fn handler_get_progress_returns_404_when_none() {
     let id = Uuid::new_v4();
-    let app = app_with_progress_service(FakeHandlerProgressRepo::empty());
+    let app = app_with_progress_service_for_resource(
+        ResourceType::Ebook,
+        id,
+        FakeHandlerProgressRepo::empty(),
+    );
 
     let resp = app
         .oneshot(
@@ -1306,7 +1660,7 @@ async fn handler_get_progress_returns_404_when_none() {
 async fn handler_get_progress_returns_200_when_set() {
     let id = Uuid::new_v4();
     let repo = FakeHandlerProgressRepo::with_progress(&id.to_string(), 0.25, Some("start"));
-    let app = app_with_progress_service(repo);
+    let app = app_with_progress_service_for_resource(ResourceType::Ebook, id, repo);
 
     let resp = app
         .oneshot(
@@ -1332,7 +1686,7 @@ async fn handler_get_progress_returns_200_when_set() {
 async fn handler_patch_progress_creates_and_returns_200() {
     let id = Uuid::new_v4();
     let repo = FakeHandlerProgressRepo::empty();
-    let app = app_with_progress_service(repo.clone());
+    let app = app_with_progress_service_for_resource(ResourceType::Ebook, id, repo.clone());
 
     let resp = app
         .oneshot(
@@ -1363,7 +1717,11 @@ async fn handler_patch_progress_creates_and_returns_200() {
 #[tokio::test]
 async fn handler_patch_progress_rejects_out_of_range() {
     let id = Uuid::new_v4();
-    let app = app_with_progress_service(FakeHandlerProgressRepo::empty());
+    let app = app_with_progress_service_for_resource(
+        ResourceType::Ebook,
+        id,
+        FakeHandlerProgressRepo::empty(),
+    );
 
     let resp = app
         .oneshot(
@@ -1386,4 +1744,41 @@ async fn handler_patch_progress_rejects_out_of_range() {
         "error body must mention range: {:?}",
         json
     );
+}
+
+#[tokio::test]
+async fn handler_get_progress_wrong_type_route_returns_404() {
+    let id = Uuid::new_v4();
+    // Seed as ebook + progress, but request via video route
+    let repo = FakeHandlerProgressRepo::with_progress(&id.to_string(), 0.5, None);
+    let app = app_with_progress_service_for_resource(ResourceType::Ebook, id, repo);
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/inventory/videos/{id}/progress"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn openapi_smoke_all_progress_get_paths_exist() {
+    let json_str = adapters::generate_openapi_json();
+    let doc: Value = serde_json::from_str(&json_str).expect("valid OpenAPI JSON");
+    let paths = doc["paths"].as_object().expect("paths object");
+
+    for kind in &["ebooks", "web-readers", "images", "videos", "games"] {
+        let path = format!("/api/v1/inventory/{kind}/{{id}}/progress");
+        assert!(
+            paths.contains_key(&path),
+            "expected path '{path}' in OpenAPI but not found; available: {:?}",
+            paths.keys().collect::<Vec<_>>()
+        );
+    }
 }
