@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 
 use domain::progress::{ProgressRepository, ResourceProgress};
 use domain::DomainError;
 
-use super::SharedSqliteConnection;
+use crate::sqlite::{map_sqlite_error, parse_timestamp_for_row, SharedSqliteConnection};
 
 pub struct SqliteProgressRepository {
     conn: SharedSqliteConnection,
@@ -14,6 +14,20 @@ pub struct SqliteProgressRepository {
 impl SqliteProgressRepository {
     pub fn new(conn: SharedSqliteConnection) -> Self {
         Self { conn }
+    }
+
+    fn row_to_progress(row: &rusqlite::Row<'_>) -> rusqlite::Result<ResourceProgress> {
+        let resource_id: String = row.get(0)?;
+        let progress: f64 = row.get(1)?;
+        let notes: Option<String> = row.get(2)?;
+        let updated_at_raw: String = row.get(3)?;
+        let updated_at = parse_timestamp_for_row(updated_at_raw)?;
+        Ok(ResourceProgress {
+            resource_id,
+            progress,
+            notes,
+            updated_at,
+        })
     }
 }
 
@@ -24,39 +38,15 @@ impl ProgressRepository for SqliteProgressRepository {
             .conn
             .lock()
             .map_err(|e| DomainError::InternalError(e.to_string()))?;
-        let mut stmt = conn
-            .prepare(
-                "SELECT resource_id, progress, notes, updated_at
-                 FROM resource_progress
-                 WHERE resource_id = ?1",
-            )
-            .map_err(|e| DomainError::InternalError(e.to_string()))?;
-        let mut rows = stmt
-            .query_map(params![resource_id], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, f64>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                    row.get::<_, String>(3)?,
-                ))
-            })
-            .map_err(|e| DomainError::InternalError(e.to_string()))?;
-
-        match rows.next() {
-            None => Ok(None),
-            Some(Err(e)) => Err(DomainError::InternalError(e.to_string())),
-            Some(Ok((rid, progress, notes, updated_at_str))) => {
-                let updated_at = updated_at_str
-                    .parse::<chrono::DateTime<Utc>>()
-                    .map_err(|e| DomainError::InternalError(e.to_string()))?;
-                Ok(Some(ResourceProgress {
-                    resource_id: rid,
-                    progress,
-                    notes,
-                    updated_at,
-                }))
-            }
-        }
+        conn.query_row(
+            "SELECT resource_id, progress, notes, updated_at
+             FROM resource_progress
+             WHERE resource_id = ?1",
+            params![resource_id],
+            Self::row_to_progress,
+        )
+        .optional()
+        .map_err(map_sqlite_error)
     }
 
     async fn upsert(
@@ -76,7 +66,7 @@ impl ProgressRepository for SqliteProgressRepository {
              VALUES (?1, ?2, ?3, ?4)",
             params![resource_id, progress, notes, now_str],
         )
-        .map_err(|e| DomainError::InternalError(e.to_string()))?;
+        .map_err(map_sqlite_error)?;
 
         Ok(ResourceProgress {
             resource_id: resource_id.to_string(),

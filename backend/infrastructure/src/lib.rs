@@ -113,6 +113,9 @@ mod tests {
         assert!(table_names.contains(&"credentials".to_string()));
         assert!(table_names.contains(&"sync_jobs".to_string()));
         assert!(table_names.contains(&"dedup_warnings".to_string()));
+        assert!(table_names.contains(&"resource_progress".to_string()));
+        assert!(table_names.contains(&"tags".to_string()));
+        assert!(table_names.contains(&"resource_tags".to_string()));
     }
 
     #[test]

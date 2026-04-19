@@ -887,6 +887,40 @@ fn sqlite_device_repository_register_is_atomic() {
 }
 
 #[test]
+fn sqlite_progress_repository_upsert_rejects_missing_resource() {
+    let bundle = sqlite_bundle();
+    let result = block_on(bundle.progress_repo.upsert("missing-resource", 0.25, None));
+    assert!(
+        matches!(result, Err(DomainError::NotFound(_))),
+        "expected NotFound for missing FK, got: {result:?}"
+    );
+}
+
+#[test]
+fn sqlite_progress_repository_upsert_rejects_invalid_progress() {
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Check Constraint Test Book".to_string(),
+                notes: None,
+                resource_type: ResourceType::Ebook,
+            })
+            .await
+            .expect("create resource");
+
+        let resource_id = resource.id.to_string();
+        let result = bundle.progress_repo.upsert(&resource_id, 1.5, None).await;
+        assert!(
+            matches!(result, Err(DomainError::Conflict(_))),
+            "expected Conflict for CHECK constraint violation, got: {result:?}"
+        );
+    });
+}
+
+#[test]
 fn sqlite_progress_repository_get_returns_none_when_no_row() {
     let bundle = sqlite_bundle();
     let result = block_on(bundle.progress_repo.get("nonexistent-resource-id")).unwrap();
