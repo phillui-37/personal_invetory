@@ -1,17 +1,117 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::{
     body::{to_bytes, Body},
     http::{Request, StatusCode},
 };
+use chrono::Utc;
+use domain::{device::{Device, DeviceRepository}, DomainError};
 use serde_json::{json, Value};
 use tower::ServiceExt;
+use uuid::Uuid;
 
 use adapters::{build_router, AppState};
 
 fn app_with_openapi(openapi_json: &str) -> axum::Router {
     let mut state = AppState::for_tests("secret-key".to_string());
     state.openapi_json = openapi_json.to_string();
+    build_router(Arc::new(state))
+}
+
+// ── In-memory DeviceRepository for handler tests ──────────────────────────
+
+#[derive(Default)]
+struct FakeHandlerDeviceRepo {
+    devices: std::sync::Mutex<Vec<Device>>,
+}
+
+impl FakeHandlerDeviceRepo {
+    fn empty() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    fn with_device(device_id: &str, device_name: Option<&str>) -> Arc<Self> {
+        let repo = Self::empty();
+        let now = Utc::now();
+        repo.devices.lock().unwrap().push(Device {
+            id: Uuid::new_v4().to_string(),
+            device_id: device_id.to_string(),
+            device_name: device_name.map(str::to_string),
+            linked_at: now,
+            delinked_at: None,
+            location_count: 0,
+        });
+        repo
+    }
+}
+
+#[async_trait]
+impl DeviceRepository for FakeHandlerDeviceRepo {
+    async fn all_with_counts(&self) -> Result<Vec<Device>, DomainError> {
+        Ok(self.devices.lock().unwrap().clone())
+    }
+
+    async fn active_by_device_id(&self, device_id: &str) -> Result<Option<Device>, DomainError> {
+        Ok(self
+            .devices
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|d| d.device_id == device_id && d.delinked_at.is_none())
+            .cloned())
+    }
+
+    async fn register(&self, device_id: &str, device_name: Option<&str>) -> Result<Device, DomainError> {
+        let now = Utc::now();
+        let device = Device {
+            id: Uuid::new_v4().to_string(),
+            device_id: device_id.to_string(),
+            device_name: device_name.map(str::to_string),
+            linked_at: now,
+            delinked_at: None,
+            location_count: 0,
+        };
+        self.devices.lock().unwrap().push(device.clone());
+        Ok(device)
+    }
+
+    async fn delink(&self, device_id: &str, at: chrono::DateTime<Utc>) -> Result<(), DomainError> {
+        let mut devices = self.devices.lock().unwrap();
+        let d = devices
+            .iter_mut()
+            .find(|d| d.device_id == device_id && d.delinked_at.is_none())
+            .ok_or_else(|| DomainError::NotFound(format!("device '{device_id}' not found")))?;
+        d.delinked_at = Some(at);
+        Ok(())
+    }
+}
+
+fn app_with_device_service(device_id: &str) -> axum::Router {
+    let openapi = r#"{"paths":{"/api/v1/system/health":{}}}"#;
+    let repo = FakeHandlerDeviceRepo::empty();
+    let svc = Arc::new(services::DeviceService::new(
+        repo,
+        device_id.to_string(),
+        "test-host".to_string(),
+    ));
+    let mut state = AppState::for_tests("secret-key".to_string());
+    state.openapi_json = openapi.to_string();
+    let state = state.with_device_service(svc);
+    build_router(Arc::new(state))
+}
+
+fn app_with_device_service_and_device(device_id: &str) -> axum::Router {
+    let openapi = r#"{"paths":{"/api/v1/system/health":{}}}"#;
+    let repo = FakeHandlerDeviceRepo::with_device(device_id, Some("Test Device"));
+    let svc = Arc::new(services::DeviceService::new(
+        repo,
+        device_id.to_string(),
+        "test-host".to_string(),
+    ));
+    let mut state = AppState::for_tests("secret-key".to_string());
+    state.openapi_json = openapi.to_string();
+    let state = state.with_device_service(svc);
     build_router(Arc::new(state))
 }
 
@@ -948,4 +1048,168 @@ async fn device_handlers_return_503_when_service_not_configured() {
         .await
         .expect("response");
     assert_eq!(delink.status(), StatusCode::SERVICE_UNAVAILABLE);
+}
+
+#[tokio::test]
+async fn device_list_handler_returns_200_with_empty_array() {
+    let app = app_with_device_service("current-dev");
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/devices")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+    assert!(json.is_array(), "body must be a JSON array");
+}
+
+#[tokio::test]
+async fn device_current_handler_returns_404_when_not_registered() {
+    let app = app_with_device_service("unregistered-dev");
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/devices/current")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn device_current_handler_returns_200_when_registered() {
+    let app = app_with_device_service_and_device("my-dev");
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/devices/current")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["device_id"], "my-dev");
+    assert_eq!(json["is_current"], true);
+}
+
+#[tokio::test]
+async fn device_register_handler_returns_201_with_device_info() {
+    let app = app_with_device_service("current-dev");
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/devices/register")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"device_id": "new-dev", "device_name": "New PC"}).to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["device_id"], "new-dev");
+    assert_eq!(json["device_name"], "New PC");
+}
+
+#[tokio::test]
+async fn device_register_handler_rejects_empty_device_id_with_422() {
+    let app = app_with_device_service("current-dev");
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/devices/register")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"device_id": ""}).to_string()))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn device_delink_handler_returns_422_for_current_device() {
+    let app = app_with_device_service_and_device("self-dev");
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/devices/self-dev/delink")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn device_delink_handler_returns_404_for_unknown_device() {
+    let app = app_with_device_service("current-dev");
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/devices/ghost-dev/delink")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn device_delink_handler_returns_200_for_other_device() {
+    let app = app_with_device_service_and_device("current-dev");
+    // Register a second device to delink
+    let register_resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/devices/register")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"device_id": "other-dev"}).to_string()))
+                .expect("request"),
+        )
+        .await
+        .expect("register response");
+    assert_eq!(register_resp.status(), StatusCode::CREATED);
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/devices/other-dev/delink")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(resp.status(), StatusCode::OK);
 }

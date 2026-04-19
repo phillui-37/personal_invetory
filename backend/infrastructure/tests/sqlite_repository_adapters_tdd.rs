@@ -777,3 +777,111 @@ fn sqlite_device_repository_register_list_and_delink() {
         assert!(matches!(err2, domain::DomainError::NotFound(_)));
     });
 }
+
+#[test]
+fn sqlite_device_repository_location_count_reflects_resource_locations() {
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        // Register a device and add resource locations for it
+        bundle
+            .device_repo
+            .register("device-loc", None)
+            .await
+            .expect("register device-loc");
+
+        // Create a resource and add two locations for device-loc
+        let res = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Loc Test Book".to_string(),
+                notes: None,
+                resource_type: ResourceType::Ebook,
+            })
+            .await
+            .expect("create resource");
+
+        bundle
+            .location_repo
+            .add(
+                res.id,
+                NewResourceLocation {
+                    device_id: "device-loc".to_string(),
+                    path_or_url: "/path/a".to_string(),
+                    storage_type: StorageType::LocalFs,
+                },
+            )
+            .await
+            .expect("add location 1");
+        bundle
+            .location_repo
+            .add(
+                res.id,
+                NewResourceLocation {
+                    device_id: "device-loc".to_string(),
+                    path_or_url: "/path/b".to_string(),
+                    storage_type: StorageType::LocalFs,
+                },
+            )
+            .await
+            .expect("add location 2");
+
+        let all = bundle
+            .device_repo
+            .all_with_counts()
+            .await
+            .expect("all_with_counts");
+        let device = all
+            .iter()
+            .find(|d| d.device_id == "device-loc")
+            .expect("device-loc should be in list");
+        assert_eq!(
+            device.location_count, 2,
+            "location_count must reflect resource_locations rows"
+        );
+    });
+}
+
+#[test]
+fn sqlite_device_repository_register_is_atomic() {
+    // Verifies the happy-path atomicity: re-registering succeeds and list stays consistent.
+    // (A failed INSERT after UPDATE would leave the device with no active binding.)
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        bundle
+            .device_repo
+            .register("atomic-device", Some("v1"))
+            .await
+            .expect("first register");
+
+        // Re-register: delinks old, inserts new atomically
+        let new_binding = bundle
+            .device_repo
+            .register("atomic-device", Some("v2"))
+            .await
+            .expect("re-register");
+        assert_eq!(new_binding.device_name.as_deref(), Some("v2"));
+
+        // Active binding must be the new one
+        let active = bundle
+            .device_repo
+            .active_by_device_id("atomic-device")
+            .await
+            .expect("active_by_device_id");
+        assert!(active.is_some(), "device must have an active binding after re-register");
+        assert_eq!(active.unwrap().device_name.as_deref(), Some("v2"));
+
+        // all_with_counts still returns exactly one row for this device_id
+        let all = bundle
+            .device_repo
+            .all_with_counts()
+            .await
+            .expect("all_with_counts");
+        assert_eq!(
+            all.iter().filter(|d| d.device_id == "atomic-device").count(),
+            1,
+            "all_with_counts must deduplicate to one row per device_id"
+        );
+    });
+}

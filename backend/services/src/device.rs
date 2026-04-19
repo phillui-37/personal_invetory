@@ -76,6 +76,12 @@ impl DeviceService {
         device_id: &str,
         device_name: Option<&str>,
     ) -> Result<DeviceInfo, DomainError> {
+        let device_id = device_id.trim();
+        if device_id.is_empty() {
+            return Err(DomainError::ValidationError(
+                "device_id must not be empty".into(),
+            ));
+        }
         let device = self.repo.register(device_id, device_name).await?;
         Ok(self.to_info(device))
     }
