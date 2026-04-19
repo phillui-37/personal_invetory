@@ -1,6 +1,7 @@
 pub mod dedup;
 pub mod device;
 pub mod ecosystem;
+pub mod progress;
 pub mod sync;
 pub mod vault;
 
@@ -1063,5 +1064,23 @@ mod repository_contract_tests {
         assert_eq!(notification.id, deserialized.id);
         assert_eq!(notification.message, deserialized.message);
         assert!(!deserialized.read);
+    }
+
+    #[test]
+    fn resource_progress_struct_shape() {
+        use crate::progress::ResourceProgress;
+        
+        let now = Utc::now();
+        let progress = ResourceProgress {
+            resource_id: "res-123".to_string(),
+            progress: 0.5,
+            notes: Some("Half-way through".to_string()),
+            updated_at: now,
+        };
+        
+        assert_eq!(progress.resource_id, "res-123");
+        assert_eq!(progress.progress, 0.5);
+        assert_eq!(progress.notes, Some("Half-way through".to_string()));
+        assert_eq!(progress.updated_at, now);
     }
 }
