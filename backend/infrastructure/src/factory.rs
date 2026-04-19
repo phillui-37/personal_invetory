@@ -29,6 +29,7 @@ pub struct AdapterBundle {
     pub sync_job_repo: Arc<dyn domain::sync::SyncJobRepository>,
     pub dedup_warning_repo: Arc<dyn domain::dedup::DedupWarningRepository>,
     pub device_repo: Arc<dyn domain::device::DeviceRepository>,
+    pub progress_repo: Arc<dyn domain::progress::ProgressRepository>,
 }
 
 pub struct AdapterFactory;
@@ -75,7 +76,10 @@ impl AdapterFactory {
                 dedup_warning_repo: Arc::new(sqlite::dedup::SqliteDedupWarningRepository::new(
                     shared.clone(),
                 )),
-                device_repo: Arc::new(sqlite::device::SqliteDeviceRepository::new(shared)),
+                device_repo: Arc::new(sqlite::device::SqliteDeviceRepository::new(
+                    shared.clone(),
+                )),
+                progress_repo: Arc::new(sqlite::progress::SqliteProgressRepository::new(shared)),
             });
         }
 

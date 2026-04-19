@@ -259,6 +259,17 @@ Implemented device management as a first-class feature:
 - **Database**: `owner_id` legacy field: set to `device_id` value on all new inserts.
 - **Test Count**: Backend 261 (baseline 251). Flutter 174 (baseline 159).
 
+## Phase 6 — Progress Tracking (in progress)
+
+### P6-A: Domain — ResourceProgress struct + ProgressRepository trait ✅
+- **Backend**: `backend/domain/src/progress.rs` created with:
+  - `ResourceProgress` struct: `resource_id` (String), `progress` (f64, 0.0–1.0), `notes` (Option<String>), `updated_at` (DateTime<Utc>)
+  - `ProgressRepository` trait with async methods: `get(resource_id)` returns Option, `upsert(resource_id, progress, notes)` returns ResourceProgress
+  - Uses `#[async_trait]`, `DomainError`, matches existing domain patterns (device.rs, etc.)
+- **Tests**: Added compile-time test `resource_progress_struct_shape` verifying struct shape (field access + values)
+- **Result**: 26 tests passing (1 new), committed as f50aba3
+- **Next**: P6-B (migrations), P6-C (SqliteProgressRepository), P6-E (ProgressService), P6-G (handlers)
+
 ## References
 - Requirements: `TODO.md`
 - Agent rules: `AGENTS.md`

@@ -885,3 +885,68 @@ fn sqlite_device_repository_register_is_atomic() {
         );
     });
 }
+
+#[test]
+fn sqlite_progress_repository_get_returns_none_when_no_row() {
+    let bundle = sqlite_bundle();
+    let result = block_on(bundle.progress_repo.get("nonexistent-resource-id")).unwrap();
+    assert!(result.is_none());
+}
+
+#[test]
+fn sqlite_progress_repository_upsert_creates_and_updates() {
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Progress Test Book".to_string(),
+                notes: None,
+                resource_type: ResourceType::Ebook,
+            })
+            .await
+            .expect("create resource");
+
+        let resource_id = resource.id.to_string();
+
+        // First upsert (create)
+        let p1 = bundle
+            .progress_repo
+            .upsert(&resource_id, 0.25, Some("just started"))
+            .await
+            .expect("first upsert");
+        assert_eq!(p1.resource_id, resource_id);
+        assert!((p1.progress - 0.25).abs() < f64::EPSILON);
+        assert_eq!(p1.notes, Some("just started".to_string()));
+
+        // Get should return the row
+        let fetched = bundle
+            .progress_repo
+            .get(&resource_id)
+            .await
+            .expect("get after first upsert")
+            .expect("row should exist");
+        assert_eq!(fetched.resource_id, resource_id);
+        assert!((fetched.progress - 0.25).abs() < f64::EPSILON);
+
+        // Second upsert (update)
+        let p2 = bundle
+            .progress_repo
+            .upsert(&resource_id, 0.75, None)
+            .await
+            .expect("second upsert");
+        assert!((p2.progress - 0.75).abs() < f64::EPSILON);
+        assert_eq!(p2.notes, None);
+
+        // Confirm update persisted
+        let final_p = bundle
+            .progress_repo
+            .get(&resource_id)
+            .await
+            .expect("get after second upsert")
+            .expect("row should still exist");
+        assert!((final_p.progress - 0.75).abs() < f64::EPSILON);
+        assert_eq!(final_p.notes, None);
+    });
+}
