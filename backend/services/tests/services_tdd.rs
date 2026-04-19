@@ -997,3 +997,129 @@ async fn chapter_check_service_runs_checker_without_nested_runtime_panic() {
     assert!(!check.has_new_chapter);
     assert_eq!(check.latest_chapter.as_deref(), Some("ch-1"));
 }
+
+// ── DeviceService ──────────────────────────────────────────────
+
+use domain::device::{Device, DeviceRepository};
+
+struct FakeDeviceRepo {
+    devices: std::sync::Mutex<Vec<Device>>,
+}
+
+impl FakeDeviceRepo {
+    fn empty() -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self {
+            devices: std::sync::Mutex::new(vec![]),
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl DeviceRepository for FakeDeviceRepo {
+    async fn all_with_counts(&self) -> Result<Vec<Device>, domain::DomainError> {
+        Ok(self.devices.lock().unwrap().clone())
+    }
+    async fn active_by_device_id(
+        &self,
+        device_id: &str,
+    ) -> Result<Option<Device>, domain::DomainError> {
+        let found = self
+            .devices
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|d| d.device_id == device_id && d.delinked_at.is_none())
+            .cloned();
+        Ok(found)
+    }
+    async fn register(
+        &self,
+        device_id: &str,
+        device_name: Option<&str>,
+    ) -> Result<Device, domain::DomainError> {
+        let d = Device {
+            id: uuid::Uuid::new_v4().to_string(),
+            device_id: device_id.to_string(),
+            device_name: device_name.map(str::to_string),
+            linked_at: chrono::Utc::now(),
+            delinked_at: None,
+            location_count: 0,
+        };
+        self.devices.lock().unwrap().push(d.clone());
+        Ok(d)
+    }
+    async fn delink(
+        &self,
+        device_id: &str,
+        at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), domain::DomainError> {
+        let mut devices = self.devices.lock().unwrap();
+        let total = devices.iter().filter(|d| d.device_id == device_id).count();
+        if total == 0 {
+            return Err(domain::DomainError::NotFound(format!("{device_id} not found")));
+        }
+        let active = devices
+            .iter_mut()
+            .find(|d| d.device_id == device_id && d.delinked_at.is_none());
+        match active {
+            None => Err(domain::DomainError::Conflict(format!("{device_id} already delinked"))),
+            Some(d) => {
+                d.delinked_at = Some(at);
+                Ok(())
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn device_service_list_enriches_with_is_current() {
+    let repo = FakeDeviceRepo::empty();
+    repo.register("current-dev", None).await.unwrap();
+    repo.register("other-dev", Some("Other")).await.unwrap();
+    let svc = services::DeviceService::new(repo, "current-dev".into(), "myhostname".into());
+    let list = svc.list().await.expect("list");
+    let current = list.iter().find(|d| d.device_id == "current-dev").unwrap();
+    let other = list.iter().find(|d| d.device_id == "other-dev").unwrap();
+    assert!(current.is_current);
+    assert!(!other.is_current);
+    // hostname fallback for current device when device_name is None
+    assert_eq!(current.device_name, "myhostname");
+    // device_id fallback for other devices when device_name is None
+    assert_eq!(other.device_name, "Other");
+}
+
+#[tokio::test]
+async fn device_service_current_returns_not_found_when_unregistered() {
+    let repo = FakeDeviceRepo::empty();
+    let svc = services::DeviceService::new(repo, "missing".into(), "h".into());
+    let err = svc.current().await.expect_err("should be NotFound");
+    assert!(matches!(err, domain::DomainError::NotFound(_)));
+}
+
+#[tokio::test]
+async fn device_service_register_returns_device_info() {
+    let repo = FakeDeviceRepo::empty();
+    let svc = services::DeviceService::new(repo, "dev1".into(), "hostname".into());
+    let info = svc.register("dev1", Some("My PC")).await.expect("register");
+    assert_eq!(info.device_id, "dev1");
+    assert_eq!(info.device_name, "My PC");
+    assert!(info.is_current);
+}
+
+#[tokio::test]
+async fn device_service_delink_self_returns_validation_error() {
+    let repo = FakeDeviceRepo::empty();
+    repo.register("dev1", None).await.unwrap();
+    let svc = services::DeviceService::new(repo, "dev1".into(), "h".into());
+    let err = svc.delink("dev1").await.expect_err("cannot delink self");
+    assert!(matches!(err, domain::DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
+async fn device_service_delink_other_device_succeeds() {
+    let repo = FakeDeviceRepo::empty();
+    repo.register("dev1", None).await.unwrap();
+    repo.register("dev2", None).await.unwrap();
+    let svc = services::DeviceService::new(repo, "dev1".into(), "h".into());
+    svc.delink("dev2").await.expect("delink other device");
+}
