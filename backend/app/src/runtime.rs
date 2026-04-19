@@ -6,8 +6,8 @@ use axum::Router;
 use infrastructure::{resolve_search_strategy, AdapterFactory};
 use plugins::{PluginRegistry, PluginsConfig, PluginsToml, WebChecker, WebCheckerConfig};
 use services::{
-    ChapterCheckService, DedupService, EbookService, GameService, ImageService, SearchConfig,
-    SyncService, VaultService, VideoService, WebReaderService,
+    ChapterCheckService, DedupService, DeviceService, EbookService, GameService, ImageService,
+    SearchConfig, SyncService, VaultService, VideoService, WebReaderService,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -75,6 +75,17 @@ pub fn build_app_router(
         bundle.sync_job_repo,
     ));
 
+    let hostname_str = hostname::get()
+        .ok()
+        .and_then(|h| h.into_string().ok())
+        .unwrap_or_else(|| config.device_id.clone());
+    let effective_hostname = config.device_name.clone().unwrap_or(hostname_str);
+    let device_service = std::sync::Arc::new(DeviceService::new(
+        bundle.device_repo.clone(),
+        config.device_id.clone(),
+        effective_hostname,
+    ));
+
     let mut state = AppState::new(
         ebook_service,
         web_reader_service,
@@ -111,6 +122,7 @@ pub fn build_app_router(
     state = state.with_vault_service(vault_service);
     state = state.with_dedup_service(dedup_service);
     state = state.with_sync_service(sync_service);
+    state = state.with_device_service(device_service);
     state.plugin_registry = Arc::new(plugin_registry);
     state.openapi_json = generate_openapi_json();
     if config.scheduler_enabled {
