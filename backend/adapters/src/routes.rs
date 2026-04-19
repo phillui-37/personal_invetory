@@ -32,6 +32,7 @@ use crate::{
     },
     sync_handler::{ecosystem_status, get_sync_job, list_platform_syncs, trigger_sync},
     system::{health, openapi},
+    tag_handler::{attach_tag, create_tag, delete_tag, detach_tag, list_resource_tags, list_tags},
     vault_handler::{
         delete_credential, initialize_vault, list_vault_platforms, lock_vault,
         retrieve_credential, store_credential, unlock_vault, vault_status,
@@ -216,6 +217,17 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/api/v1/inventory/games/:id/progress",
             get(get_game_progress).patch(patch_game_progress),
+        )
+        // Tags
+        .route("/api/v1/tags", get(list_tags).post(create_tag))
+        .route("/api/v1/tags/:id", delete(delete_tag))
+        .route(
+            "/api/v1/inventory/:type/:id/tags",
+            get(list_resource_tags).post(attach_tag),
+        )
+        .route(
+            "/api/v1/inventory/:type/:id/tags/:tag_id",
+            delete(detach_tag),
         )
         .layer(from_fn_with_state(state.clone(), auth_middleware))
         .with_state(state)

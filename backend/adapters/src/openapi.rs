@@ -20,6 +20,7 @@ use crate::{
         DiscoveredItemInput, EcosystemStatusResponse, PlatformStatus, SyncJobListResponse,
         SyncJobResponse, TriggerSyncRequest, TriggerSyncResponse,
     },
+    tag_handler::{AttachTagRequest, CreateTagRequest, TagResponse},
     video::{AddLocationRequest as VideoAddLocationRequest, AddVideoRequest, UpdateVideoRequest, VideoDetailResponse},
     web_reader::{
         AddLocationRequest as WebReaderAddLocationRequest, UpsertWebReaderRequest,
@@ -113,6 +114,12 @@ impl Modify for SecurityAddon {
         crate::progress_handler::patch_video_progress,
         crate::progress_handler::get_game_progress,
         crate::progress_handler::patch_game_progress,
+        crate::tag_handler::list_tags,
+        crate::tag_handler::create_tag,
+        crate::tag_handler::delete_tag,
+        crate::tag_handler::list_resource_tags,
+        crate::tag_handler::attach_tag,
+        crate::tag_handler::detach_tag,
     ),
     components(
         schemas(
@@ -164,6 +171,9 @@ impl Modify for SecurityAddon {
             RegisterDeviceRequest,
             ProgressResponse,
             PatchProgressRequest,
+            TagResponse,
+            CreateTagRequest,
+            AttachTagRequest,
         )
     ),
     info(

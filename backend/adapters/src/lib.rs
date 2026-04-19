@@ -14,6 +14,7 @@ mod routes;
 mod state;
 mod sync_handler;
 mod system;
+mod tag_handler;
 mod vault_handler;
 mod video;
 mod web_reader;

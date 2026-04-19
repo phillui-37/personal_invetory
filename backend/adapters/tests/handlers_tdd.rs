@@ -9,6 +9,7 @@ use chrono::Utc;
 use domain::{
     device::{Device, DeviceRepository},
     progress::{ProgressRepository, ResourceProgress},
+    tag::{ResourceTagRepository, Tag, TagRepository},
     DomainError, EbookMeta, EbookMetaRepository, GameMeta, GameMetaRepository, ImageMeta,
     ImageMetaRepository, LocationRepository, NewEbookMeta, NewGameMeta, NewImageMeta,
     NewResourceLocation, NewVideoMeta, NewWebReaderMeta, Resource, ResourceLocation,
@@ -16,7 +17,7 @@ use domain::{
     WebReaderMetaRepository,
 };
 use serde_json::{json, Value};
-use services::{EbookService, GameService, ImageService, VideoService, WebReaderService};
+use services::{EbookService, GameService, ImageService, TagService, VideoService, WebReaderService};
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -1781,4 +1782,469 @@ async fn openapi_smoke_all_progress_get_paths_exist() {
             paths.keys().collect::<Vec<_>>()
         );
     }
+}
+
+// ── Fake repos for tag handler tests ─────────────────────────────────────
+
+struct FakeHandlerTagRepo {
+    tags: std::sync::Mutex<Vec<Tag>>,
+}
+
+impl FakeHandlerTagRepo {
+    fn empty() -> Arc<Self> {
+        Arc::new(Self {
+            tags: std::sync::Mutex::new(vec![]),
+        })
+    }
+
+    fn with_tag(id: &str, name: &str) -> Arc<Self> {
+        let repo = Self::empty();
+        repo.tags.lock().unwrap().push(Tag {
+            id: id.to_string(),
+            name: name.to_string(),
+            created_at: Utc::now(),
+        });
+        repo
+    }
+}
+
+#[async_trait]
+impl TagRepository for FakeHandlerTagRepo {
+    async fn list(&self) -> Result<Vec<Tag>, DomainError> {
+        Ok(self.tags.lock().unwrap().clone())
+    }
+
+    async fn get_by_id(&self, id: &str) -> Result<Option<Tag>, DomainError> {
+        Ok(self.tags.lock().unwrap().iter().find(|t| t.id == id).cloned())
+    }
+
+    async fn get_by_name(&self, name: &str) -> Result<Option<Tag>, DomainError> {
+        Ok(self.tags.lock().unwrap().iter().find(|t| t.name == name).cloned())
+    }
+
+    async fn create(&self, name: &str) -> Result<Tag, DomainError> {
+        let tag = Tag {
+            id: Uuid::new_v4().to_string(),
+            name: name.to_string(),
+            created_at: Utc::now(),
+        };
+        self.tags.lock().unwrap().push(tag.clone());
+        Ok(tag)
+    }
+
+    async fn delete(&self, id: &str) -> Result<(), DomainError> {
+        let mut tags = self.tags.lock().unwrap();
+        let pos = tags
+            .iter()
+            .position(|t| t.id == id)
+            .ok_or_else(|| DomainError::NotFound(format!("tag {id} not found")))?;
+        tags.remove(pos);
+        Ok(())
+    }
+}
+
+struct FakeHandlerResourceTagRepo {
+    associations: std::sync::Mutex<Vec<(String, String)>>,
+    tag_repo: Arc<FakeHandlerTagRepo>,
+}
+
+impl FakeHandlerResourceTagRepo {
+    fn empty(tag_repo: Arc<FakeHandlerTagRepo>) -> Arc<Self> {
+        Arc::new(Self {
+            associations: std::sync::Mutex::new(vec![]),
+            tag_repo,
+        })
+    }
+
+    fn with_association(
+        tag_repo: Arc<FakeHandlerTagRepo>,
+        resource_id: &str,
+        tag_id: &str,
+    ) -> Arc<Self> {
+        let repo = Self::empty(tag_repo);
+        repo.associations
+            .lock()
+            .unwrap()
+            .push((resource_id.to_string(), tag_id.to_string()));
+        repo
+    }
+}
+
+#[async_trait]
+impl ResourceTagRepository for FakeHandlerResourceTagRepo {
+    async fn tags_for_resource(&self, resource_id: &str) -> Result<Vec<Tag>, DomainError> {
+        let tag_ids: Vec<String> = self
+            .associations
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(rid, _)| rid == resource_id)
+            .map(|(_, tid)| tid.clone())
+            .collect();
+        let tags = self.tag_repo.tags.lock().unwrap();
+        Ok(tags.iter().filter(|t| tag_ids.contains(&t.id)).cloned().collect())
+    }
+
+    async fn attach(&self, resource_id: &str, tag_id: &str) -> Result<(), DomainError> {
+        let mut assocs = self.associations.lock().unwrap();
+        if !assocs.iter().any(|(rid, tid)| rid == resource_id && tid == tag_id) {
+            assocs.push((resource_id.to_string(), tag_id.to_string()));
+        }
+        Ok(())
+    }
+
+    async fn detach(&self, resource_id: &str, tag_id: &str) -> Result<(), DomainError> {
+        let mut assocs = self.associations.lock().unwrap();
+        let pos = assocs
+            .iter()
+            .position(|(rid, tid)| rid == resource_id && tid == tag_id)
+            .ok_or_else(|| DomainError::NotFound("association not found".into()))?;
+        assocs.remove(pos);
+        Ok(())
+    }
+
+    async fn resource_ids_with_tag_id(&self, tag_id: &str) -> Result<Vec<String>, DomainError> {
+        Ok(self
+            .associations
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, tid)| tid == tag_id)
+            .map(|(rid, _)| rid.clone())
+            .collect())
+    }
+}
+
+fn app_with_tag_service_for_resource(
+    resource_type: ResourceType,
+    id: Uuid,
+    tag_repo: Arc<FakeHandlerTagRepo>,
+    resource_tag_repo: Arc<FakeHandlerResourceTagRepo>,
+) -> axum::Router {
+    let openapi = r#"{"paths":{"/api/v1/system/health":{}}}"#;
+    let resource_repo = FakeHandlerResourceRepo::with_resource(id, resource_type.clone());
+    let location_repo = Arc::new(FakeHandlerLocationRepo);
+
+    let ebook_meta = match resource_type {
+        ResourceType::Ebook => FakeHandlerEbookMetaRepo::for_id(id),
+        _ => FakeHandlerEbookMetaRepo::empty(),
+    };
+    let web_reader_meta = match resource_type {
+        ResourceType::WebReader => FakeHandlerWebReaderMetaRepo::for_id(id),
+        _ => FakeHandlerWebReaderMetaRepo::empty(),
+    };
+    let image_meta = match resource_type {
+        ResourceType::Image => FakeHandlerImageMetaRepo::for_id(id),
+        _ => FakeHandlerImageMetaRepo::empty(),
+    };
+    let video_meta = match resource_type {
+        ResourceType::Video => FakeHandlerVideoMetaRepo::for_id(id),
+        _ => FakeHandlerVideoMetaRepo::empty(),
+    };
+    let game_meta = match resource_type {
+        ResourceType::Game => FakeHandlerGameMetaRepo::for_id(id),
+        _ => FakeHandlerGameMetaRepo::empty(),
+    };
+
+    let ebook_service = Arc::new(EbookService::new(
+        resource_repo.clone(),
+        ebook_meta,
+        location_repo.clone(),
+    ));
+    let web_reader_service = Arc::new(WebReaderService::new(
+        resource_repo.clone(),
+        web_reader_meta,
+        location_repo.clone(),
+    ));
+    let image_service = Arc::new(ImageService::new(
+        resource_repo.clone(),
+        image_meta,
+        location_repo.clone(),
+    ));
+    let video_service = Arc::new(VideoService::new(
+        resource_repo.clone(),
+        video_meta,
+        location_repo.clone(),
+    ));
+    let game_service = Arc::new(GameService::new(resource_repo, game_meta, location_repo));
+
+    let tr: Arc<dyn TagRepository> = tag_repo;
+    let rtr: Arc<dyn ResourceTagRepository> = resource_tag_repo;
+    let tag_svc = Arc::new(TagService::new(tr, rtr));
+
+    let mut state = AppState::new(
+        ebook_service,
+        web_reader_service,
+        image_service,
+        video_service,
+        game_service,
+        "secret-key".to_string(),
+    );
+    state.openapi_json = openapi.to_string();
+    let state = state.with_tag_service(tag_svc);
+    build_router(Arc::new(state))
+}
+
+// ── Tag handler tests ─────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn handler_list_tags_returns_empty_list() {
+    let tag_repo = FakeHandlerTagRepo::empty();
+    let resource_tag_repo = FakeHandlerResourceTagRepo::empty(tag_repo.clone());
+    let id = Uuid::new_v4();
+    let app = app_with_tag_service_for_resource(
+        ResourceType::Ebook,
+        id,
+        tag_repo,
+        resource_tag_repo,
+    );
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/tags")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json, json!([]));
+}
+
+#[tokio::test]
+async fn handler_create_tag_returns_201() {
+    let tag_repo = FakeHandlerTagRepo::empty();
+    let resource_tag_repo = FakeHandlerResourceTagRepo::empty(tag_repo.clone());
+    let id = Uuid::new_v4();
+    let app = app_with_tag_service_for_resource(
+        ResourceType::Ebook,
+        id,
+        tag_repo,
+        resource_tag_repo,
+    );
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/tags")
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"name": "  Sci-Fi  "}).to_string()))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["name"], "sci-fi");
+    assert!(json["id"].is_string());
+    assert!(json["created_at"].is_string());
+}
+
+#[tokio::test]
+async fn handler_delete_tag_returns_204() {
+    let tag_id = Uuid::new_v4().to_string();
+    let tag_repo = FakeHandlerTagRepo::with_tag(&tag_id, "fiction");
+    let resource_tag_repo = FakeHandlerResourceTagRepo::empty(tag_repo.clone());
+    let id = Uuid::new_v4();
+    let app = app_with_tag_service_for_resource(
+        ResourceType::Ebook,
+        id,
+        tag_repo.clone(),
+        resource_tag_repo,
+    );
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/v1/tags/{tag_id}"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    assert!(
+        tag_repo.tags.lock().unwrap().is_empty(),
+        "tag must be removed from repo"
+    );
+}
+
+#[tokio::test]
+async fn handler_get_resource_tags_returns_list() {
+    let id = Uuid::new_v4();
+    let tag_id_1 = Uuid::new_v4().to_string();
+    let tag_id_2 = Uuid::new_v4().to_string();
+
+    let tag_repo = Arc::new(FakeHandlerTagRepo {
+        tags: std::sync::Mutex::new(vec![
+            Tag {
+                id: tag_id_1.clone(),
+                name: "fantasy".to_string(),
+                created_at: Utc::now(),
+            },
+            Tag {
+                id: tag_id_2.clone(),
+                name: "sci-fi".to_string(),
+                created_at: Utc::now(),
+            },
+        ]),
+    });
+    let resource_tag_repo = Arc::new(FakeHandlerResourceTagRepo {
+        associations: std::sync::Mutex::new(vec![
+            (id.to_string(), tag_id_1.clone()),
+            (id.to_string(), tag_id_2.clone()),
+        ]),
+        tag_repo: tag_repo.clone(),
+    });
+
+    let app = app_with_tag_service_for_resource(
+        ResourceType::Ebook,
+        id,
+        tag_repo,
+        resource_tag_repo,
+    );
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/inventory/ebooks/{id}/tags"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+    let arr = json.as_array().expect("expected array");
+    assert_eq!(arr.len(), 2);
+    let names: Vec<&str> = arr.iter().map(|t| t["name"].as_str().unwrap()).collect();
+    assert!(names.contains(&"fantasy"));
+    assert!(names.contains(&"sci-fi"));
+}
+
+#[tokio::test]
+async fn handler_attach_tag_to_resource_returns_200() {
+    let id = Uuid::new_v4();
+    let tag_id = Uuid::new_v4().to_string();
+    let tag_repo = FakeHandlerTagRepo::with_tag(&tag_id, "action");
+    let resource_tag_repo = FakeHandlerResourceTagRepo::empty(tag_repo.clone());
+    let resource_tag_repo_ref = resource_tag_repo.clone();
+
+    let app = app_with_tag_service_for_resource(
+        ResourceType::Ebook,
+        id,
+        tag_repo,
+        resource_tag_repo,
+    );
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/inventory/ebooks/{id}/tags"))
+                .header("authorization", "Bearer secret-key")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"tag_id": tag_id}).to_string()))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let assocs = resource_tag_repo_ref.associations.lock().unwrap();
+    assert!(
+        assocs
+            .iter()
+            .any(|(rid, tid)| rid == &id.to_string() && tid == &tag_id),
+        "association must be stored"
+    );
+}
+
+#[tokio::test]
+async fn handler_detach_tag_from_resource_returns_204() {
+    let id = Uuid::new_v4();
+    let tag_id = Uuid::new_v4().to_string();
+    let tag_repo = FakeHandlerTagRepo::with_tag(&tag_id, "horror");
+    let resource_tag_repo = FakeHandlerResourceTagRepo::with_association(
+        tag_repo.clone(),
+        &id.to_string(),
+        &tag_id,
+    );
+    let resource_tag_repo_ref = resource_tag_repo.clone();
+
+    let app = app_with_tag_service_for_resource(
+        ResourceType::Ebook,
+        id,
+        tag_repo,
+        resource_tag_repo,
+    );
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/v1/inventory/ebooks/{id}/tags/{tag_id}"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    let assocs = resource_tag_repo_ref.associations.lock().unwrap();
+    assert!(
+        !assocs
+            .iter()
+            .any(|(rid, tid)| rid == &id.to_string() && tid == &tag_id),
+        "association must be removed"
+    );
+}
+
+#[tokio::test]
+async fn handler_get_resource_tags_wrong_type_route_returns_404() {
+    let id = Uuid::new_v4();
+    let tag_id = Uuid::new_v4().to_string();
+    let tag_repo = FakeHandlerTagRepo::with_tag(&tag_id, "drama");
+    let resource_tag_repo = FakeHandlerResourceTagRepo::with_association(
+        tag_repo.clone(),
+        &id.to_string(),
+        &tag_id,
+    );
+
+    // Seed resource as Ebook; access via videos route → should 404
+    let app = app_with_tag_service_for_resource(
+        ResourceType::Ebook,
+        id,
+        tag_repo,
+        resource_tag_repo,
+    );
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/inventory/videos/{id}/tags"))
+                .header("authorization", "Bearer secret-key")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
