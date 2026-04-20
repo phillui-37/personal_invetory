@@ -95,6 +95,7 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - **Phase 4**: Ecosystem integrations (BookWalker, Kindle, Steam/DLSite/FANZA). **✅ Complete.** All Plans 1–3 implemented: vault, dedup, Steam connector, 4 additional connectors (DLSite/FANZA/BookWalker/Kindle), multi-platform SyncService, sync API, Flutter sync dashboard + ecosystem settings.
 - **Phase 5**: Optimization and hardening. ✅ Complete (device management).
 - **Phase 6**: Progress tracking + tags. **✅ Complete.** Backend domain/infra/services/adapters for progress and tags; frontend models/repos/blocs/widgets/screens; 318 backend + 204 frontend tests green.
+- **Phase 7**: PostgreSQL full implementation, DB portability, MOBI/AZW3 metadata, real WebView, batch metadata ops, Android build. **Planned.** See `tasks/phase7.md`.
 
 ## Phase 1 Deferred Items
 - Tags and tag-based search
