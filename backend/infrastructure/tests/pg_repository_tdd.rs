@@ -242,4 +242,210 @@ mod pg_tests {
         // cleanup
         res_repo.delete(r.id).await.ok();
     }
+
+    // ── ChapterCheck ──────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn pg_chapter_check_create_and_list() {
+        let Some(pool) = setup().await else { return };
+        let res_repo = infrastructure::postgres::resource::PgResourceRepository::new(pool.clone());
+        let cc_repo =
+            infrastructure::postgres::chapter_check::PgChapterCheckRepository::new(pool.clone());
+        use domain::{ChapterCheckRepository, ResourceRepository};
+
+        let r = res_repo
+            .create(NewResource {
+                title: format!("pg_cc_{}", uuid::Uuid::new_v4()),
+                notes: None,
+                resource_type: ResourceType::WebReader,
+            })
+            .await
+            .expect("create resource");
+
+        let cc = cc_repo
+            .create(r.id, true, Some("Chapter 42".to_string()), None)
+            .await
+            .expect("create chapter check");
+
+        assert_eq!(cc.resource_id, r.id);
+        assert!(cc.has_new_chapter);
+        assert_eq!(cc.latest_chapter, Some("Chapter 42".to_string()));
+
+        let list = cc_repo.list(r.id).await.expect("list");
+        assert!(list.iter().any(|x| x.id == cc.id));
+
+        // cleanup
+        res_repo.delete(r.id).await.ok();
+    }
+
+    // ── Notification ──────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn pg_notification_create_list_mark_read() {
+        let Some(pool) = setup().await else { return };
+        let res_repo = infrastructure::postgres::resource::PgResourceRepository::new(pool.clone());
+        let notif_repo =
+            infrastructure::postgres::notification::PgNotificationRepository::new(pool.clone());
+        use domain::{NotificationRepository, ResourceRepository};
+
+        let r = res_repo
+            .create(NewResource {
+                title: format!("pg_notif_{}", uuid::Uuid::new_v4()),
+                notes: None,
+                resource_type: ResourceType::WebReader,
+            })
+            .await
+            .expect("create resource");
+
+        let n = notif_repo
+            .create(r.id, "new chapter available".to_string())
+            .await
+            .expect("create notification");
+
+        assert_eq!(n.resource_id, r.id);
+        assert!(!n.read);
+
+        let unread = notif_repo.list(true).await.expect("list unread");
+        assert!(unread.iter().any(|x| x.id == n.id));
+
+        notif_repo.mark_read(n.id).await.expect("mark_read");
+
+        let unread2 = notif_repo.list(true).await.expect("list unread after mark");
+        assert!(!unread2.iter().any(|x| x.id == n.id));
+
+        // cleanup
+        res_repo.delete(r.id).await.ok();
+    }
+
+    // ── ImageMeta ─────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn pg_image_meta_upsert_and_get() {
+        let Some(pool) = setup().await else { return };
+        let res_repo = infrastructure::postgres::resource::PgResourceRepository::new(pool.clone());
+        let meta_repo =
+            infrastructure::postgres::image_meta::PgImageMetaRepository::new(pool.clone());
+        use domain::{ImageMetaRepository, NewImageMeta, ResourceRepository};
+
+        let r = res_repo
+            .create(NewResource {
+                title: format!("pg_img_{}", uuid::Uuid::new_v4()),
+                notes: None,
+                resource_type: ResourceType::Image,
+            })
+            .await
+            .expect("create resource");
+
+        let meta = meta_repo
+            .upsert(
+                r.id,
+                NewImageMeta {
+                    width: Some(1920),
+                    height: Some(1080),
+                    file_format: Some("jpeg".to_string()),
+                    file_size_bytes: Some(204800),
+                },
+            )
+            .await
+            .expect("upsert");
+
+        assert_eq!(meta.resource_id, r.id);
+        assert_eq!(meta.width, Some(1920));
+        assert_eq!(meta.height, Some(1080));
+
+        let fetched = meta_repo.get(r.id).await.expect("get");
+        assert_eq!(fetched.file_format, Some("jpeg".to_string()));
+        assert_eq!(fetched.file_size_bytes, Some(204800));
+
+        // cleanup
+        res_repo.delete(r.id).await.ok();
+    }
+
+    // ── VideoMeta ─────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn pg_video_meta_upsert_and_get() {
+        let Some(pool) = setup().await else { return };
+        let res_repo = infrastructure::postgres::resource::PgResourceRepository::new(pool.clone());
+        let meta_repo =
+            infrastructure::postgres::video_meta::PgVideoMetaRepository::new(pool.clone());
+        use domain::{NewVideoMeta, ResourceRepository, VideoMetaRepository};
+
+        let r = res_repo
+            .create(NewResource {
+                title: format!("pg_vid_{}", uuid::Uuid::new_v4()),
+                notes: None,
+                resource_type: ResourceType::Video,
+            })
+            .await
+            .expect("create resource");
+
+        let meta = meta_repo
+            .upsert(
+                r.id,
+                NewVideoMeta {
+                    duration_secs: Some(3600),
+                    file_format: Some("mp4".to_string()),
+                    resolution: Some("1920x1080".to_string()),
+                    file_size_bytes: Some(1073741824),
+                },
+            )
+            .await
+            .expect("upsert");
+
+        assert_eq!(meta.resource_id, r.id);
+        assert_eq!(meta.duration_secs, Some(3600));
+
+        let fetched = meta_repo.get(r.id).await.expect("get");
+        assert_eq!(fetched.resolution, Some("1920x1080".to_string()));
+        assert_eq!(fetched.file_format, Some("mp4".to_string()));
+
+        // cleanup
+        res_repo.delete(r.id).await.ok();
+    }
+
+    // ── GameMeta ──────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn pg_game_meta_upsert_and_get() {
+        let Some(pool) = setup().await else { return };
+        let res_repo = infrastructure::postgres::resource::PgResourceRepository::new(pool.clone());
+        let meta_repo =
+            infrastructure::postgres::game_meta::PgGameMetaRepository::new(pool.clone());
+        use domain::{GameMetaRepository, NewGameMeta, ResourceRepository};
+
+        let r = res_repo
+            .create(NewResource {
+                title: format!("pg_game_{}", uuid::Uuid::new_v4()),
+                notes: None,
+                resource_type: ResourceType::Game,
+            })
+            .await
+            .expect("create resource");
+
+        let meta = meta_repo
+            .upsert(
+                r.id,
+                NewGameMeta {
+                    platform: Some("PC".to_string()),
+                    store: Some("Steam".to_string()),
+                    developer: Some("Dev Studio".to_string()),
+                    publisher: Some("Pub Co".to_string()),
+                    manual_notes: Some("Great game".to_string()),
+                },
+            )
+            .await
+            .expect("upsert");
+
+        assert_eq!(meta.resource_id, r.id);
+        assert_eq!(meta.platform, Some("PC".to_string()));
+        assert_eq!(meta.store, Some("Steam".to_string()));
+
+        let fetched = meta_repo.get(r.id).await.expect("get");
+        assert_eq!(fetched.developer, Some("Dev Studio".to_string()));
+        assert_eq!(fetched.manual_notes, Some("Great game".to_string()));
+
+        // cleanup
+        res_repo.delete(r.id).await.ok();
+    }
 }
