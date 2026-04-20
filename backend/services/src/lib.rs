@@ -28,7 +28,7 @@ pub use game::{GameDetail, GameService};
 pub use image::{ImageDetail, ImageService};
 pub use progress::ProgressService;
 pub use search::SearchConfig;
-pub use search_aggregation::{count_formats, sort_resources, SortField, SortOrder};
+pub use search_aggregation::{count_formats, sort_resources, SortField, SortOrder, FormatCount};
 pub use use_cases::ebook::{NewEbookInput, UpdateEbookInput};
 pub use use_cases::game::{NewGameInput, UpdateGameInput};
 pub use use_cases::image::{NewImageInput, UpdateImageInput};
