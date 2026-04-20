@@ -15,11 +15,11 @@ use tokio_util::sync::CancellationToken;
 use crate::config::AppConfig;
 use crate::scheduler::{OpsCheckRunner, Scheduler};
 
-pub fn build_app_router(
+pub async fn build_app_router(
     config: &AppConfig,
     api_key: String,
 ) -> Result<Router, domain::DomainError> {
-    let bundle = AdapterFactory::from_url(&config.database_url)?;
+    let bundle = AdapterFactory::from_url(&config.database_url).await?;
     let strategy = resolve_search_strategy(&bundle.database, None);
     let search_config = SearchConfig { strategy };
 
@@ -212,7 +212,7 @@ mod tests {
 
     #[tokio::test]
     async fn app_router_exposes_health_and_protects_inventory_routes() {
-        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+        let app = build_app_router(&test_config(), "secret".to_string()).await.expect("build router");
 
         let health_response = app
             .clone()
@@ -240,7 +240,7 @@ mod tests {
 
     #[tokio::test]
     async fn app_router_wires_notifications_service() {
-        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+        let app = build_app_router(&test_config(), "secret".to_string()).await.expect("build router");
 
         let response = app
             .oneshot(
@@ -258,7 +258,7 @@ mod tests {
 
     #[tokio::test]
     async fn app_router_wires_image_service() {
-        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+        let app = build_app_router(&test_config(), "secret".to_string()).await.expect("build router");
 
         let response = app
             .oneshot(
@@ -276,7 +276,7 @@ mod tests {
 
     #[tokio::test]
     async fn app_router_wires_video_service() {
-        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+        let app = build_app_router(&test_config(), "secret".to_string()).await.expect("build router");
 
         let response = app
             .oneshot(
@@ -294,7 +294,7 @@ mod tests {
 
     #[tokio::test]
     async fn app_router_wires_game_service() {
-        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+        let app = build_app_router(&test_config(), "secret".to_string()).await.expect("build router");
 
         let response = app
             .oneshot(
@@ -312,7 +312,7 @@ mod tests {
 
     #[tokio::test]
     async fn app_router_wires_vault_service() {
-        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+        let app = build_app_router(&test_config(), "secret".to_string()).await.expect("build router");
 
         let response = app
             .oneshot(
@@ -330,7 +330,7 @@ mod tests {
 
     #[tokio::test]
     async fn app_router_wires_dedup_service() {
-        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+        let app = build_app_router(&test_config(), "secret".to_string()).await.expect("build router");
 
         let response = app
             .oneshot(
@@ -348,7 +348,7 @@ mod tests {
 
     #[tokio::test]
     async fn app_router_wires_progress_service() {
-        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+        let app = build_app_router(&test_config(), "secret".to_string()).await.expect("build router");
 
         let create_response = app
             .clone()
@@ -398,7 +398,7 @@ mod tests {
 
     #[tokio::test]
     async fn app_router_wires_tag_service() {
-        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+        let app = build_app_router(&test_config(), "secret".to_string()).await.expect("build router");
 
         let tag_list_response = app
             .clone()

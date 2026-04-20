@@ -30,7 +30,7 @@ async fn main() {
 
     match bootstrap_api_key(config.api_key.clone(), Path::new(".env")) {
         ApiKeyBootstrapResult::Ready { api_key } => {
-            let router = match build_app_router(&config, api_key) {
+            let router = match build_app_router(&config, api_key).await {
                 Ok(router) => router,
                 Err(error) => {
                     eprintln!("failed to build app router: {error:?}");

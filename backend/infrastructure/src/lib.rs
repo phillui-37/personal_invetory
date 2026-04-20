@@ -119,27 +119,17 @@ mod tests {
         assert!(table_names.contains(&"resource_tags".to_string()));
     }
 
-    #[test]
-    fn adapter_factory_rejects_postgres_until_implemented() {
-        let error = match super::AdapterFactory::from_url("postgres://localhost:5432/inventory") {
-            Ok(_) => panic!("postgres adapter should fail fast until repositories exist"),
-            Err(error) => error,
-        };
-        assert!(
-            matches!(error, DomainError::ValidationError(message) if message.contains("Postgres adapter is not implemented"))
-        );
-    }
-
-    #[test]
-    fn adapter_factory_recognizes_sqlite_prefix() {
+    #[tokio::test]
+    async fn adapter_factory_recognizes_sqlite_prefix() {
         let bundle = super::AdapterFactory::from_url("sqlite://:memory:")
+            .await
             .expect("sqlite adapter bundle");
         assert!(matches!(bundle.database, super::DatabaseAdapter::Sqlite));
     }
 
-    #[test]
-    fn adapter_factory_rejects_unknown_prefix() {
-        let error = match super::AdapterFactory::from_url("mysql://localhost/inventory") {
+    #[tokio::test]
+    async fn adapter_factory_rejects_unknown_prefix() {
+        let error = match super::AdapterFactory::from_url("mysql://localhost/inventory").await {
             Ok(_) => panic!("unknown prefix should return an error"),
             Err(error) => error,
         };

@@ -8,7 +8,8 @@ use futures::executor::block_on;
 use infrastructure::{AdapterFactory, DatabaseAdapter};
 
 fn sqlite_bundle() -> infrastructure::AdapterBundle {
-    AdapterFactory::from_url("sqlite://:memory:").expect("sqlite adapter bundle")
+    futures::executor::block_on(AdapterFactory::from_url("sqlite://:memory:"))
+        .expect("sqlite adapter bundle")
 }
 
 #[test]

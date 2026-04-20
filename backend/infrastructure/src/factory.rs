@@ -7,6 +7,9 @@ use domain::{
     VideoMetaRepository, WebReaderMetaRepository,
 };
 
+#[cfg(feature = "postgres")]
+use crate::postgres;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DatabaseAdapter {
     Postgres,
@@ -37,7 +40,7 @@ pub struct AdapterBundle {
 pub struct AdapterFactory;
 
 impl AdapterFactory {
-    pub fn from_url(database_url: &str) -> Result<AdapterBundle, DomainError> {
+    pub async fn from_url(database_url: &str) -> Result<AdapterBundle, DomainError> {
         if database_url.starts_with("sqlite://") {
             let conn = sqlite::open_sqlite_connection(database_url)?;
             let shared = Arc::new(std::sync::Mutex::new(conn));
@@ -88,10 +91,37 @@ impl AdapterFactory {
             });
         }
 
+        #[cfg(feature = "postgres")]
+        if database_url.starts_with("postgres://") {
+            let pool = postgres::pool::open_pg_pool(database_url).await?;
+            postgres::migrations::run_migrations(&pool).await?;
+            let tag_repo = Arc::new(postgres::tag::PgTagRepository::new(pool.clone()));
+            return Ok(AdapterBundle {
+                database: DatabaseAdapter::Postgres,
+                database_url: database_url.to_string(),
+                resource_repo: Arc::new(postgres::resource::PgResourceRepository::new(pool.clone())),
+                ebook_meta_repo: Arc::new(postgres::ebook_meta::PgEbookMetaRepository::new(pool.clone())),
+                web_reader_meta_repo: Arc::new(postgres::web_reader_meta::PgWebReaderMetaRepository::new(pool.clone())),
+                location_repo: Arc::new(postgres::location::PgLocationRepository::new(pool.clone())),
+                chapter_check_repo: Arc::new(postgres::chapter_check::PgChapterCheckRepository::new(pool.clone())),
+                notification_repo: Arc::new(postgres::notification::PgNotificationRepository::new(pool.clone())),
+                image_meta_repo: Arc::new(postgres::image_meta::PgImageMetaRepository::new(pool.clone())),
+                video_meta_repo: Arc::new(postgres::video_meta::PgVideoMetaRepository::new(pool.clone())),
+                game_meta_repo: Arc::new(postgres::game_meta::PgGameMetaRepository::new(pool.clone())),
+                vault_backend: Arc::new(postgres::vault::PgVaultBackend::new(pool.clone())),
+                sync_job_repo: Arc::new(postgres::sync_job::PgSyncJobRepository::new(pool.clone())),
+                dedup_warning_repo: Arc::new(postgres::dedup::PgDedupWarningRepository::new(pool.clone())),
+                device_repo: Arc::new(postgres::device::PgDeviceRepository::new(pool.clone())),
+                progress_repo: Arc::new(postgres::progress::PgProgressRepository::new(pool.clone())),
+                tag_repo: tag_repo.clone() as Arc<dyn domain::tag::TagRepository>,
+                resource_tag_repo: tag_repo as Arc<dyn domain::tag::ResourceTagRepository>,
+            });
+        }
+
+        #[cfg(not(feature = "postgres"))]
         if database_url.starts_with("postgres://") {
             return Err(DomainError::ValidationError(
-                "Postgres adapter is not implemented yet; use a sqlite:// database URL for now"
-                    .to_string(),
+                "Postgres support not compiled in; rebuild with --features postgres".to_string(),
             ));
         }
 
