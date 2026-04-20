@@ -43,6 +43,7 @@ pub struct AppState {
     pub device_service: Option<Arc<services::DeviceService>>,
     pub progress_service: Option<Arc<services::ProgressService>>,
     pub tag_service: Option<Arc<services::TagService>>,
+    pub otp_service: Option<Arc<services::OtpInteractionService>>,
 }
 
 impl AppState {
@@ -72,6 +73,7 @@ impl AppState {
             device_service: None,
             progress_service: None,
             tag_service: None,
+            otp_service: None,
         }
     }
 
@@ -107,6 +109,11 @@ impl AppState {
 
     pub fn with_tag_service(mut self, svc: Arc<services::TagService>) -> Self {
         self.tag_service = Some(svc);
+        self
+    }
+
+    pub fn with_otp_service(mut self, svc: Arc<services::OtpInteractionService>) -> Self {
+        self.otp_service = Some(svc);
         self
     }
 
@@ -155,6 +162,7 @@ impl AppState {
         state.device_service = None;
         state.progress_service = None;
         state.tag_service = None;
+        state.otp_service = None;
         state
     }
 }

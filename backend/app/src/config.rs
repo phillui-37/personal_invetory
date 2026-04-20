@@ -12,6 +12,7 @@ pub struct AppConfig {
     pub scheduler_enabled: bool,
     pub device_id: String,
     pub device_name: Option<String>,
+    pub otp_timeout_secs: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,6 +75,10 @@ impl AppConfig {
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty());
 
+        let otp_timeout_secs = map
+            .get("OTP_TIMEOUT_SECS")
+            .and_then(|v| v.trim().parse::<u64>().ok());
+
         Ok(Self {
             database_url,
             api_key,
@@ -85,6 +90,7 @@ impl AppConfig {
             scheduler_enabled,
             device_id,
             device_name,
+            otp_timeout_secs,
         })
     }
 }
@@ -126,6 +132,7 @@ mod tests {
         assert!(config.scheduler_enabled);
         assert_eq!(config.device_id, "test-device");
         assert_eq!(config.device_name, None);
+        assert_eq!(config.otp_timeout_secs, None);
     }
 
     #[test]
