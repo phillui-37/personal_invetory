@@ -449,3 +449,124 @@ mod pg_tests {
         res_repo.delete(r.id).await.ok();
     }
 }
+
+// ── P7-D: vault, sync_job, dedup, device, progress, tag PG repos ───────────
+
+#[cfg(feature = "postgres")]
+#[tokio::test]
+async fn pg_vault_backend_config_roundtrip() {
+    let url = match std::env::var("TEST_PG_URL") {
+        Ok(u) => u,
+        Err(_) => return,
+    };
+    let pool = infrastructure::postgres::pool::open_pg_pool(&url).await.unwrap();
+    infrastructure::postgres::migrations::run_migrations(&pool).await.unwrap();
+
+    use infrastructure::postgres::vault::PgVaultBackend;
+    use domain::vault::VaultBackend;
+
+    let backend = PgVaultBackend::new(pool);
+    let cfg = domain::vault::VaultConfig {
+        salt: vec![1, 2, 3, 4],
+        key_check: vec![5, 6, 7, 8],
+        key_check_nonce: vec![9, 10],
+    };
+    backend.save_config(&cfg).await.expect("save_config");
+    let loaded = backend.get_config().await.expect("get_config").expect("should exist");
+    assert_eq!(loaded.salt, cfg.salt);
+    assert_eq!(loaded.key_check, cfg.key_check);
+}
+
+#[cfg(feature = "postgres")]
+#[tokio::test]
+async fn pg_sync_job_repository_create_and_get() {
+    let url = match std::env::var("TEST_PG_URL") {
+        Ok(u) => u,
+        Err(_) => return,
+    };
+    let pool = infrastructure::postgres::pool::open_pg_pool(&url).await.unwrap();
+    infrastructure::postgres::migrations::run_migrations(&pool).await.unwrap();
+
+    use infrastructure::postgres::sync_job::PgSyncJobRepository;
+    use domain::sync::{NewSyncJob, SyncJobRepository, SyncJobStatus};
+
+    let repo = PgSyncJobRepository::new(pool);
+    let job = repo.create(NewSyncJob { platform: "test_platform".to_string() })
+        .await.expect("create");
+
+    assert_eq!(job.platform, "test_platform");
+    assert!(matches!(job.status, SyncJobStatus::Pending));
+
+    let fetched = repo.get(job.id).await.expect("get");
+    assert_eq!(fetched.id, job.id);
+}
+
+#[cfg(feature = "postgres")]
+#[tokio::test]
+async fn pg_progress_repository_upsert_and_get() {
+    let url = match std::env::var("TEST_PG_URL") {
+        Ok(u) => u,
+        Err(_) => return,
+    };
+    let pool = infrastructure::postgres::pool::open_pg_pool(&url).await.unwrap();
+    infrastructure::postgres::migrations::run_migrations(&pool).await.unwrap();
+
+    use infrastructure::postgres::{
+        progress::PgProgressRepository, resource::PgResourceRepository,
+    };
+    use domain::{NewResource, ProgressRepository, ResourceRepository, ResourceType};
+
+    let res_repo = PgResourceRepository::new(pool.clone());
+    let r = res_repo.create(NewResource {
+        title: "prog test resource".to_string(),
+        notes: None,
+        resource_type: ResourceType::Ebook,
+    }).await.expect("create resource");
+
+    let prog_repo = PgProgressRepository::new(pool);
+    let result = prog_repo.upsert(&r.id.to_string(), 0.5, Some("halfway"))
+        .await.expect("upsert");
+    assert_eq!(result.progress, 0.5);
+    assert_eq!(result.notes, Some("halfway".to_string()));
+
+    let fetched = prog_repo.get(&r.id.to_string()).await.expect("get").expect("should exist");
+    assert_eq!(fetched.progress, 0.5);
+
+    res_repo.delete(r.id).await.ok();
+}
+
+#[cfg(feature = "postgres")]
+#[tokio::test]
+async fn pg_tag_repository_create_and_attach() {
+    let url = match std::env::var("TEST_PG_URL") {
+        Ok(u) => u,
+        Err(_) => return,
+    };
+    let pool = infrastructure::postgres::pool::open_pg_pool(&url).await.unwrap();
+    infrastructure::postgres::migrations::run_migrations(&pool).await.unwrap();
+
+    use infrastructure::postgres::{
+        resource::PgResourceRepository, tag::PgTagRepository,
+    };
+    use domain::{NewResource, ResourceRepository, ResourceType};
+    use domain::tag::{TagRepository, ResourceTagRepository};
+
+    let res_repo = PgResourceRepository::new(pool.clone());
+    let r = res_repo.create(NewResource {
+        title: "tag test resource".to_string(),
+        notes: None,
+        resource_type: ResourceType::Ebook,
+    }).await.expect("create resource");
+
+    let tag_repo = PgTagRepository::new(pool);
+    let tag = tag_repo.create("pg-test-tag").await.expect("create tag");
+    assert_eq!(tag.name, "pg-test-tag");
+
+    tag_repo.attach(&r.id.to_string(), &tag.id).await.expect("attach");
+    let tags = tag_repo.tags_for_resource(&r.id.to_string()).await.expect("tags_for_resource");
+    assert!(tags.iter().any(|t| t.id == tag.id));
+
+    tag_repo.detach(&r.id.to_string(), &tag.id).await.expect("detach");
+    tag_repo.delete(&tag.id).await.expect("delete tag");
+    res_repo.delete(r.id).await.ok();
+}
