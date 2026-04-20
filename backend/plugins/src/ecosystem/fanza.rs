@@ -9,6 +9,11 @@ use domain::ecosystem::{DiscoveredItem, EcosystemConnector};
 const FANZA_LOGIN_URL: &str = "https://accounts.dmm.com/service/login/password";
 const FANZA_LIBRARY_BASE_URL: &str = "https://www.dmm.com/digital/mypage";
 
+// CSS selectors for FANZA login form
+const FANZA_USERNAME_SELECTOR: &str = "input[name='login_id']";
+const FANZA_PASSWORD_SELECTOR: &str = "input[name='password']";
+const FANZA_SUBMIT_SELECTOR: &str = "button[type='submit']";
+
 /// A product entry from FANZA purchase history.
 #[derive(Debug, Clone, Deserialize)]
 pub struct FanzaProduct {
@@ -42,6 +47,19 @@ pub fn parse_library_response(json: &str) -> Result<Vec<FanzaProduct>, DomainErr
         .map_err(|e| DomainError::InternalError(format!("FANZA parse error: {e}")))
 }
 
+/// Builds a cookie header string from a collection of cookies.
+pub fn build_cookie_header(cookies: &[Cookie]) -> String {
+    cookies
+        .iter()
+        .map(|c| {
+            let name = c.name.replace(['\r', '\n'], "");
+            let value = c.value.replace(['\r', '\n'], "");
+            format!("{name}={value}")
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
 /// FANZA connector. Authenticates via DMM account browser session, then fetches purchase history.
 pub struct FanzaConnector<P: BrowserPage> {
     browser: P,
@@ -64,10 +82,9 @@ impl<P: BrowserPage> FanzaConnector<P> {
         // TODO(network-inspection): Navigate to auth-check page and detect login status.
         self.browser.navigate(FANZA_LOGIN_URL).await?;
         if let (Some(user), Some(pass)) = (username, password) {
-            // TODO(network-inspection): Replace with actual DMM login form selectors.
-            self.browser.fill("input[name='login_id']", user).await?;
-            self.browser.fill("input[name='password']", pass).await?;
-            self.browser.click("input[type='submit']").await?;
+            self.browser.fill(FANZA_USERNAME_SELECTOR, user).await?;
+            self.browser.fill(FANZA_PASSWORD_SELECTOR, pass).await?;
+            self.browser.click(FANZA_SUBMIT_SELECTOR).await?;
         }
         Ok(())
     }
@@ -75,15 +92,7 @@ impl<P: BrowserPage> FanzaConnector<P> {
     #[cfg(feature = "real-plugins")]
     async fn fetch_library(&self) -> Result<Vec<FanzaProduct>, DomainError> {
         let cookies = self.browser.get_cookies().await?;
-        let cookie_header = cookies
-            .iter()
-            .map(|c| {
-                let name = c.name.replace(['\r', '\n'], "");
-                let value = c.value.replace(['\r', '\n'], "");
-                format!("{}={}", name, value)
-            })
-            .collect::<Vec<_>>()
-            .join("; ");
+        let cookie_header = build_cookie_header(&cookies);
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
@@ -259,5 +268,30 @@ mod tests {
         assert_eq!(products[0].maker_name, Some("Maker X".to_string()));
         assert_eq!(products[1].content_type, "comic");
         assert_eq!(products[2].content_type, "video");
+    }
+
+    #[test]
+    fn fanza_login_selectors_defined() {
+        assert!(!FANZA_USERNAME_SELECTOR.is_empty());
+        assert!(!FANZA_PASSWORD_SELECTOR.is_empty());
+        assert!(!FANZA_SUBMIT_SELECTOR.is_empty());
+    }
+
+    #[test]
+    fn fanza_library_url_is_dmm() {
+        assert!(FANZA_LIBRARY_BASE_URL.contains("dmm.com") || FANZA_LIBRARY_BASE_URL.contains("dmm.co.jp"));
+    }
+
+    #[test]
+    fn fanza_build_cookie_header() {
+        use crate::browser_session::Cookie;
+        let cookies = vec![Cookie {
+            name: "sess".to_string(),
+            value: "xyz".to_string(),
+            domain: ".dmm.com".to_string(),
+            path: "/".to_string(),
+        }];
+        let header = build_cookie_header(&cookies);
+        assert_eq!(header, "sess=xyz");
     }
 }
