@@ -30,6 +30,9 @@ pub struct ListQuery {
     pub tags: Vec<String>,
     pub tag: Option<String>,
     pub logic: Option<String>,
+    pub sort_by: Option<String>,
+    pub sort_order: Option<String>,
+    pub with_facets: Option<bool>,
 }
 
 pub async fn resolve_tag_filter_ids(
