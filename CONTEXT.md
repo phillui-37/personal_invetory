@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-21 (Phase 9 Task P9-A9 complete — OTP endpoint + vault wiring)
+2026-04-21 (Phase 9 Task P9-B4 complete — repository filter/sort params added)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
@@ -827,7 +827,8 @@ Deferred pending clarification on:
 ### Frontend (P9-B Track)
 - **P9-B2: SearchFilterBloc + SearchFilterBar Widget**: Created `SearchFilterBloc` for managing filter state (selectedTags, sortBy, sortOrder, filterLogic) and `SearchFilterBar` widget with multi-tag selection, sort controls, and logic dropdown.
 - **P9-B3: Wire SearchFilterBar into ResourceListScreen**: Added SearchFilterBloc to MultiBlocProvider, replaced `_TagFilterBar` with `SearchFilterBar`, extended Load events in all 5 resource BLoCs with filter/sort params (tags, sortBy, sortOrder, filterLogic). All 354 tests passing.
-- **Tests**: All 354 tests passing.
+- **P9-B4: Update repositories with filter/sort params**: Added optional filter/sort parameters (tags, sortBy, sortOrder, filterLogic) to all 5 repository interfaces and implementations. Updated BLoC handlers to pass Load event params through to repository calls. Updated all fake repositories in tests. All tests passing.
+- **Tests**: All tests passing.
 
 
 
@@ -857,3 +858,41 @@ Deferred pending clarification on:
 - Endpoint requires both platform and code in request body (not URL path)
 - Enables context-aware OTP submission during browser-based ecosystem syncs
 - Integrates with existing vault/sync infrastructure for secure credential handling
+
+---
+
+## Phase 9 Final Summary
+
+**Branch**: `feature/phase9-real-api-search` (15 commits, from `4d21b593`)
+
+### Test Results (Final Verification)
+- **Backend**: 452 tests passed, 0 failed (up from ~418 baseline)
+- **Frontend**: 354 tests passed, 0 failed
+
+### Track A — Real API Integration (9 tasks)
+| Task | Description | New Tests |
+|------|-------------|-----------|
+| A1 | HAR parser + real-structure fixtures | 7 |
+| A2 | HttpConnectorClient (reqwest + retry) | 4 |
+| A3 | ChromiumSession (real BrowserPage) | 2 |
+| A4 | Steam real integration (credentials + API URL) | 2 |
+| A5 | DLSite real integration (selectors + cookie) | 3 |
+| A6 | FANZA real integration (selectors + cookie) | 3 |
+| A7 | OTP interaction service (oneshot channels) | 4 |
+| A8 | Kindle real integration (selectors + credentials) | 3 |
+| A9 | OTP endpoint + AppState wiring | 2 |
+
+### Track B — Advanced Search (4 tasks)
+| Task | Description | New Tests |
+|------|-------------|-----------|
+| B1 | Backend sort/facet query params (all 5 list handlers) | 4 |
+| B2 | SearchFilterBloc (frontend global filter state) | 6 |
+| B3 | Wire SearchFilterBar into ResourceListScreen | 0 (existing pass) |
+| B4 | Filter/sort params in repository interfaces + BLoC wiring | 0 (existing pass) |
+
+### Key Architecture Decisions
+- List handlers return `Json<serde_json::Value>` (plain array or faceted envelope)
+- `STEAM_API_BASE` uses `#[cfg(any(feature = "real-plugins", test))]`
+- OTP service uses tokio oneshot channels for pause/resume state machine
+- Repository interfaces accept optional filter/sort params with defaults
+- SearchFilterBloc provides global filter state across ResourceListScreen
