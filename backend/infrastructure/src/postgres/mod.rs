@@ -1,3 +1,4 @@
+pub mod error;
 pub mod chapter_check;
 pub mod dedup;
 pub mod device;
