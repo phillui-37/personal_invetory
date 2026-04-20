@@ -8,6 +8,7 @@ use axum::{
 };
 use domain::{DomainError, Resource, ResourceLocation, WebReaderMeta};
 use serde::{Deserialize, Serialize};
+use serde_json::{self, Value};
 use services::{NewLocationInput, NewWebReaderInput, UpdateWebReaderInput, WebReaderDetail};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -67,7 +68,7 @@ pub struct AddLocationRequest {
         ("logic" = Option<String>, Query, description = "Filter logic: 'and' or 'or' (default: 'and')")
     ),
     responses(
-        (status = 200, description = "List of web readers", body = Vec<Resource>),
+        (status = 200, description = "List of web readers", body = Value),
     ),
     tag = "web_readers",
     security(("bearer_auth" = []))
@@ -75,13 +76,44 @@ pub struct AddLocationRequest {
 pub async fn list_web_readers(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ListQuery>,
-) -> Result<Json<Vec<Resource>>, ApiError> {
+) -> Result<Json<serde_json::Value>, ApiError> {
     let allowed_ids = resolve_list_query_filters(&state, &query).await?;
-    let result = state
+    let mut result = state
         .web_reader_service
         .list_web_readers(allowed_ids.as_ref())
         .await?;
-    Ok(Json(result))
+
+    let (sort_field, sort_order) = crate::tag_filter::resolve_sort_params(
+        query.sort_by.as_deref(),
+        query.sort_order.as_deref(),
+    );
+    result = services::sort_resources(
+        result,
+        match sort_field {
+            crate::search_options::SortField::Title => services::SortField::Title,
+            crate::search_options::SortField::DateAdded => services::SortField::DateAdded,
+        },
+        match sort_order {
+            crate::search_options::SortOrder::Asc => services::SortOrder::Asc,
+            crate::search_options::SortOrder::Desc => services::SortOrder::Desc,
+        },
+    );
+
+    if query.with_facets == Some(true) {
+        let facets = services::count_formats(&result);
+        let facet_response: Vec<serde_json::Value> = facets
+            .into_iter()
+            .map(|f| serde_json::json!({"name": f.name, "count": f.count}))
+            .collect();
+        Ok(Json(serde_json::json!({
+            "items": result,
+            "facets": {"formats": facet_response}
+        })))
+    } else {
+        Ok(Json(serde_json::to_value(&result).map_err(|e| {
+            ApiError::from(domain::DomainError::InternalError(format!("JSON error: {e}")))
+        })?))
+    }
 }
 
 #[utoipa::path(
