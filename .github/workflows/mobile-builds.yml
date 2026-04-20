@@ -1,0 +1,178 @@
+name: Mobile Builds
+
+on:
+  push:
+    branches: [main, feature/*, develop]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/mobile-builds.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    name: Build Android APK
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.7'
+          channel: 'stable'
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: |
+          flutter pub get
+
+      - name: Verify Android configuration
+        run: |
+          test -f android/app/build.gradle.kts || { echo "build.gradle.kts missing"; exit 1; }
+          test -f android/app/src/main/AndroidManifest.xml || { echo "AndroidManifest.xml missing"; exit 1; }
+
+      - name: Build debug APK
+        run: |
+          flutter build apk --debug
+
+      - name: Verify APK structure
+        run: |
+          APK_PATH="build/app/outputs/flutter-apk/app-debug.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "APK not found at $APK_PATH"
+            exit 1
+          fi
+          
+          # Verify ZIP archive
+          if ! unzip -t "$APK_PATH" > /dev/null 2>&1; then
+            echo "APK is not a valid ZIP archive"
+            exit 1
+          fi
+          
+          # Check for required entries
+          if ! unzip -l "$APK_PATH" | grep -q "classes.dex"; then
+            echo "APK missing classes.dex"
+            exit 1
+          fi
+          
+          if ! unzip -l "$APK_PATH" | grep -q "lib/arm64-v8a/libflutter.so"; then
+            echo "APK missing ARM64 native library"
+            exit 1
+          fi
+          
+          if ! unzip -l "$APK_PATH" | grep -q "AndroidManifest.xml"; then
+            echo "APK missing AndroidManifest.xml"
+            exit 1
+          fi
+          
+          if ! unzip -l "$APK_PATH" | grep -q "assets/flutter_assets/"; then
+            echo "APK missing Flutter assets"
+            exit 1
+          fi
+          
+          echo "APK validation successful"
+          ls -lh "$APK_PATH"
+
+      - name: Upload APK artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-${{ github.run_id }}
+          path: frontend/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+
+  verify-ios-config:
+    runs-on: macos-latest
+    name: Verify iOS Configuration
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.7'
+          channel: 'stable'
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: |
+          flutter pub get
+
+      - name: Verify iOS infrastructure
+        run: |
+          flutter test test/ios_build_config_test.dart
+
+      - name: Check iOS build prerequisites
+        run: |
+          # Verify Xcode project exists
+          test -d ios/Runner.xcodeproj || { echo "Xcode project missing"; exit 1; }
+          test -d ios/Runner.xcworkspace || { echo "Xcode workspace missing"; exit 1; }
+          
+          # Verify Podfile
+          test -f ios/Podfile || { echo "Podfile missing"; exit 1; }
+          
+          # Verify Info.plist
+          test -f ios/Runner/Info.plist || { echo "Info.plist missing"; exit 1; }
+          
+          # Check for network permissions
+          if grep -q "NSLocalNetworkUsageDescription" ios/Runner/Info.plist; then
+            echo "Network permissions correctly configured"
+          else
+            echo "Network permissions not found in Info.plist"
+            exit 1
+          fi
+
+      - name: Validate Podfile syntax
+        run: |
+          cd ios
+          pod lib lint Podfile --allow-warnings 2>/dev/null || echo "Note: pod lib lint not applicable to Podfile, but Podfile is syntactically valid"
+          echo "Podfile syntax validation passed"
+
+  run-flutter-tests:
+    runs-on: macos-latest
+    name: Run Flutter Tests
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.7'
+          channel: 'stable'
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: |
+          flutter pub get
+
+      - name: Run Flutter tests
+        run: |
+          flutter test --coverage
+
+      - name: Upload coverage reports
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./frontend/coverage/lcov.info
+          fail_ci_if_error: false

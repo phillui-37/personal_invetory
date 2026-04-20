@@ -14,6 +14,7 @@ import 'blocs/vault/vault_bloc.dart';
 import 'blocs/video/video_bloc.dart';
 import 'blocs/web_reader/web_reader_bloc.dart';
 import 'config/app_config.dart';
+import 'config/app_theme.dart';
 import 'models/resources.dart';
 import 'repositories/http_batch_operation_repository.dart';
 import 'repositories/http_dedup_repository.dart';
@@ -70,6 +71,9 @@ class PersonalInventoryApp extends StatelessWidget {
         BlocProvider<BatchBloc>(create: (_) => BatchBloc(batchRepository)),
       ],
       child: MaterialApp(
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.system,
         home: _AppShell(ebookRepository: ebookRepository),
       ),
     );

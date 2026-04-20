@@ -13,6 +13,7 @@ mod notifications;
 mod openapi;
 mod progress_handler;
 mod routes;
+mod search_options;
 mod state;
 mod sync_handler;
 mod system;
@@ -25,6 +26,7 @@ pub use auth::auth_middleware;
 pub use error::ApiError;
 pub use openapi::generate_openapi_json;
 pub use routes::build_router;
+pub use search_options::{SearchFacets, SearchOptionsQuery, SortField, SortOrder};
 pub use state::{AppState, BroadcastNotifier, NotificationEvent};
 
 pub fn adapters_ready() -> bool {

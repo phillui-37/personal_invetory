@@ -13,7 +13,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    tag_filter::{resolve_tag_filter_ids, ListQuery},
+    tag_filter::{resolve_list_query_filters, ListQuery},
     ApiError, AppState,
 };
 
@@ -61,7 +61,11 @@ pub struct AddLocationRequest {
 #[utoipa::path(
     get,
     path = "/api/v1/inventory/web-readers/list",
-    params(("tag" = Option<String>, Query, description = "Optional tag name filter")),
+    params(
+        ("tag" = Option<String>, Query, description = "Optional single tag name filter (deprecated, use tags)"),
+        ("tags" = Vec<String>, Query, description = "Optional multiple tag names for filtering"),
+        ("logic" = Option<String>, Query, description = "Filter logic: 'and' or 'or' (default: 'and')")
+    ),
     responses(
         (status = 200, description = "List of web readers", body = Vec<Resource>),
     ),
@@ -72,7 +76,7 @@ pub async fn list_web_readers(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ListQuery>,
 ) -> Result<Json<Vec<Resource>>, ApiError> {
-    let allowed_ids = resolve_tag_filter_ids(&state, query.tag.as_deref()).await?;
+    let allowed_ids = resolve_list_query_filters(&state, &query).await?;
     let result = state
         .web_reader_service
         .list_web_readers(allowed_ids.as_ref())

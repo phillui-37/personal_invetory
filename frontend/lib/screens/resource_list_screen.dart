@@ -8,9 +8,10 @@ import '../blocs/image/image_bloc.dart';
 import '../blocs/tag/tag_bloc.dart';
 import '../blocs/video/video_bloc.dart';
 import '../blocs/web_reader/web_reader_bloc.dart';
+import '../models/failures.dart';
 import '../models/resources.dart';
 import '../models/tag.dart';
-import '../widgets/app_failure_text.dart';
+import '../widgets/error_display.dart';
 import '../widgets/resource_list_item.dart';
 import 'add_resource_screen.dart';
 import 'batch_operations_screen.dart';
@@ -104,9 +105,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             _ResourceTab<EbookBloc, EbookState>(
               isLoading: (state) => state is EbookLoading,
               isError: (state) => state is EbookError,
-              errorText: (state) => state is EbookError
-                  ? appFailureMessage(state.failure)
-                  : '',
+              failure: (state) => state is EbookError ? state.failure : null,
               resources: (state) =>
                   state is EbookListLoaded ? state.ebooks : const <Resource>[],
               tagFilter: _activeTagName,
@@ -132,9 +131,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             _ResourceTab<WebReaderBloc, WebReaderState>(
               isLoading: (state) => state is WebReaderLoading,
               isError: (state) => state is WebReaderError,
-              errorText: (state) => state is WebReaderError
-                  ? appFailureMessage(state.failure)
-                  : '',
+              failure: (state) => state is WebReaderError ? state.failure : null,
               resources: (state) => state is WebReaderListLoaded
                   ? state.webReaders
                   : const <Resource>[],
@@ -162,9 +159,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             _ResourceTab<ImageBloc, ImageState>(
               isLoading: (state) => state is ImageLoading,
               isError: (state) => state is ImageError,
-              errorText: (state) => state is ImageError
-                  ? appFailureMessage(state.failure)
-                  : '',
+              failure: (state) => state is ImageError ? state.failure : null,
               resources: (state) =>
                   state is ImageListLoaded ? state.images : const <Resource>[],
               tagFilter: _activeTagName,
@@ -190,9 +185,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             _ResourceTab<VideoBloc, VideoState>(
               isLoading: (state) => state is VideoLoading,
               isError: (state) => state is VideoError,
-              errorText: (state) => state is VideoError
-                  ? appFailureMessage(state.failure)
-                  : '',
+              failure: (state) => state is VideoError ? state.failure : null,
               resources: (state) =>
                   state is VideoListLoaded ? state.videos : const <Resource>[],
               tagFilter: _activeTagName,
@@ -218,9 +211,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             _ResourceTab<GameBloc, GameState>(
               isLoading: (state) => state is GameLoading,
               isError: (state) => state is GameError,
-              errorText: (state) => state is GameError
-                  ? appFailureMessage(state.failure)
-                  : '',
+              failure: (state) => state is GameError ? state.failure : null,
               resources: (state) =>
                   state is GameListLoaded ? state.games : const <Resource>[],
               tagFilter: _activeTagName,
@@ -276,7 +267,7 @@ class _ResourceTab<B extends StateStreamable<S>, S> extends StatelessWidget {
   const _ResourceTab({
     required this.isLoading,
     required this.isError,
-    required this.errorText,
+    required this.failure,
     required this.resources,
     required this.onRetry,
     required this.onRefresh,
@@ -286,13 +277,11 @@ class _ResourceTab<B extends StateStreamable<S>, S> extends StatelessWidget {
 
   final bool Function(S state) isLoading;
   final bool Function(S state) isError;
-  final String Function(S state) errorText;
+  final AppFailure? Function(S state) failure;
   final List<Resource> Function(S state) resources;
   final VoidCallback onRetry;
   final Future<void> Function() onRefresh;
   final ValueChanged<Resource> onTap;
-  // When non-null, only resources matching this tag name are shown.
-  // In-memory repos return all resources; HTTP repos pass ?tag= query param.
   final String? tagFilter;
 
   @override
@@ -304,14 +293,17 @@ class _ResourceTab<B extends StateStreamable<S>, S> extends StatelessWidget {
         }
 
         if (isError(state)) {
+          final err = failure(state);
+          if (err == null) {
+            return const Center(child: Text('Unknown error occurred'));
+          }
           return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(errorText(state)),
-                const SizedBox(height: 8),
-                ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: ErrorDisplay(
+                failure: err,
+                onRetry: onRetry,
+              ),
             ),
           );
         }
