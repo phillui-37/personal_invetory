@@ -1,5 +1,6 @@
 pub mod browser_session;
 pub mod ecosystem;
+pub mod mobi;
 
 use std::collections::HashMap;
 
