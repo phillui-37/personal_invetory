@@ -6,12 +6,28 @@ use infrastructure::{
 };
 use rusqlite::Connection;
 
-const SQLITE_MIGRATIONS: [&str; 5] = [
+const SQLITE_MIGRATIONS: [&str; 21] = [
     include_str!("../migrations/0001_create_resources.sql"),
     include_str!("../migrations/0002_create_ebook_metas.sql"),
     include_str!("../migrations/0003_create_web_reader_metas.sql"),
     include_str!("../migrations/0004_create_resource_locations.sql"),
     include_str!("../migrations/0005_create_devices.sql"),
+    include_str!("../migrations/0006_alter_web_reader_metas_add_check_fields.sql"),
+    include_str!("../migrations/0007_create_chapter_checks.sql"),
+    include_str!("../migrations/0008_create_site_configs.sql"),
+    include_str!("../migrations/0009_create_notifications.sql"),
+    include_str!("../migrations/0010_create_image_metas.sql"),
+    include_str!("../migrations/0011_create_video_metas.sql"),
+    include_str!("../migrations/0012_create_game_metas.sql"),
+    include_str!("../migrations/0013_create_vault_config.sql"),
+    include_str!("../migrations/0014_create_credentials.sql"),
+    include_str!("../migrations/0015_create_sync_jobs.sql"),
+    include_str!("../migrations/0016_create_dedup_warnings.sql"),
+    include_str!("../migrations/0017_alter_devices_add_name.sql"),
+    include_str!("../migrations/0018_create_device_location_view.sql"),
+    include_str!("../migrations/0019_create_resource_progress.sql"),
+    include_str!("../migrations/0020_create_tags.sql"),
+    include_str!("../migrations/0021_create_resource_tags.sql"),
 ];
 
 fn apply_sqlite_migrations(conn: &Connection) -> rusqlite::Result<()> {
@@ -183,6 +199,7 @@ fn normalization_helpers_produce_stable_sorted_snapshot() {
                 storage_type: "Platform".to_string(),
             },
         ],
+        ..Default::default()
     };
 
     let normalized = CanonicalResourceSnapshot {
@@ -190,6 +207,7 @@ fn normalization_helpers_produce_stable_sorted_snapshot() {
         ebook_metas: normalize_ebook_meta_rows(unsorted.ebook_metas),
         web_reader_metas: normalize_web_reader_meta_rows(unsorted.web_reader_metas),
         resource_locations: normalize_resource_location_rows(unsorted.resource_locations),
+        ..Default::default()
     };
 
     assert_eq!(normalized.resources[0].id, "resource-a");

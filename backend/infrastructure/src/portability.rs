@@ -1,6 +1,6 @@
 use rusqlite::{params, Connection};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ResourceRow {
     pub id: String,
     pub title: String,
@@ -10,7 +10,7 @@ pub struct ResourceRow {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct EbookMetaRow {
     pub resource_id: String,
     pub author: Option<String>,
@@ -20,7 +20,7 @@ pub struct EbookMetaRow {
     pub file_format: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct WebReaderMetaRow {
     pub resource_id: String,
     pub url: String,
@@ -28,7 +28,7 @@ pub struct WebReaderMetaRow {
     pub last_checked_chapter: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ResourceLocationRow {
     pub id: String,
     pub resource_id: String,
@@ -37,13 +37,74 @@ pub struct ResourceLocationRow {
     pub storage_type: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ImageMetaRow {
+    pub resource_id: String,
+    pub file_format: Option<String>,
+    pub width: Option<i64>,
+    pub height: Option<i64>,
+    pub tags: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct VideoMetaRow {
+    pub resource_id: String,
+    pub duration_secs: Option<i64>,
+    pub resolution: Option<String>,
+    pub file_format: Option<String>,
+    pub studio: Option<String>,
+    pub series: Option<String>,
+    pub episode: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct GameMetaRow {
+    pub resource_id: String,
+    pub platform: Option<String>,
+    pub store: Option<String>,
+    pub developer: Option<String>,
+    pub publisher: Option<String>,
+    pub manual_notes: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ProgressRow {
+    pub resource_id: String,
+    pub progress: f64,
+    pub notes: Option<String>,
+    pub updated_at: String,
+}
+
+impl Eq for ProgressRow {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TagRow {
+    pub id: String,
+    pub name: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ResourceTagRow {
+    pub resource_id: String,
+    pub tag_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct CanonicalResourceSnapshot {
     pub resources: Vec<ResourceRow>,
     pub ebook_metas: Vec<EbookMetaRow>,
     pub web_reader_metas: Vec<WebReaderMetaRow>,
     pub resource_locations: Vec<ResourceLocationRow>,
+    pub image_metas: Vec<ImageMetaRow>,
+    pub video_metas: Vec<VideoMetaRow>,
+    pub game_metas: Vec<GameMetaRow>,
+    pub progress: Vec<ProgressRow>,
+    pub tags: Vec<TagRow>,
+    pub resource_tags: Vec<ResourceTagRow>,
 }
+
+impl Eq for CanonicalResourceSnapshot {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PortabilityBackend {
@@ -216,12 +277,125 @@ pub fn export_canonical_snapshot_sqlite(
         normalize_resource_location_rows(rows)
     };
 
+    let image_metas = export_image_metas_sqlite(conn).unwrap_or_default();
+    let video_metas = export_video_metas_sqlite(conn).unwrap_or_default();
+    let game_metas = export_game_metas_sqlite(conn).unwrap_or_default();
+    let progress = export_progress_sqlite(conn).unwrap_or_default();
+    let tags = export_tags_sqlite(conn).unwrap_or_default();
+    let resource_tags = export_resource_tags_sqlite(conn).unwrap_or_default();
+
     Ok(CanonicalResourceSnapshot {
         resources,
         ebook_metas,
         web_reader_metas,
         resource_locations,
+        image_metas,
+        video_metas,
+        game_metas,
+        progress,
+        tags,
+        resource_tags,
     })
+}
+
+fn export_image_metas_sqlite(conn: &Connection) -> rusqlite::Result<Vec<ImageMetaRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT resource_id, file_format, width, height, tags FROM image_metas ORDER BY resource_id",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(ImageMetaRow {
+            resource_id: row.get(0)?,
+            file_format: row.get(1)?,
+            width: row.get(2)?,
+            height: row.get(3)?,
+            tags: row.get(4)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+fn export_video_metas_sqlite(conn: &Connection) -> rusqlite::Result<Vec<VideoMetaRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT resource_id, duration_secs, resolution, file_format, studio, series, episode
+         FROM video_metas ORDER BY resource_id",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(VideoMetaRow {
+            resource_id: row.get(0)?,
+            duration_secs: row.get(1)?,
+            resolution: row.get(2)?,
+            file_format: row.get(3)?,
+            studio: row.get(4)?,
+            series: row.get(5)?,
+            episode: row.get(6)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+fn export_game_metas_sqlite(conn: &Connection) -> rusqlite::Result<Vec<GameMetaRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT resource_id, platform, store, developer, publisher, manual_notes
+         FROM game_metas ORDER BY resource_id",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(GameMetaRow {
+            resource_id: row.get(0)?,
+            platform: row.get(1)?,
+            store: row.get(2)?,
+            developer: row.get(3)?,
+            publisher: row.get(4)?,
+            manual_notes: row.get(5)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+fn export_progress_sqlite(conn: &Connection) -> rusqlite::Result<Vec<ProgressRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT resource_id, progress, notes, updated_at FROM resource_progress ORDER BY resource_id",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(ProgressRow {
+            resource_id: row.get(0)?,
+            progress: row.get(1)?,
+            notes: row.get(2)?,
+            updated_at: row.get(3)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+fn export_tags_sqlite(conn: &Connection) -> rusqlite::Result<Vec<TagRow>> {
+    let mut stmt =
+        conn.prepare("SELECT id, name, created_at FROM tags ORDER BY id")?;
+    let rows = stmt.query_map([], |row| {
+        Ok(TagRow {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            created_at: row.get(2)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+fn export_resource_tags_sqlite(conn: &Connection) -> rusqlite::Result<Vec<ResourceTagRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT resource_id, tag_id FROM resource_tags ORDER BY resource_id, tag_id",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(ResourceTagRow {
+            resource_id: row.get(0)?,
+            tag_id: row.get(1)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
 }
 
 pub fn import_canonical_snapshot_sqlite(
@@ -230,6 +404,13 @@ pub fn import_canonical_snapshot_sqlite(
 ) -> rusqlite::Result<()> {
     let tx = conn.transaction()?;
 
+    // Delete in reverse dependency order
+    tx.execute("DELETE FROM resource_tags", [])?;
+    tx.execute("DELETE FROM tags", [])?;
+    tx.execute("DELETE FROM resource_progress", [])?;
+    tx.execute("DELETE FROM game_metas", [])?;
+    tx.execute("DELETE FROM video_metas", [])?;
+    tx.execute("DELETE FROM image_metas", [])?;
     tx.execute("DELETE FROM resource_locations", [])?;
     tx.execute("DELETE FROM web_reader_metas", [])?;
     tx.execute("DELETE FROM ebook_metas", [])?;
@@ -289,6 +470,58 @@ pub fn import_canonical_snapshot_sqlite(
                 row.path_or_url,
                 row.storage_type
             ],
+        )?;
+    }
+
+    for row in &snapshot.image_metas {
+        tx.execute(
+            "INSERT INTO image_metas (resource_id, file_format, width, height, tags)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![row.resource_id, row.file_format, row.width, row.height, row.tags],
+        )?;
+    }
+
+    for row in &snapshot.video_metas {
+        tx.execute(
+            "INSERT INTO video_metas (resource_id, duration_secs, resolution, file_format, studio, series, episode)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                row.resource_id, row.duration_secs, row.resolution,
+                row.file_format, row.studio, row.series, row.episode
+            ],
+        )?;
+    }
+
+    for row in &snapshot.game_metas {
+        tx.execute(
+            "INSERT INTO game_metas (resource_id, platform, store, developer, publisher, manual_notes)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                row.resource_id, row.platform, row.store,
+                row.developer, row.publisher, row.manual_notes
+            ],
+        )?;
+    }
+
+    for row in &snapshot.progress {
+        tx.execute(
+            "INSERT INTO resource_progress (resource_id, progress, notes, updated_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![row.resource_id, row.progress, row.notes, row.updated_at],
+        )?;
+    }
+
+    for row in &snapshot.tags {
+        tx.execute(
+            "INSERT INTO tags (id, name, created_at) VALUES (?1, ?2, ?3)",
+            params![row.id, row.name, row.created_at],
+        )?;
+    }
+
+    for row in &snapshot.resource_tags {
+        tx.execute(
+            "INSERT INTO resource_tags (resource_id, tag_id) VALUES (?1, ?2)",
+            params![row.resource_id, row.tag_id],
         )?;
     }
 

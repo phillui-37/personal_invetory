@@ -13,8 +13,9 @@ pub use sqlite::tag::SqliteTagRepository;
 pub use portability::{
     export_canonical_snapshot_sqlite, import_canonical_snapshot_sqlite, normalize_ebook_meta_rows,
     normalize_resource_location_rows, normalize_resource_rows, normalize_web_reader_meta_rows,
-    postgres_parity_hooks, CanonicalResourceSnapshot, EbookMetaRow, PortabilityBackend,
-    PostgresParityHooks, ResourceLocationRow, ResourceRow, WebReaderMetaRow,
+    postgres_parity_hooks, CanonicalResourceSnapshot, EbookMetaRow, GameMetaRow, ImageMetaRow,
+    PortabilityBackend, PostgresParityHooks, ProgressRow, ResourceLocationRow, ResourceRow,
+    ResourceTagRow, TagRow, VideoMetaRow, WebReaderMetaRow,
 };
 
 use rusqlite::{Connection, OptionalExtension};
