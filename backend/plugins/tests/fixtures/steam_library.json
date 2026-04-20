@@ -1,0 +1,42 @@
+{
+  "response": {
+    "game_count": 5,
+    "games": [
+      {
+        "appid": 570,
+        "name": "Dota 2",
+        "playtime_forever": 2440,
+        "img_logo_url": "fcdb6eef3b0b7b2b17f3b8e1c5e29a2ef0c2d3e4",
+        "capsule_image": "https://steamcdn-a.akamaihd.net/steam/apps/570/capsule_231x87.jpg"
+      },
+      {
+        "appid": 440,
+        "name": "Team Fortress 2",
+        "playtime_forever": 1853,
+        "img_logo_url": "e1f4b8a2c3d4e5f6a7b8c9d0e1f2a3b4",
+        "capsule_image": "https://steamcdn-a.akamaihd.net/steam/apps/440/capsule_231x87.jpg"
+      },
+      {
+        "appid": 730,
+        "name": "Counter-Strike 2",
+        "playtime_forever": 5234,
+        "img_logo_url": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+        "capsule_image": "https://steamcdn-a.akamaihd.net/steam/apps/730/capsule_231x87.jpg"
+      },
+      {
+        "appid": 252950,
+        "name": "Rocket League",
+        "playtime_forever": 342,
+        "img_logo_url": "b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3",
+        "capsule_image": "https://steamcdn-a.akamaihd.net/steam/apps/252950/capsule_231x87.jpg"
+      },
+      {
+        "appid": 221380,
+        "name": "Dark Souls II",
+        "playtime_forever": 0,
+        "img_logo_url": "c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4",
+        "capsule_image": "https://steamcdn-a.akamaihd.net/steam/apps/221380/capsule_231x87.jpg"
+      }
+    ]
+  }
+}

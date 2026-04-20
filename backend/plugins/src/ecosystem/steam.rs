@@ -94,4 +94,15 @@ mod tests {
         let resp: OwnedGamesResponse = serde_json::from_str(json).expect("deserialize");
         assert_eq!(resp.response.games.unwrap().len(), 0);
     }
+
+    #[test]
+    fn real_fixture_deserializes() {
+        let json = include_str!("../../tests/fixtures/real/steam_owned_games.json");
+        let resp: OwnedGamesResponse = serde_json::from_str(json).expect("deserialize fixture");
+        let games = resp.response.games.unwrap();
+        assert_eq!(games.len(), 3);
+        assert_eq!(games[0].name, "Team Fortress 2");
+        assert_eq!(games[1].name, "Dota 2");
+        assert_eq!(games[2].name, "Counter-Strike 2");
+    }
 }

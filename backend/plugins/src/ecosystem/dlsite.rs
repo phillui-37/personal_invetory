@@ -291,4 +291,17 @@ mod tests {
         assert_eq!(items[0].metadata.get("maker").unwrap(), "Test Circle");
         assert_eq!(items[0].metadata.get("resource_type").unwrap(), "Image");
     }
+
+    #[test]
+    fn real_fixture_deserializes() {
+        let json = include_str!("../../tests/fixtures/real/dlsite_library.json");
+        let works: Vec<DLSiteWork> = serde_json::from_str(json).expect("deserialize fixture");
+        assert_eq!(works.len(), 3);
+        assert_eq!(works[0].workno, "RJ123456");
+        assert_eq!(works[0].work_name, "Test Game Alpha");
+        assert_eq!(works[0].work_type, "GAM");
+        assert_eq!(works[0].maker_name, Some("Studio A".to_string()));
+        assert_eq!(works[1].work_type, "CG");
+        assert_eq!(works[2].work_type, "MOV");
+    }
 }

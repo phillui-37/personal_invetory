@@ -1,0 +1,32 @@
+[
+  {
+    "workno": "RJ001234",
+    "work_name": "魔法少女大戦",
+    "work_type": "GAM",
+    "maker_name": "Fantasy Games Studio"
+  },
+  {
+    "workno": "RJ001235",
+    "work_name": "美少女大学",
+    "work_type": "MNG",
+    "maker_name": "Manga House"
+  },
+  {
+    "workno": "RJ001236",
+    "work_name": "ダンジョン探検2024",
+    "work_type": "GAM",
+    "maker_name": "Dungeon Creators"
+  },
+  {
+    "workno": "RJ001237",
+    "work_name": "SCI-FI Movie Collection",
+    "work_type": "MOV",
+    "maker_name": "Video Production Ltd"
+  },
+  {
+    "workno": "RJ001238",
+    "work_name": "CG Art Masterpiece",
+    "work_type": "CG",
+    "maker_name": "Art Studios Inc"
+  }
+]

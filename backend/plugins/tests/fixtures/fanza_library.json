@@ -1,0 +1,42 @@
+[
+  {
+    "product_id": "26123456",
+    "title": "Harem Fantasy RPG 2024",
+    "category": "game",
+    "content_type": "game",
+    "purchase_date": "2024-01-15",
+    "thumbnail": "https://c2d.dmm.co.jp/thumbs/26123456.jpg"
+  },
+  {
+    "product_id": "26123457",
+    "title": "Adult Visual Novel Series",
+    "category": "content",
+    "content_type": "video",
+    "purchase_date": "2024-02-20",
+    "thumbnail": "https://c2d.dmm.co.jp/thumbs/26123457.jpg"
+  },
+  {
+    "product_id": "26123458",
+    "title": "Doujin CG Collection",
+    "category": "image",
+    "content_type": "image",
+    "purchase_date": "2024-03-10",
+    "thumbnail": "https://c2d.dmm.co.jp/thumbs/26123458.jpg"
+  },
+  {
+    "product_id": "26123459",
+    "title": "Premium Manga Pack",
+    "category": "manga",
+    "content_type": "image",
+    "purchase_date": "2024-04-05",
+    "thumbnail": "https://c2d.dmm.co.jp/thumbs/26123459.jpg"
+  },
+  {
+    "product_id": "26123460",
+    "title": "Indie Game Bundle",
+    "category": "game",
+    "content_type": "game",
+    "purchase_date": "2024-05-12",
+    "thumbnail": "https://c2d.dmm.co.jp/thumbs/26123460.jpg"
+  }
+]

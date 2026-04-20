@@ -247,4 +247,17 @@ mod tests {
             .unwrap();
         assert!(items.is_empty());
     }
+
+    #[test]
+    fn real_fixture_deserializes() {
+        let json = include_str!("../../tests/fixtures/real/fanza_library.json");
+        let products: Vec<FanzaProduct> = serde_json::from_str(json).expect("deserialize fixture");
+        assert_eq!(products.len(), 3);
+        assert_eq!(products[0].content_id, "d_123456");
+        assert_eq!(products[0].title, "FANZA Game Alpha");
+        assert_eq!(products[0].content_type, "game");
+        assert_eq!(products[0].maker_name, Some("Maker X".to_string()));
+        assert_eq!(products[1].content_type, "comic");
+        assert_eq!(products[2].content_type, "video");
+    }
 }
