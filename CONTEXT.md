@@ -259,6 +259,41 @@ Implemented device management as a first-class feature:
 - **Database**: `owner_id` legacy field: set to `device_id` value on all new inserts.
 - **Test Count**: Backend 261 (baseline 251). Flutter 174 (baseline 159).
 
+## Phase 6 — Backend Progress
+
+- **P6-H review hardening**: tag handlers now have negative-path coverage for duplicate tag creation (409), missing-tag attach (404), unsupported resource type (422), and OpenAPI smoke coverage for all tag routes. Tag OpenAPI path params were standardized to `{type}`.
+- **P6-I tag filtering**: all 5 inventory list endpoints now accept optional `?tag=<name>` filters. Blank `?tag=` is ignored. Adapters share a tag-filter resolver, and services share a typed resource filter helper so filtering logic stays consistent across ebook/web-reader/image/video/game lists.
+- **P6-J runtime wiring**: `ProgressService` and `TagService` are now constructed in `backend/app/src/runtime.rs` and attached to `AppState`, so progress routes, tag routes, and tag-filtered list endpoints are live in the real app runtime.
+- **Verification**: `cd backend && cargo test`; `cd frontend && flutter test`.
+
+## Phase 6 — P6-P Frontend Integration (IN PROGRESS)
+
+**Branch**: `feature/phase6-progress-tags` in worktree `.worktrees/feature-phase6-progress-tags`
+
+**Status**: All 16 tasks P6-A through P6-O complete. P6-P (widget integration) is ~95% done.
+
+**What's done in P6-P**:
+- `ProgressEditor` + `TagChipList` widgets created and GREEN (8 widget tests passing)
+- `main.dart`: `InMemoryTagRepository` + `TagBloc` wired
+- `resource_detail_screen.dart`: Full rewrite — TagBloc + ProgressBloc listeners, state vars (`_currentProgress`, `_currentTags`, `_allTags`, `_pendingTagName`), create-then-attach tag flow, all 5 body types updated with ProgressEditor + TagChipList
+- `resource_list_screen.dart`: TagBloc + `_TagFilterBar` widget with FilterChips, `_activeTagName` state, `tagFilter` param on `_ResourceTab`
+- Test fixes: All screen tests have `TagBloc(FakeTagRepository())` providers
+
+**What remains before commit**:
+1. Fix 1 failing test: `resource_list_screen_test.dart` "reloads list after returning from detail"
+   - **Root cause**: Second `MultiBlocProvider` in that test (lines 67–80) is missing `ProgressBloc` provider
+   - **Fix applied**: Added `ProgressBloc` import + provider to first test setup already; second setup still needs `ProgressBloc` added (line 75 block, lines 66-80)
+   - **Exact change needed**: Add `BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),` after line 75 in `test/screens/resource_list_screen_test.dart`
+2. Run full flutter test to confirm 0 failures
+3. Run `cd backend && cargo test` to confirm no regressions
+4. Commit to `feature/phase6-progress-tags`
+5. Merge/finish branch via `finishing-a-development-branch` skill
+
+**Key technical notes**:
+- `DateTime.utc()` is NOT a compile-time const in Dart — do not use as const sentinel
+- Create-then-attach flow: check `_allTags` via `indexWhere` → if found dispatch AttachTag; if not, set `_pendingTagName`, dispatch CreateTag → on TagOperationSuccess(created) dispatch LoadTags → on TagListLoaded with pending name, dispatch AttachTag
+- Every screen test's `MultiBlocProvider` needs both `ProgressBloc(FakeProgressRepository())` AND `TagBloc(FakeTagRepository())`
+
 ## References
 - Requirements: `TODO.md`
 - Agent rules: `AGENTS.md`
