@@ -124,9 +124,14 @@ class WebReaderProgressTrackerState extends State<WebReaderProgressTracker> {
                 ),
               ],
             ),
-            // TODO(D8): Replace with actual WebViewWidget once platform channels
-            // are fully wired on all targets. The controller is already configured
-            // with ProgressSignal channel + JS injection on page load.
+            // WebViewWidget renders the actual browser content.
+            // The controller is configured with ProgressSignal JS channel
+            // and JS injection on page load.
+            if (_webController != null)
+              SizedBox(
+                height: 300,
+                child: WebViewWidget(controller: _webController!),
+              ),
             const SizedBox(height: 4),
             const Text(
               'Manual override:',
