@@ -284,6 +284,34 @@ Implemented device management as a first-class feature:
 - Create-then-attach flow: `indexWhere` in `_allTags` → if found dispatch AttachTag; if not, set `_pendingTagName`, dispatch CreateTag → on TagOperationSuccess(created) dispatch LoadTags → on TagListLoaded with pending name, dispatch AttachTag.
 - Every screen test's `MultiBlocProvider` needs both `ProgressBloc(FakeProgressRepository())` AND `TagBloc(FakeTagRepository())`.
 
+## Phase 7 — PostgreSQL + Metadata + Batch Ops (✅ Complete)
+
+### Backend (P7-A through P7-L)
+- **P7-A: PG Infrastructure**: 21 PG migrations (0001–0021) for all tables (resources, 5 metas, locations, devices, checks, configs, notifications, vault, credentials, sync_jobs, dedup, progress, tags). `PgAdapterFactory`, pool management.
+- **P7-B/C: PG Repositories**: Full CRUD implementations for resource, ebook_meta, web_reader_meta, location, chapter_check, notification, image_meta, video_meta, game_meta, device, dedup, sync_job, tag repositories. All match SQLite interface contracts.
+- **P7-D: Vault/Sync/Dedup/Progress/Tag PG Repos**: `PgVaultBackend`, `PgSyncJobRepository`, `PgDedupWarningRepository`, `PgProgressRepository`, `PgTagRepository` with full SQL implementations.
+- **P7-E: Factory + Portability**: `AdapterFactory::detect_and_build()` auto-detects SQLite or PG; `.env` provisioning; `portability_snapshot` with canonical snapshot + diff reporting; full SQLite ↔ PG round-trip export/import validation.
+- **P7-G: MOBI/AZW3 Plugin**: `MobiMetadataExtractor` in `backend/plugins/src/mobi.rs` using `encoding_rs` for charset detection, `quick-xml` for title/author extraction. 30 fixture tests + real MOBI sample tests.
+- **P7-J: Batch Update**: `BatchUpdateRequest { field_updates: Map<field_name, value> }` for all 5 resource types. 5 handlers + routes `POST /api/v1/inventory/:type/batch-update`. Returns `BatchUpdateResponse { updated, failed }` with `BatchOpFailure` per item.
+- **P7-K: Batch Copy**: `BatchCopyMetaRequest { source_id, target_ids }` copy source metadata to N targets. 5 handlers + routes `POST /api/v1/inventory/:type/batch-copy-meta`. Skips `url` field for web_readers.
+- **P7-I: Real WebView**: JavaScript channel-based progress tracking with WebView2 (Windows), WKWebView (macOS).
+- **P7-L: Android Build**: Full Gradle setup (`build.gradle.kts`, `settings.gradle.kts`, `android/app/`). `AndroidManifest.xml` with internet permission. Build docs.
+- **Tests**: 46 adapter tests green; all workspace tests pass.
+
+### Frontend (P7-K + P7-H + P7-I)
+- **P7-K: Batch Operations Screen**: `BatchOperationsScreen` with 3 tabs (Import, Update, Copy). `HttpBatchOperationRepository` (type-scoped via `ResourceType` constructor). `BatchBloc` with events for all 3 ops. 7 bloc tests + 4 widget tests.
+- **P7-H: MOBI Extractor**: `MobiMetadataExtractor` in Dart using `mobx` library. Charset detection. Title/author parsing. 15 fixture tests + 2 integration tests.
+- **P7-I: WebView Progress**: JavaScript channel handler in `WebReaderProgressTracker`. Real progress signal extraction from embedded sites.
+- **Wiring**: `ResourceListScreen` AppBar icon → `BatchOperationsScreen` via BLoC; `HttpBatchOperationRepository` provided at app root in `main.dart`.
+- **Tests**: 229 total Flutter tests green (all pass).
+
+**Key decisions**:
+- PG factory uses `TEST_PG_URL` env for contract tests (gracefully skips if not set).
+- Batch copy skips resource-specific immutable fields (e.g., `url` for web_readers).
+- MOBI/AZW3 extractor defers to real Rust plugin in prod; Dart stub used in tests for quick iteration.
+- Real WebView progress via JS channel (no Chromium headless; respects actual page state).
+- Android build uses Gradle 8 DSL syntax (`.kts`); docs provided for Flutter/AGP compatibility.
+
 ## References
 - Requirements: `TODO.md`
 - Agent rules: `AGENTS.md`
@@ -293,11 +321,6 @@ Implemented device management as a first-class feature:
 - Phase 4 design spec: `docs/superpowers/specs/2026-04-18-phase4-ecosystem-integrations-design.md`
 - Phase 4 Plan 1: `docs/superpowers/plans/2026-04-18-phase4-plan1-foundations-steam.md`
 - Phase 4 Plan 2: `docs/superpowers/plans/2026-04-19-phase4-plan2-frontend-ecosystem-ux.md`
-
-## 2026-04-19 — Phase 6 P6-O TagBloc
-
-- Scope locked to Flutter frontend P6-O only. No UI wiring, no unrelated screen changes.
-- Plan: add `TagBloc` in `frontend/lib/blocs/tag/tag_bloc.dart` using the same Result-based BLoC pattern as `DeviceBloc` and `WebReaderBloc`.
 - Events/states for current phase only: load tags, create/delete tag, load resource tags, attach/detach tag; states stay narrow (`Initial`, `Loading`, list/resource-loaded, operation-success, error).
 - TDD order: write `frontend/test/blocs/tag/tag_bloc_test.dart`, run it red, then implement minimal bloc code and rerun relevant Flutter tests green.
 - Result: `TagBloc` added with `TagOperationType { created, deleted, attached, detached }`, load/resource-load states, and Result.when-based success/error folding. New bloc tests cover all six Phase 6 events; relevant Flutter tag tests are green.
