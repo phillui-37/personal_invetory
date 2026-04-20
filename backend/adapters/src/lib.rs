@@ -1,5 +1,6 @@
 mod auth;
 mod batch_import;
+mod batch_update;
 mod chapter_check;
 mod dedup_handler;
 mod device_handler;

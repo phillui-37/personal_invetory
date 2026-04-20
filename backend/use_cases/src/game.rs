@@ -22,6 +22,20 @@ pub struct UpdateGameInput {
     pub manual_notes: Option<String>,
 }
 
+impl Clone for UpdateGameInput {
+    fn clone(&self) -> Self {
+        Self {
+            title: self.title.clone(),
+            notes: self.notes.clone(),
+            platform: self.platform.clone(),
+            store: self.store.clone(),
+            developer: self.developer.clone(),
+            publisher: self.publisher.clone(),
+            manual_notes: self.manual_notes.clone(),
+        }
+    }
+}
+
 pub fn validate_new_game(
     input: &NewGameInput,
 ) -> Result<(NewResource, NewGameMeta), ValidationError> {

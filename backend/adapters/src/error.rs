@@ -25,6 +25,13 @@ impl ApiError {
         }
     }
 
+    pub fn bad_request(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            message: message.into(),
+        }
+    }
+
     pub fn service_unavailable(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::SERVICE_UNAVAILABLE,

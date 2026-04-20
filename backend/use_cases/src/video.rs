@@ -20,6 +20,19 @@ pub struct UpdateVideoInput {
     pub file_size_bytes: Option<u64>,
 }
 
+impl Clone for UpdateVideoInput {
+    fn clone(&self) -> Self {
+        Self {
+            title: self.title.clone(),
+            notes: self.notes.clone(),
+            duration_secs: self.duration_secs,
+            file_format: self.file_format.clone(),
+            resolution: self.resolution.clone(),
+            file_size_bytes: self.file_size_bytes,
+        }
+    }
+}
+
 pub fn validate_new_video(
     input: &NewVideoInput,
 ) -> Result<(NewResource, NewVideoMeta), ValidationError> {

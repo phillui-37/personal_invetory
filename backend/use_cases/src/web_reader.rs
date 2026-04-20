@@ -23,6 +23,20 @@ pub struct UpdateWebReaderInput {
     pub progress_css_selector: Option<String>,
 }
 
+impl Clone for UpdateWebReaderInput {
+    fn clone(&self) -> Self {
+        Self {
+            title: self.title.clone(),
+            notes: self.notes.clone(),
+            url: self.url.clone(),
+            site_name: self.site_name.clone(),
+            last_checked_chapter: self.last_checked_chapter.clone(),
+            check_interval_secs: self.check_interval_secs,
+            progress_css_selector: self.progress_css_selector.clone(),
+        }
+    }
+}
+
 pub fn validate_new_web_reader(
     input: &NewWebReaderInput,
 ) -> Result<(NewResource, NewWebReaderMeta), ValidationError> {

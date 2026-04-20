@@ -22,6 +22,20 @@ pub struct UpdateEbookInput {
     pub file_format: Option<String>,
 }
 
+impl Clone for UpdateEbookInput {
+    fn clone(&self) -> Self {
+        Self {
+            title: self.title.clone(),
+            notes: self.notes.clone(),
+            author: self.author.clone(),
+            isbn: self.isbn.clone(),
+            publisher: self.publisher.clone(),
+            language: self.language.clone(),
+            file_format: self.file_format.clone(),
+        }
+    }
+}
+
 pub fn validate_new_ebook(
     input: &NewEbookInput,
 ) -> Result<(NewResource, NewEbookMeta), ValidationError> {

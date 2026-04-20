@@ -2526,3 +2526,215 @@ async fn handler_list_videos_supports_tag_filter_and_ignores_empty_tag() {
 async fn handler_list_games_supports_tag_filter_and_ignores_empty_tag() {
     assert_list_tag_filter_and_empty_ignore("games", ResourceType::Game).await;
 }
+
+// ── Batch-update handler tests (P7-J) ─────────────────────────────────────
+
+// Resource repo that returns success on update (needed for batch-update tests).
+struct FakeUpdatableResourceRepo {
+    resources: std::sync::Mutex<Vec<Resource>>,
+}
+
+impl FakeUpdatableResourceRepo {
+    fn with_resources(resources: Vec<Resource>) -> Arc<Self> {
+        Arc::new(Self { resources: std::sync::Mutex::new(resources) })
+    }
+}
+
+#[async_trait]
+impl ResourceRepository for FakeUpdatableResourceRepo {
+    async fn list(&self) -> Result<Vec<Resource>, DomainError> {
+        Ok(self.resources.lock().unwrap().clone())
+    }
+    async fn search(&self, _query: &str) -> Result<Vec<Resource>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_by_id(&self, id: Uuid) -> Result<Resource, DomainError> {
+        self.resources
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|r| r.id == id)
+            .cloned()
+            .ok_or_else(|| DomainError::NotFound(format!("resource {id} not found")))
+    }
+    async fn create(&self, input: domain::NewResource) -> Result<Resource, DomainError> {
+        let now = Utc::now();
+        Ok(Resource {
+            id: Uuid::new_v4(),
+            title: input.title,
+            notes: input.notes,
+            resource_type: input.resource_type,
+            created_at: now,
+            updated_at: now,
+        })
+    }
+    async fn update(&self, id: Uuid, input: domain::UpdateResource) -> Result<Resource, DomainError> {
+        let mut resources = self.resources.lock().unwrap();
+        let resource = resources
+            .iter_mut()
+            .find(|r| r.id == id)
+            .ok_or_else(|| DomainError::NotFound(format!("resource {id} not found")))?;
+        if let Some(title) = input.title {
+            resource.title = title;
+        }
+        Ok(resource.clone())
+    }
+    async fn delete(&self, _id: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+fn make_ebook_resource(id: Uuid) -> Resource {
+    let now = Utc::now();
+    Resource {
+        id,
+        title: "Test Ebook".to_string(),
+        notes: None,
+        resource_type: domain::ResourceType::Ebook,
+        created_at: now,
+        updated_at: now,
+    }
+}
+
+struct FakeMultiIdEbookMetaRepo {
+    ids: Vec<Uuid>,
+}
+
+impl FakeMultiIdEbookMetaRepo {
+    fn new(ids: Vec<Uuid>) -> Self {
+        Self { ids }
+    }
+}
+
+#[async_trait]
+impl EbookMetaRepository for FakeMultiIdEbookMetaRepo {
+    async fn get(&self, resource_id: Uuid) -> Result<EbookMeta, DomainError> {
+        if self.ids.contains(&resource_id) {
+            Ok(EbookMeta {
+                resource_id,
+                author: None,
+                isbn: None,
+                publisher: None,
+                language: None,
+                file_format: None,
+            })
+        } else {
+            Err(DomainError::NotFound(format!("ebook meta for {resource_id} not found")))
+        }
+    }
+    async fn upsert(&self, resource_id: Uuid, input: NewEbookMeta) -> Result<EbookMeta, DomainError> {
+        Ok(EbookMeta {
+            resource_id,
+            author: input.author,
+            isbn: input.isbn,
+            publisher: input.publisher,
+            language: input.language,
+            file_format: input.file_format,
+        })
+    }
+}
+
+fn app_for_batch_update_ebooks(ids: &[Uuid]) -> axum::Router {
+    let resources: Vec<Resource> = ids.iter().map(|&id| make_ebook_resource(id)).collect();
+    let resource_repo: Arc<dyn ResourceRepository> =
+        FakeUpdatableResourceRepo::with_resources(resources);
+    // Use an ebook meta repo that seeds all IDs via upsert (returns Ok for any ID)
+    let ebook_meta = Arc::new(FakeMultiIdEbookMetaRepo::new(ids.to_vec()));
+    let location_repo = Arc::new(FakeHandlerLocationRepo);
+    let ebook_service = Arc::new(EbookService::new(
+        resource_repo.clone(),
+        ebook_meta,
+        location_repo.clone(),
+    ));
+    let web_reader_service = Arc::new(WebReaderService::new(
+        resource_repo.clone(),
+        FakeHandlerWebReaderMetaRepo::empty(),
+        location_repo.clone(),
+    ));
+    let image_service = Arc::new(ImageService::new(
+        resource_repo.clone(),
+        FakeHandlerImageMetaRepo::empty(),
+        location_repo.clone(),
+    ));
+    let video_service = Arc::new(VideoService::new(
+        resource_repo.clone(),
+        FakeHandlerVideoMetaRepo::empty(),
+        location_repo.clone(),
+    ));
+    let game_service = Arc::new(GameService::new(
+        resource_repo,
+        FakeHandlerGameMetaRepo::empty(),
+        location_repo,
+    ));
+    let state = AppState::new(
+        ebook_service,
+        web_reader_service,
+        image_service,
+        video_service,
+        game_service,
+        "secret-key".to_string(),
+    );
+    build_router(Arc::new(state))
+}
+
+#[tokio::test]
+async fn handler_batch_update_ebooks_returns_updated_count() {
+    let id1 = Uuid::new_v4();
+    let id2 = Uuid::new_v4();
+    let app = app_for_batch_update_ebooks(&[id1, id2]);
+
+    let body = json!({
+        "ids": [id1.to_string(), id2.to_string()],
+        "fields": { "author": "Batch Author" }
+    });
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PATCH")
+                .uri("/api/v1/inventory/ebooks/batch-update")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::from(serde_json::to_string(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["updated"], 2);
+    assert_eq!(json["failed"].as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn handler_batch_update_ebooks_reports_invalid_uuid_in_failed() {
+    let id1 = Uuid::new_v4();
+    let app = app_for_batch_update_ebooks(&[id1]);
+
+    let body = json!({
+        "ids": [id1.to_string(), "not-a-uuid"],
+        "fields": { "author": "Batch Author" }
+    });
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PATCH")
+                .uri("/api/v1/inventory/ebooks/batch-update")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::from(serde_json::to_string(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["updated"], 1);
+    assert_eq!(json["failed"].as_array().unwrap().len(), 1);
+    assert_eq!(json["failed"][0]["id"], "not-a-uuid");
+}

@@ -20,6 +20,19 @@ pub struct UpdateImageInput {
     pub file_size_bytes: Option<u64>,
 }
 
+impl Clone for UpdateImageInput {
+    fn clone(&self) -> Self {
+        Self {
+            title: self.title.clone(),
+            notes: self.notes.clone(),
+            width: self.width,
+            height: self.height,
+            file_format: self.file_format.clone(),
+            file_size_bytes: self.file_size_bytes,
+        }
+    }
+}
+
 pub fn validate_new_image(
     input: &NewImageInput,
 ) -> Result<(NewResource, NewImageMeta), ValidationError> {

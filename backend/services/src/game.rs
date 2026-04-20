@@ -129,6 +129,22 @@ impl GameService {
         self.resource_repo.delete(resource_id).await
     }
 
+    pub async fn batch_update_games(
+        &self,
+        ids: Vec<Uuid>,
+        input: UpdateGameInput,
+    ) -> (usize, Vec<(Uuid, String)>) {
+        let mut updated = 0usize;
+        let mut failed = Vec::new();
+        for id in ids {
+            match self.update_game(id, input.clone()).await {
+                Ok(_) => updated += 1,
+                Err(e) => failed.push((id, format!("{e:?}"))),
+            }
+        }
+        (updated, failed)
+    }
+
     pub async fn add_game_location(
         &self,
         resource_id: Uuid,

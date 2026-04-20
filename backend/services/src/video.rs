@@ -129,6 +129,22 @@ impl VideoService {
         self.resource_repo.delete(resource_id).await
     }
 
+    pub async fn batch_update_videos(
+        &self,
+        ids: Vec<Uuid>,
+        input: UpdateVideoInput,
+    ) -> (usize, Vec<(Uuid, String)>) {
+        let mut updated = 0usize;
+        let mut failed = Vec::new();
+        for id in ids {
+            match self.update_video(id, input.clone()).await {
+                Ok(_) => updated += 1,
+                Err(e) => failed.push((id, format!("{e:?}"))),
+            }
+        }
+        (updated, failed)
+    }
+
     pub async fn add_video_location(
         &self,
         resource_id: Uuid,

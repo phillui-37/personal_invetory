@@ -2,13 +2,17 @@ use std::sync::Arc;
 
 use axum::{
     middleware::from_fn_with_state,
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
     Router,
 };
 
 use crate::{
     auth_middleware,
     batch_import::batch_import_ebooks,
+    batch_update::{
+        batch_update_ebooks, batch_update_games, batch_update_images, batch_update_videos,
+        batch_update_web_readers,
+    },
     chapter_check::{list_chapter_checks, trigger_chapter_check},
     dedup_handler::{dismiss_warning, list_pending_warnings, merge_resources, scan_duplicates},
     device_handler::{current_device, delink_device, list_devices, register_device},
@@ -217,6 +221,27 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/api/v1/inventory/games/:id/progress",
             get(get_game_progress).patch(patch_game_progress),
+        )
+        // Batch update
+        .route(
+            "/api/v1/inventory/ebooks/batch-update",
+            patch(batch_update_ebooks),
+        )
+        .route(
+            "/api/v1/inventory/images/batch-update",
+            patch(batch_update_images),
+        )
+        .route(
+            "/api/v1/inventory/videos/batch-update",
+            patch(batch_update_videos),
+        )
+        .route(
+            "/api/v1/inventory/games/batch-update",
+            patch(batch_update_games),
+        )
+        .route(
+            "/api/v1/inventory/web-readers/batch-update",
+            patch(batch_update_web_readers),
         )
         // Tags
         .route("/api/v1/tags", get(list_tags).post(create_tag))

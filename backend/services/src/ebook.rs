@@ -128,6 +128,22 @@ impl EbookService {
         self.resource_repo.delete(resource_id).await
     }
 
+    pub async fn batch_update_ebooks(
+        &self,
+        ids: Vec<Uuid>,
+        input: UpdateEbookInput,
+    ) -> (usize, Vec<(Uuid, String)>) {
+        let mut updated = 0usize;
+        let mut failed = Vec::new();
+        for id in ids {
+            match self.update_ebook(id, input.clone()).await {
+                Ok(_) => updated += 1,
+                Err(e) => failed.push((id, format!("{e:?}"))),
+            }
+        }
+        (updated, failed)
+    }
+
     pub async fn add_ebook_location(
         &self,
         resource_id: Uuid,
