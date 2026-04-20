@@ -6,6 +6,7 @@ import 'package:personal_inventory_frontend/blocs/ebook/ebook_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/game/game_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/image/image_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/progress/progress_bloc.dart';
+import 'package:personal_inventory_frontend/blocs/search_filter/search_filter_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/tag/tag_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/video/video_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/web_reader/web_reader_bloc.dart';
@@ -38,6 +39,7 @@ void main() {
           BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),
           BlocProvider(
               create: (_) => BatchBloc(FakeBatchOperationRepository())),
+          BlocProvider(create: (_) => SearchFilterBloc()),
         ],
         child: const MaterialApp(
           home: ResourceListScreen(),
@@ -65,6 +67,7 @@ void main() {
           BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),
           BlocProvider(
               create: (_) => BatchBloc(FakeBatchOperationRepository())),
+          BlocProvider(create: (_) => SearchFilterBloc()),
         ],
         child: const MaterialApp(
           home: ResourceListScreen(),
@@ -107,6 +110,7 @@ void main() {
           BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),
           BlocProvider(
               create: (_) => BatchBloc(FakeBatchOperationRepository())),
+          BlocProvider(create: (_) => SearchFilterBloc()),
         ],
         child: const MaterialApp(
           home: ResourceListScreen(),

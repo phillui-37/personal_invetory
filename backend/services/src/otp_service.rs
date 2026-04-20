@@ -17,12 +17,6 @@ impl OtpInteractionService {
         }
     }
 
-    pub async fn request_otp(&self, platform: &str) {
-        let (tx, _rx) = oneshot::channel();
-        let mut pending = self.pending.lock().await;
-        pending.insert(platform.to_string(), tx);
-    }
-
     pub async fn is_pending(&self, platform: &str) -> bool {
         self.pending.lock().await.contains_key(platform)
     }
@@ -36,10 +30,15 @@ impl OtpInteractionService {
         let tx = pending.remove(platform).ok_or_else(|| {
             DomainError::ValidationError(format!("No OTP pending for {platform}"))
         })?;
-        let _ = tx.send(code.to_string());
+        tx.send(code.to_string()).map_err(|_| {
+            DomainError::InternalError("OTP receiver dropped".to_string())
+        })?;
         Ok(code.to_string())
     }
 
+    /// Installs a live channel and blocks until OTP is submitted or timeout.
+    /// The caller (sync connector) calls this when it detects OTP is needed;
+    /// the HTTP endpoint calls `submit_otp` to deliver the code.
     pub async fn wait_for_otp(&self, platform: &str) -> Result<String, DomainError> {
         let rx = {
             let mut pending = self.pending.lock().await;
@@ -72,18 +71,29 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn request_otp_sets_pending_state() {
-        let svc = OtpInteractionService::new(300);
-        svc.request_otp("kindle").await;
+    async fn wait_for_otp_sets_pending_state() {
+        let svc = OtpInteractionService::new(5);
+        let svc_clone = svc.clone();
+        let handle = tokio::spawn(async move {
+            svc_clone.wait_for_otp("kindle").await
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         assert!(svc.is_pending("kindle").await);
+        svc.submit_otp("kindle", "123456").await.unwrap();
+        handle.await.unwrap().unwrap();
     }
 
     #[tokio::test]
     async fn submit_otp_resolves_pending() {
-        let svc = OtpInteractionService::new(300);
-        svc.request_otp("kindle").await;
+        let svc = OtpInteractionService::new(5);
+        let svc_clone = svc.clone();
+        let handle = tokio::spawn(async move {
+            svc_clone.wait_for_otp("kindle").await
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         let code = svc.submit_otp("kindle", "123456").await.unwrap();
         assert_eq!(code, "123456");
+        handle.await.unwrap().unwrap();
         assert!(!svc.is_pending("kindle").await);
     }
 
@@ -96,9 +106,7 @@ mod tests {
 
     #[tokio::test]
     async fn wait_for_otp_receives_submitted_code() {
-        let svc = OtpInteractionService::new(300);
-        svc.request_otp("kindle").await;
-
+        let svc = OtpInteractionService::new(5);
         let svc_clone = svc.clone();
         let handle = tokio::spawn(async move {
             svc_clone.wait_for_otp("kindle").await
@@ -109,5 +117,13 @@ mod tests {
 
         let result = handle.await.unwrap();
         assert_eq!(result.unwrap(), "654321");
+    }
+
+    #[tokio::test]
+    async fn wait_for_otp_times_out() {
+        let svc = OtpInteractionService::new(1);
+        let result = svc.wait_for_otp("kindle").await;
+        assert!(result.is_err());
+        assert!(!svc.is_pending("kindle").await);
     }
 }

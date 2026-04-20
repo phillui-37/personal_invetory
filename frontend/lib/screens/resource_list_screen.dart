@@ -27,14 +27,29 @@ class ResourceListScreen extends StatefulWidget {
 }
 
 class _ResourceListScreenState extends State<ResourceListScreen> {
+  void _loadAllResources(BuildContext context) {
+    final f = context.read<SearchFilterBloc>().state;
+    context.read<EbookBloc>().add(LoadEbooks(
+      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
+    ));
+    context.read<WebReaderBloc>().add(LoadWebReaders(
+      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
+    ));
+    context.read<ImageBloc>().add(LoadImages(
+      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
+    ));
+    context.read<VideoBloc>().add(LoadVideos(
+      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
+    ));
+    context.read<GameBloc>().add(LoadGames(
+      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
+    ));
+  }
+
   @override
   void initState() {
     super.initState();
-    context.read<EbookBloc>().add(const LoadEbooks());
-    context.read<WebReaderBloc>().add(const LoadWebReaders());
-    context.read<ImageBloc>().add(const LoadImages());
-    context.read<VideoBloc>().add(const LoadVideos());
-    context.read<GameBloc>().add(const LoadGames());
+    _loadAllResources(context);
     context.read<TagBloc>().add(const LoadTags());
   }
 
@@ -84,7 +99,11 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             ],
           ),
         ),
-        body: Column(
+        body: BlocListener<SearchFilterBloc, SearchFilterState>(
+          listener: (context, state) {
+            _loadAllResources(context);
+          },
+          child: Column(
           children: [
             BlocBuilder<TagBloc, TagState>(
               builder: (context, tagState) {
@@ -113,9 +132,9 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               failure: (state) => state is EbookError ? state.failure : null,
               resources: (state) =>
                   state is EbookListLoaded ? state.ebooks : const <Resource>[],
-              onRetry: () => context.read<EbookBloc>().add(const LoadEbooks()),
+              onRetry: () => _loadAllResources(context),
               onRefresh: () async {
-                context.read<EbookBloc>().add(const LoadEbooks());
+                _loadAllResources(context);
               },
               onTap: (resource) async {
                 await Navigator.of(context).push(
@@ -129,7 +148,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 if (!context.mounted) {
                   return;
                 }
-                context.read<EbookBloc>().add(const LoadEbooks());
+                _loadAllResources(context);
               },
             ),
             _ResourceTab<WebReaderBloc, WebReaderState>(
@@ -139,10 +158,9 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               resources: (state) => state is WebReaderListLoaded
                   ? state.webReaders
                   : const <Resource>[],
-              onRetry: () =>
-                  context.read<WebReaderBloc>().add(const LoadWebReaders()),
+              onRetry: () => _loadAllResources(context),
               onRefresh: () async {
-                context.read<WebReaderBloc>().add(const LoadWebReaders());
+                _loadAllResources(context);
               },
               onTap: (resource) async {
                 await Navigator.of(context).push(
@@ -156,7 +174,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 if (!context.mounted) {
                   return;
                 }
-                context.read<WebReaderBloc>().add(const LoadWebReaders());
+                _loadAllResources(context);
               },
             ),
             _ResourceTab<ImageBloc, ImageState>(
@@ -165,9 +183,9 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               failure: (state) => state is ImageError ? state.failure : null,
               resources: (state) =>
                   state is ImageListLoaded ? state.images : const <Resource>[],
-              onRetry: () => context.read<ImageBloc>().add(const LoadImages()),
+              onRetry: () => _loadAllResources(context),
               onRefresh: () async {
-                context.read<ImageBloc>().add(const LoadImages());
+                _loadAllResources(context);
               },
               onTap: (resource) async {
                 await Navigator.of(context).push(
@@ -181,7 +199,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 if (!context.mounted) {
                   return;
                 }
-                context.read<ImageBloc>().add(const LoadImages());
+                _loadAllResources(context);
               },
             ),
             _ResourceTab<VideoBloc, VideoState>(
@@ -190,9 +208,9 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               failure: (state) => state is VideoError ? state.failure : null,
               resources: (state) =>
                   state is VideoListLoaded ? state.videos : const <Resource>[],
-              onRetry: () => context.read<VideoBloc>().add(const LoadVideos()),
+              onRetry: () => _loadAllResources(context),
               onRefresh: () async {
-                context.read<VideoBloc>().add(const LoadVideos());
+                _loadAllResources(context);
               },
               onTap: (resource) async {
                 await Navigator.of(context).push(
@@ -206,7 +224,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 if (!context.mounted) {
                   return;
                 }
-                context.read<VideoBloc>().add(const LoadVideos());
+                _loadAllResources(context);
               },
             ),
             _ResourceTab<GameBloc, GameState>(
@@ -215,9 +233,9 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               failure: (state) => state is GameError ? state.failure : null,
               resources: (state) =>
                   state is GameListLoaded ? state.games : const <Resource>[],
-              onRetry: () => context.read<GameBloc>().add(const LoadGames()),
+              onRetry: () => _loadAllResources(context),
               onRefresh: () async {
-                context.read<GameBloc>().add(const LoadGames());
+                _loadAllResources(context);
               },
               onTap: (resource) async {
                 await Navigator.of(context).push(
@@ -231,13 +249,14 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 if (!context.mounted) {
                   return;
                 }
-                context.read<GameBloc>().add(const LoadGames());
+                _loadAllResources(context);
               },
             ),
                 ],
               ),
             ),
           ],
+        ),
         ),
         floatingActionButton: FloatingActionButton(
           key: const Key('add-resource-fab'),
@@ -250,11 +269,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             if (!context.mounted) {
               return;
             }
-            context.read<EbookBloc>().add(const LoadEbooks());
-            context.read<WebReaderBloc>().add(const LoadWebReaders());
-            context.read<ImageBloc>().add(const LoadImages());
-            context.read<VideoBloc>().add(const LoadVideos());
-            context.read<GameBloc>().add(const LoadGames());
+            _loadAllResources(context);
           },
           child: const Icon(Icons.add),
         ),
