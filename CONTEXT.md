@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-21 (Phase 9 Task P9-A7 complete — OTP interaction service implemented)
+2026-04-21 (Phase 9 Task P9-A8 complete — Kindle real integration)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
@@ -816,7 +816,9 @@ Deferred pending clarification on:
 
 ### Backend (P9-A Track)
 - **P9-A3: ChromiumSession**: Real `BrowserPage` implementation using `chromiumoxide` for JavaScript-rendered pages. Supports all 9 `BrowserPage` methods (navigate, wait_for_selector, extract_text/html, click, fill, cookies). Feature-gated behind `real-plugins`. `ChromiumConfig` with headless mode and path override.
-- **Tests**: 2 new config tests + 80 existing tests passing.
+- **P9-A7: OTP Interaction Service**: Added `OtpInteractionService` trait with `NoopOtpService` (default) and `TwoFactorAuthService` (real). Supports TOTP generation via `totp-rs` for Google Authenticator compatibility. Feature-gated behind `real-plugins`. 1 test for TOTP generation with known secret.
+- **P9-A8: Kindle Real Integration**: Added real CSS selectors (`KINDLE_EMAIL_SELECTOR`, `KINDLE_PASSWORD_SELECTOR`, `KINDLE_SUBMIT_SELECTOR`, `KINDLE_OTP_SELECTOR`), `KindleCredentials` struct with marketplace defaulting to "jp", and updated `ensure_authenticated` to use constants. 3 new tests for selector validation, credentials parsing, and JP URL verification.
+- **Tests**: 11 Kindle tests passing (8 existing + 3 new) + 80 other tests passing.
 
 ### Backend (P9-B Track)
 - **P9-B1: Sort/Facet Query Params**: All 5 list endpoints (`/api/v1/inventory/{ebooks,games,images,videos,web-readers}/list`) now support `sort_by`, `sort_order`, `with_facets` query parameters. Extended `ListQuery` struct in `tag_filter.rs`. Added `resolve_sort_params` helper function. Returns JSON envelope with `items` and optional `facets.formats` when `with_facets=true`. Otherwise returns direct resource array. Default sort: `date_added desc`. Supports `title` and `date_added` fields with `asc`/`desc` orders.

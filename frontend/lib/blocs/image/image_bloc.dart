@@ -15,7 +15,20 @@ sealed class ImageEvent extends Equatable {
 }
 
 final class LoadImages extends ImageEvent {
-  const LoadImages();
+  const LoadImages({
+    this.tags = const [],
+    this.sortBy,
+    this.sortOrder,
+    this.filterLogic,
+  });
+
+  final List<String> tags;
+  final String? sortBy;
+  final String? sortOrder;
+  final String? filterLogic;
+
+  @override
+  List<Object?> get props => [tags, sortBy, sortOrder, filterLogic];
 }
 
 final class SearchImages extends ImageEvent {

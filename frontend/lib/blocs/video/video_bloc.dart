@@ -15,7 +15,20 @@ sealed class VideoEvent extends Equatable {
 }
 
 final class LoadVideos extends VideoEvent {
-  const LoadVideos();
+  const LoadVideos({
+    this.tags = const [],
+    this.sortBy,
+    this.sortOrder,
+    this.filterLogic,
+  });
+
+  final List<String> tags;
+  final String? sortBy;
+  final String? sortOrder;
+  final String? filterLogic;
+
+  @override
+  List<Object?> get props => [tags, sortBy, sortOrder, filterLogic];
 }
 
 final class SearchVideos extends VideoEvent {

@@ -8,6 +8,7 @@ import 'blocs/ebook/ebook_bloc.dart';
 import 'blocs/game/game_bloc.dart';
 import 'blocs/image/image_bloc.dart';
 import 'blocs/progress/progress_bloc.dart';
+import 'blocs/search_filter/search_filter_bloc.dart';
 import 'blocs/sync/sync_bloc.dart';
 import 'blocs/tag/tag_bloc.dart';
 import 'blocs/vault/vault_bloc.dart';
@@ -64,6 +65,7 @@ class PersonalInventoryApp extends StatelessWidget {
         BlocProvider<ProgressBloc>(
             create: (_) => ProgressBloc(progressRepository)),
         BlocProvider<TagBloc>(create: (_) => TagBloc(tagRepository)),
+        BlocProvider<SearchFilterBloc>(create: (_) => SearchFilterBloc()),
         BlocProvider<VaultBloc>(create: (_) => VaultBloc(vaultRepository)),
         BlocProvider<DedupBloc>(create: (_) => DedupBloc(dedupRepository)),
         BlocProvider<SyncBloc>(create: (_) => SyncBloc(syncRepository)),

@@ -15,7 +15,20 @@ sealed class EbookEvent extends Equatable {
 }
 
 final class LoadEbooks extends EbookEvent {
-  const LoadEbooks();
+  const LoadEbooks({
+    this.tags = const [],
+    this.sortBy,
+    this.sortOrder,
+    this.filterLogic,
+  });
+
+  final List<String> tags;
+  final String? sortBy;
+  final String? sortOrder;
+  final String? filterLogic;
+
+  @override
+  List<Object?> get props => [tags, sortBy, sortOrder, filterLogic];
 }
 
 final class SearchEbooks extends EbookEvent {
