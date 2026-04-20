@@ -824,3 +824,8 @@ Deferred pending clarification on:
 - **P9-B1: Sort/Facet Query Params**: All 5 list endpoints (`/api/v1/inventory/{ebooks,games,images,videos,web-readers}/list`) now support `sort_by`, `sort_order`, `with_facets` query parameters. Extended `ListQuery` struct in `tag_filter.rs`. Added `resolve_sort_params` helper function. Returns JSON envelope with `items` and optional `facets.formats` when `with_facets=true`. Otherwise returns direct resource array. Default sort: `date_added desc`. Supports `title` and `date_added` fields with `asc`/`desc` orders.
 - **Tests**: 4 new tests (query parsing, defaults, sort resolution) + all 21 existing adapter tests passing.
 
+### Frontend (P9-B Track)
+- **P9-B2: SearchFilterBloc + SearchFilterBar Widget**: Created `SearchFilterBloc` for managing filter state (selectedTags, sortBy, sortOrder, filterLogic) and `SearchFilterBar` widget with multi-tag selection, sort controls, and logic dropdown.
+- **P9-B3: Wire SearchFilterBar into ResourceListScreen**: Added SearchFilterBloc to MultiBlocProvider, replaced `_TagFilterBar` with `SearchFilterBar`, extended Load events in all 5 resource BLoCs with filter/sort params (tags, sortBy, sortOrder, filterLogic). All 354 tests passing.
+- **Tests**: All 354 tests passing.
+
