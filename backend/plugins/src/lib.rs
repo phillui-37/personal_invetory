@@ -1,6 +1,7 @@
 pub mod browser_session;
 pub mod ecosystem;
 pub mod har_parser;
+pub mod http_client;
 pub mod mobi;
 
 use std::collections::HashMap;
