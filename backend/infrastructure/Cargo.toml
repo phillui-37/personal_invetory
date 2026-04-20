@@ -5,6 +5,7 @@ edition = "2021"
 
 [features]
 firebase = ["dep:reqwest", "dep:jsonwebtoken", "dep:serde_json", "dep:thiserror"]
+postgres = ["dep:sqlx"]
 
 [dependencies]
 async-trait = "0.1"
@@ -21,6 +22,8 @@ thiserror = { version = "1", optional = true }
 aes-gcm = "0.10"
 argon2 = "0.5"
 rand = "0.8"
+sqlx = { version = "0.8", optional = true, features = ["postgres", "runtime-tokio-rustls", "macros", "chrono", "uuid"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 [dev-dependencies]
 futures = "0.3"

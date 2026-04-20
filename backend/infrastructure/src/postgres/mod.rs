@@ -1,6 +1,17 @@
 pub mod chapter_check;
+pub mod dedup;
+pub mod device;
 pub mod ebook_meta;
+pub mod game_meta;
+pub mod image_meta;
 pub mod location;
+pub mod migrations;
 pub mod notification;
+pub mod pool;
+pub mod progress;
 pub mod resource;
+pub mod sync_job;
+pub mod tag;
+pub mod vault;
+pub mod video_meta;
 pub mod web_reader_meta;

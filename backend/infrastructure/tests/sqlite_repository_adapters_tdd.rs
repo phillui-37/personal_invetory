@@ -1136,3 +1136,12 @@ fn sqlite_resource_tag_repository_attach_detach_and_filter() {
         assert!(with_tag_a_after.contains(&r2_id));
     });
 }
+
+// P7-A compile test: verify the postgres module tree (pool, migrations) is accessible
+#[test]
+fn pg_module_tree_compiles() {
+    // Assign function pointers to verify the modules compile and are reachable
+    let _pool_fn = infrastructure::postgres::pool::open_pg_pool;
+    let _mig_fn = infrastructure::postgres::migrations::run_migrations;
+    let _ = (_pool_fn, _mig_fn);
+}
