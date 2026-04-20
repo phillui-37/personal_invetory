@@ -186,7 +186,12 @@ final class _FakeWebReaderRepository implements WebReaderRepository {
   }
 
   @override
-  Future<Result<List<Resource>, AppFailure>> listWebReaders() {
+  Future<Result<List<Resource>, AppFailure>> listWebReaders({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  }) {
     return _onListWebReaders?.call() ??
         Future.value(const Failure(ServerFailure(500)));
   }

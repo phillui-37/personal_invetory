@@ -164,7 +164,12 @@ final class _FakeEbookRepository implements EbookRepository {
   }
 
   @override
-  Future<Result<List<Resource>, AppFailure>> listEbooks() {
+  Future<Result<List<Resource>, AppFailure>> listEbooks({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  }) {
     return _onListEbooks?.call() ??
         Future.value(const Failure(ServerFailure(500)));
   }

@@ -224,7 +224,12 @@ final class WebReaderBloc extends Bloc<WebReaderEvent, WebReaderState> {
     Emitter<WebReaderState> emit,
   ) async {
     emit(const WebReaderLoading());
-    final result = await _repository.listWebReaders();
+    final result = await _repository.listWebReaders(
+      tags: event.tags,
+      sortBy: event.sortBy,
+      sortOrder: event.sortOrder,
+      filterLogic: event.filterLogic,
+    );
     result.when(
       success: (webReaders) => emit(WebReaderListLoaded(webReaders)),
       failure: (failure) => emit(WebReaderError(failure)),

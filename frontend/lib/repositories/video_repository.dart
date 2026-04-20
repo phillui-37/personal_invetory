@@ -4,7 +4,12 @@ import '../models/resources.dart';
 import '../models/result.dart';
 
 abstract interface class VideoRepository {
-  Future<Result<List<Resource>, AppFailure>> listVideos();
+  Future<Result<List<Resource>, AppFailure>> listVideos({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  });
 
   Future<Result<List<Resource>, AppFailure>> searchVideos(String query);
 

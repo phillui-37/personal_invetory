@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-21 (Phase 9 Task P9-A8 complete — Kindle real integration)
+2026-04-21 (Phase 9 Task P9-A9 complete — OTP endpoint + vault wiring)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
@@ -829,3 +829,31 @@ Deferred pending clarification on:
 - **P9-B3: Wire SearchFilterBar into ResourceListScreen**: Added SearchFilterBloc to MultiBlocProvider, replaced `_TagFilterBar` with `SearchFilterBar`, extended Load events in all 5 resource BLoCs with filter/sort params (tags, sortBy, sortOrder, filterLogic). All 354 tests passing.
 - **Tests**: All 354 tests passing.
 
+
+
+## Phase 9 — Real API + Search Infrastructure
+
+### Task P9-A9: OTP Endpoint + Vault Wiring (✅ Complete)
+- **Implementation Date**: 2026-04-21
+- **Commit**: 115fee3
+- **Status**: All tests passing (29 adapter + 46 handler + 33 app tests)
+
+### Backend Changes
+- **Endpoint**: `POST /api/v1/sync/otp` — submit OTP code during browser-based sync
+- **Request/Response**: `OtpSubmitRequest` (platform + code) → `OtpSubmitResponse` (accepted)
+- **Service Wiring**: `OtpInteractionService` added to `AppState` with builder pattern
+- **Configuration**: `otp_timeout_secs` field added (env: `OTP_TIMEOUT_SECS`, default: 300s)
+- **Tests**: 2 new unit tests for request/response serialization
+
+### Files Modified
+1. `backend/adapters/src/sync_handler.rs` — OTP structs + handler + tests
+2. `backend/adapters/src/routes.rs` — route registration + import
+3. `backend/adapters/src/state.rs` — AppState field + builder + for_tests
+4. `backend/app/src/config.rs` — otp_timeout_secs field + parsing + tests  
+5. `backend/app/src/runtime.rs` — service wiring + import + test config
+
+### Design Notes
+- OTP service maintains platform-keyed pending request map with oneshot channels
+- Endpoint requires both platform and code in request body (not URL path)
+- Enables context-aware OTP submission during browser-based ecosystem syncs
+- Integrates with existing vault/sync infrastructure for secure credential handling

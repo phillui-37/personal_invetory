@@ -172,7 +172,12 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
 
   Future<void> _onLoadGames(LoadGames event, Emitter<GameState> emit) async {
     emit(const GameLoading());
-    final result = await _repository.listGames();
+    final result = await _repository.listGames(
+      tags: event.tags,
+      sortBy: event.sortBy,
+      sortOrder: event.sortOrder,
+      filterLogic: event.filterLogic,
+    );
     result.when(
       success: (games) => emit(GameListLoaded(games)),
       failure: (failure) => emit(GameError(failure)),

@@ -162,7 +162,12 @@ final class _FakeGameRepository implements GameRepository {
   }
 
   @override
-  Future<Result<List<Resource>, AppFailure>> listGames() {
+  Future<Result<List<Resource>, AppFailure>> listGames({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  }) {
     return _onListGames?.call() ??
         Future.value(const Failure(ServerFailure(500)));
   }

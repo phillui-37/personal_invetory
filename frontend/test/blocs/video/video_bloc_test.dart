@@ -162,7 +162,12 @@ final class _FakeVideoRepository implements VideoRepository {
   }
 
   @override
-  Future<Result<List<Resource>, AppFailure>> listVideos() {
+  Future<Result<List<Resource>, AppFailure>> listVideos({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  }) {
     return _onListVideos?.call() ??
         Future.value(const Failure(ServerFailure(500)));
   }

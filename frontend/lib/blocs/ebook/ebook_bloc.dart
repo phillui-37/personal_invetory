@@ -172,7 +172,12 @@ final class EbookBloc extends Bloc<EbookEvent, EbookState> {
 
   Future<void> _onLoadEbooks(LoadEbooks event, Emitter<EbookState> emit) async {
     emit(const EbookLoading());
-    final result = await _repository.listEbooks();
+    final result = await _repository.listEbooks(
+      tags: event.tags,
+      sortBy: event.sortBy,
+      sortOrder: event.sortOrder,
+      filterLogic: event.filterLogic,
+    );
     result.when(
       success: (ebooks) => emit(EbookListLoaded(ebooks)),
       failure: (failure) => emit(EbookError(failure)),

@@ -172,7 +172,12 @@ final class ImageBloc extends Bloc<ImageEvent, ImageState> {
 
   Future<void> _onLoadImages(LoadImages event, Emitter<ImageState> emit) async {
     emit(const ImageLoading());
-    final result = await _repository.listImages();
+    final result = await _repository.listImages(
+      tags: event.tags,
+      sortBy: event.sortBy,
+      sortOrder: event.sortOrder,
+      filterLogic: event.filterLogic,
+    );
     result.when(
       success: (images) => emit(ImageListLoaded(images)),
       failure: (failure) => emit(ImageError(failure)),

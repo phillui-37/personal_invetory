@@ -4,7 +4,12 @@ import '../models/resources.dart';
 import '../models/result.dart';
 
 abstract interface class GameRepository {
-  Future<Result<List<Resource>, AppFailure>> listGames();
+  Future<Result<List<Resource>, AppFailure>> listGames({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  });
 
   Future<Result<List<Resource>, AppFailure>> searchGames(String query);
 

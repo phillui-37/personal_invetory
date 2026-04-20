@@ -162,7 +162,12 @@ final class _FakeImageRepository implements ImageRepository {
   }
 
   @override
-  Future<Result<List<Resource>, AppFailure>> listImages() {
+  Future<Result<List<Resource>, AppFailure>> listImages({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  }) {
     return _onListImages?.call() ??
         Future.value(const Failure(ServerFailure(500)));
   }

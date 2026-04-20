@@ -172,7 +172,12 @@ final class VideoBloc extends Bloc<VideoEvent, VideoState> {
 
   Future<void> _onLoadVideos(LoadVideos event, Emitter<VideoState> emit) async {
     emit(const VideoLoading());
-    final result = await _repository.listVideos();
+    final result = await _repository.listVideos(
+      tags: event.tags,
+      sortBy: event.sortBy,
+      sortOrder: event.sortOrder,
+      filterLogic: event.filterLogic,
+    );
     result.when(
       success: (videos) => emit(VideoListLoaded(videos)),
       failure: (failure) => emit(VideoError(failure)),
