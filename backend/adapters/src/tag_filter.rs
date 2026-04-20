@@ -4,7 +4,7 @@ use domain::DomainError;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::{ApiError, AppState};
+use crate::{search_options::{SortField, SortOrder}, ApiError, AppState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilterLogic {
@@ -30,6 +30,9 @@ pub struct ListQuery {
     pub tags: Vec<String>,
     pub tag: Option<String>,
     pub logic: Option<String>,
+    pub sort_by: Option<String>,
+    pub sort_order: Option<String>,
+    pub with_facets: Option<bool>,
 }
 
 pub async fn resolve_tag_filter_ids(
@@ -151,6 +154,19 @@ pub async fn resolve_list_query_filters(
     }
 }
 
+pub fn resolve_sort_params(
+    sort_by: Option<&str>,
+    sort_order: Option<&str>,
+) -> (SortField, SortOrder) {
+    let field = sort_by
+        .and_then(|s| SortField::from_str(s).ok())
+        .unwrap_or(SortField::DateAdded);
+    let order = sort_order
+        .and_then(|s| SortOrder::from_str(s).ok())
+        .unwrap_or(SortOrder::Desc);
+    (field, order)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,5 +209,37 @@ mod tests {
     fn test_filter_logic_from_str_with_whitespace() {
         let logic = FilterLogic::from_str("  and  ").unwrap();
         assert_eq!(logic, FilterLogic::And);
+    }
+
+    #[test]
+    fn list_query_parses_sort_params() {
+        let query: ListQuery = serde_urlencoded::from_str(
+            "sort_by=title&sort_order=asc&with_facets=true"
+        ).unwrap();
+        assert_eq!(query.sort_by.as_deref(), Some("title"));
+        assert_eq!(query.sort_order.as_deref(), Some("asc"));
+        assert_eq!(query.with_facets, Some(true));
+    }
+
+    #[test]
+    fn list_query_defaults_to_none() {
+        let query: ListQuery = serde_urlencoded::from_str("").unwrap();
+        assert!(query.sort_by.is_none());
+        assert!(query.sort_order.is_none());
+        assert!(query.with_facets.is_none());
+    }
+
+    #[test]
+    fn resolve_sort_params_defaults() {
+        let (field, order) = resolve_sort_params(None, None);
+        assert_eq!(field, SortField::DateAdded);
+        assert_eq!(order, SortOrder::Desc);
+    }
+
+    #[test]
+    fn resolve_sort_params_explicit() {
+        let (field, order) = resolve_sort_params(Some("title"), Some("asc"));
+        assert_eq!(field, SortField::Title);
+        assert_eq!(order, SortOrder::Asc);
     }
 }

@@ -15,7 +15,20 @@ sealed class ImageEvent extends Equatable {
 }
 
 final class LoadImages extends ImageEvent {
-  const LoadImages();
+  const LoadImages({
+    this.tags = const [],
+    this.sortBy,
+    this.sortOrder,
+    this.filterLogic,
+  });
+
+  final List<String> tags;
+  final String? sortBy;
+  final String? sortOrder;
+  final String? filterLogic;
+
+  @override
+  List<Object?> get props => [tags, sortBy, sortOrder, filterLogic];
 }
 
 final class SearchImages extends ImageEvent {
@@ -159,7 +172,12 @@ final class ImageBloc extends Bloc<ImageEvent, ImageState> {
 
   Future<void> _onLoadImages(LoadImages event, Emitter<ImageState> emit) async {
     emit(const ImageLoading());
-    final result = await _repository.listImages();
+    final result = await _repository.listImages(
+      tags: event.tags,
+      sortBy: event.sortBy,
+      sortOrder: event.sortOrder,
+      filterLogic: event.filterLogic,
+    );
     result.when(
       success: (images) => emit(ImageListLoaded(images)),
       failure: (failure) => emit(ImageError(failure)),

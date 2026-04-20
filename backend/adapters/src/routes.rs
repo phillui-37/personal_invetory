@@ -35,7 +35,7 @@ use crate::{
         get_web_reader_progress, patch_ebook_progress, patch_game_progress, patch_image_progress,
         patch_video_progress, patch_web_reader_progress,
     },
-    sync_handler::{ecosystem_status, get_sync_job, list_platform_syncs, trigger_sync},
+    sync_handler::{ecosystem_status, get_sync_job, list_platform_syncs, submit_otp, trigger_sync},
     system::{health, openapi},
     tag_handler::{attach_tag, create_tag, delete_tag, detach_tag, list_resource_tags, list_tags},
     vault_handler::{
@@ -197,6 +197,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/ecosystem/:platform/sync", post(trigger_sync))
         .route("/api/v1/ecosystem/:platform/syncs", get(list_platform_syncs))
         .route("/api/v1/ecosystem/:platform/syncs/:id", get(get_sync_job))
+        // OTP
+        .route("/api/v1/sync/otp", post(submit_otp))
         // Device management
         .route("/api/v1/devices", get(list_devices))
         .route("/api/v1/devices/current", get(current_device))

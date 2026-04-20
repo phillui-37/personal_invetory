@@ -5,7 +5,12 @@ import '../models/resources.dart';
 import '../models/result.dart';
 
 abstract interface class EbookRepository {
-  Future<Result<List<Resource>, AppFailure>> listEbooks();
+  Future<Result<List<Resource>, AppFailure>> listEbooks({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  });
 
   Future<Result<List<Resource>, AppFailure>> searchEbooks(String query);
 

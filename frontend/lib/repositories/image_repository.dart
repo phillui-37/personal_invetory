@@ -4,7 +4,12 @@ import '../models/resources.dart';
 import '../models/result.dart';
 
 abstract interface class ImageRepository {
-  Future<Result<List<Resource>, AppFailure>> listImages();
+  Future<Result<List<Resource>, AppFailure>> listImages({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  });
 
   Future<Result<List<Resource>, AppFailure>> searchImages(String query);
 

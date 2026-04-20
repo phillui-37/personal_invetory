@@ -7,7 +7,7 @@ use infrastructure::{resolve_search_strategy, AdapterFactory};
 use plugins::{PluginRegistry, PluginsConfig, PluginsToml, WebChecker, WebCheckerConfig};
 use services::{
     ChapterCheckService, DedupService, DeviceService, EbookService, GameService, ImageService,
-    ProgressService, SearchConfig, SyncService, TagService, VaultService, VideoService,
+    OtpInteractionService, ProgressService, SearchConfig, SyncService, TagService, VaultService, VideoService,
     WebReaderService,
 };
 use tokio_util::sync::CancellationToken;
@@ -91,6 +91,7 @@ pub async fn build_app_router(
         bundle.tag_repo.clone(),
         bundle.resource_tag_repo.clone(),
     ));
+    let otp_service = Arc::new(OtpInteractionService::new(config.otp_timeout_secs.unwrap_or(300)));
 
     let mut state = AppState::new(
         ebook_service,
@@ -131,6 +132,7 @@ pub async fn build_app_router(
     state = state.with_device_service(device_service);
     state = state.with_progress_service(progress_service);
     state = state.with_tag_service(tag_service);
+    state = state.with_otp_service(otp_service);
     state.plugin_registry = Arc::new(plugin_registry);
     state.openapi_json = generate_openapi_json();
     if config.scheduler_enabled {
@@ -207,6 +209,7 @@ mod tests {
             scheduler_enabled: false,
             device_id: "test-device".to_string(),
             device_name: None,
+            otp_timeout_secs: None,
         }
     }
 

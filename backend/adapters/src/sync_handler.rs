@@ -231,3 +231,57 @@ pub async fn ecosystem_status(
         platforms: platform_statuses,
     }))
 }
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct OtpSubmitRequest {
+    pub platform: String,
+    pub code: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct OtpSubmitResponse {
+    pub accepted: bool,
+}
+
+/// POST /api/v1/sync/otp — submit an OTP code during a browser-based sync.
+#[utoipa::path(
+    post,
+    path = "/api/v1/sync/otp",
+    request_body = OtpSubmitRequest,
+    responses(
+        (status = 200, description = "OTP submitted", body = OtpSubmitResponse),
+        (status = 503, description = "OTP service not configured"),
+    ),
+    tag = "ecosystem"
+)]
+pub async fn submit_otp(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<OtpSubmitRequest>,
+) -> Result<impl IntoResponse, ApiError> {
+    let otp_svc = state
+        .otp_service
+        .as_ref()
+        .ok_or_else(|| ApiError::from(domain::DomainError::InternalError("OTP service not configured".into())))?;
+    let accepted = otp_svc.submit_otp(&body.platform, &body.code).await.is_ok();
+    Ok(Json(OtpSubmitResponse { accepted }))
+}
+
+#[cfg(test)]
+mod otp_tests {
+    use super::*;
+
+    #[test]
+    fn otp_submit_request_deserializes() {
+        let json = r#"{"platform": "kindle", "code": "123456"}"#;
+        let req: OtpSubmitRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.platform, "kindle");
+        assert_eq!(req.code, "123456");
+    }
+
+    #[test]
+    fn otp_submit_response_serializes() {
+        let resp = OtpSubmitResponse { accepted: true };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("true"));
+    }
+}

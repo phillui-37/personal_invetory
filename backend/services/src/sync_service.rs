@@ -137,6 +137,71 @@ impl SyncService {
         Ok(())
     }
 
+    /// Sync Steam games from fixture data (for testing without real API).
+    /// Converts fixture games to resources using the same logic as sync_steam_games.
+    pub async fn sync_steam_fixture(&self) -> Result<SyncJob, DomainError> {
+        let games = plugins::ecosystem::steam_fixture::load_steam_fixture_default()?;
+        self.sync_steam_games(
+            games
+                .into_iter()
+                .map(|g| SteamOwnedGame {
+                    appid: g.appid,
+                    name: g.name,
+                    playtime_forever: g.playtime_forever,
+                })
+                .collect(),
+        )
+        .await
+    }
+
+    /// Sync DLSite purchases from fixture data (for testing without real API).
+    pub async fn sync_dlsite_fixture(&self) -> Result<SyncJob, DomainError> {
+        let works = plugins::ecosystem::dlsite_fixture::load_dlsite_fixture_default()?;
+        let items: Vec<DiscoveredItem> = works
+            .into_iter()
+            .map(|w| {
+                let resource_type = plugins::ecosystem::dlsite::detect_resource_type(&w.work_type);
+                let mut metadata = std::collections::HashMap::new();
+                metadata.insert("resource_type".to_string(), format!("{:?}", resource_type));
+                if let Some(maker) = w.maker_name {
+                    metadata.insert("maker".to_string(), maker);
+                }
+                DiscoveredItem {
+                    external_id: w.workno.clone(),
+                    title: w.work_name,
+                    platform: "dlsite".to_string(),
+                    metadata,
+                }
+            })
+            .collect();
+        self.sync_discovered_items("dlsite", items).await
+    }
+
+    /// Sync FANZA items from fixture data (for testing without real API).
+    pub async fn sync_fanza_fixture(&self) -> Result<SyncJob, DomainError> {
+        let items_raw = plugins::ecosystem::fanza_fixture::load_fanza_fixture_default()?;
+        let items: Vec<DiscoveredItem> = items_raw
+            .into_iter()
+            .map(|item| {
+                let resource_type = plugins::ecosystem::fanza::detect_resource_type(&item.content_type);
+                let mut metadata = std::collections::HashMap::new();
+                metadata.insert("resource_type".to_string(), format!("{:?}", resource_type));
+                metadata.insert("category".to_string(), item.category);
+                metadata.insert("purchase_date".to_string(), item.purchase_date);
+                if let Some(thumb) = item.thumbnail {
+                    metadata.insert("thumbnail".to_string(), thumb);
+                }
+                DiscoveredItem {
+                    external_id: item.product_id.clone(),
+                    title: item.title,
+                    platform: "fanza".to_string(),
+                    metadata,
+                }
+            })
+            .collect();
+        self.sync_discovered_items("fanza", items).await
+    }
+
     pub async fn list_jobs(&self, platform: &str) -> Result<Vec<SyncJob>, DomainError> {
         self.sync_job_repo.list_by_platform(platform).await
     }

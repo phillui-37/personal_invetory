@@ -9,6 +9,11 @@ use domain::ecosystem::{DiscoveredItem, EcosystemConnector};
 const DLSITE_LOGIN_URL: &str = "https://login.dlsite.com/login";
 const DLSITE_LIBRARY_BASE_URL: &str = "https://www.dlsite.com/maniax/mypage/userbuy";
 
+// CSS selectors for DLSite login form
+const DLSITE_USERNAME_SELECTOR: &str = "input[name='login_id']";
+const DLSITE_PASSWORD_SELECTOR: &str = "input[name='password']";
+const DLSITE_SUBMIT_SELECTOR: &str = "button[type='submit']";
+
 /// A work entry returned from DLSite's purchase history API.
 #[derive(Debug, Clone, Deserialize)]
 pub struct DLSiteWork {
@@ -41,6 +46,19 @@ pub fn parse_library_response(json: &str) -> Result<Vec<DLSiteWork>, DomainError
         .map_err(|e| DomainError::InternalError(format!("DLSite parse error: {e}")))
 }
 
+/// Builds a cookie header string from a collection of cookies.
+pub fn build_cookie_header(cookies: &[Cookie]) -> String {
+    cookies
+        .iter()
+        .map(|c| {
+            let name = c.name.replace(['\r', '\n'], "");
+            let value = c.value.replace(['\r', '\n'], "");
+            format!("{name}={value}")
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
 /// DLSite connector. Authenticates via browser session, then fetches purchase history.
 pub struct DLSiteConnector<P: BrowserPage> {
     browser: P,
@@ -67,9 +85,9 @@ impl<P: BrowserPage> DLSiteConnector<P> {
         self.browser.navigate(DLSITE_LOGIN_URL).await?;
         // If login form is absent, session is valid.
         if let (Some(user), Some(pass)) = (username, password) {
-            self.browser.fill("input[name='id']", user).await?;
-            self.browser.fill("input[name='pass']", pass).await?;
-            self.browser.click("input[type='submit']").await?;
+            self.browser.fill(DLSITE_USERNAME_SELECTOR, user).await?;
+            self.browser.fill(DLSITE_PASSWORD_SELECTOR, pass).await?;
+            self.browser.click(DLSITE_SUBMIT_SELECTOR).await?;
         }
         Ok(())
     }
@@ -78,15 +96,7 @@ impl<P: BrowserPage> DLSiteConnector<P> {
     #[cfg(feature = "real-plugins")]
     async fn fetch_library(&self) -> Result<Vec<DLSiteWork>, DomainError> {
         let cookies = self.browser.get_cookies().await?;
-        let cookie_header = cookies
-            .iter()
-            .map(|c| {
-                let name = c.name.replace(['\r', '\n'], "");
-                let value = c.value.replace(['\r', '\n'], "");
-                format!("{}={}", name, value)
-            })
-            .collect::<Vec<_>>()
-            .join("; ");
+        let cookie_header = build_cookie_header(&cookies);
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
@@ -290,5 +300,51 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].metadata.get("maker").unwrap(), "Test Circle");
         assert_eq!(items[0].metadata.get("resource_type").unwrap(), "Image");
+    }
+
+    #[test]
+    fn real_fixture_deserializes() {
+        let json = include_str!("../../tests/fixtures/real/dlsite_library.json");
+        let works: Vec<DLSiteWork> = serde_json::from_str(json).expect("deserialize fixture");
+        assert_eq!(works.len(), 3);
+        assert_eq!(works[0].workno, "RJ123456");
+        assert_eq!(works[0].work_name, "Test Game Alpha");
+        assert_eq!(works[0].work_type, "GAM");
+        assert_eq!(works[0].maker_name, Some("Studio A".to_string()));
+        assert_eq!(works[1].work_type, "CG");
+        assert_eq!(works[2].work_type, "MOV");
+    }
+
+    #[test]
+    fn dlsite_login_selectors_defined() {
+        assert!(!DLSITE_USERNAME_SELECTOR.is_empty());
+        assert!(!DLSITE_PASSWORD_SELECTOR.is_empty());
+        assert!(!DLSITE_SUBMIT_SELECTOR.is_empty());
+    }
+
+    #[test]
+    fn dlsite_library_url_has_json_output() {
+        assert!(DLSITE_LIBRARY_BASE_URL.contains("dlsite.com"));
+    }
+
+    #[test]
+    fn build_cookie_header_from_cookies() {
+        use crate::browser_session::Cookie;
+        let cookies = vec![
+            Cookie {
+                name: "a".to_string(),
+                value: "1".to_string(),
+                domain: ".dlsite.com".to_string(),
+                path: "/".to_string(),
+            },
+            Cookie {
+                name: "b".to_string(),
+                value: "2".to_string(),
+                domain: ".dlsite.com".to_string(),
+                path: "/".to_string(),
+            },
+        ];
+        let header = build_cookie_header(&cookies);
+        assert_eq!(header, "a=1; b=2");
     }
 }

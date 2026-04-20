@@ -151,7 +151,12 @@ class FakeEbookRepository implements EbookRepository {
   }
 
   @override
-  Future<Result<List<Resource>, AppFailure>> listEbooks() async {
+  Future<Result<List<Resource>, AppFailure>> listEbooks({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  }) async {
     listCalls += 1;
     return listResult;
   }
@@ -373,7 +378,12 @@ class FakeWebReaderRepository implements WebReaderRepository {
   }
 
   @override
-  Future<Result<List<Resource>, AppFailure>> listWebReaders() async {
+  Future<Result<List<Resource>, AppFailure>> listWebReaders({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  }) async {
     listCalls += 1;
     return listResult;
   }
@@ -489,7 +499,12 @@ class FakeImageRepository implements ImageRepository {
   }
 
   @override
-  Future<Result<List<Resource>, AppFailure>> listImages() async {
+  Future<Result<List<Resource>, AppFailure>> listImages({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  }) async {
     listCalls += 1;
     return listResult;
   }
@@ -571,7 +586,12 @@ class FakeVideoRepository implements VideoRepository {
   }
 
   @override
-  Future<Result<List<Resource>, AppFailure>> listVideos() async {
+  Future<Result<List<Resource>, AppFailure>> listVideos({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  }) async {
     listCalls += 1;
     return listResult;
   }
@@ -653,7 +673,12 @@ class FakeGameRepository implements GameRepository {
   }
 
   @override
-  Future<Result<List<Resource>, AppFailure>> listGames() async {
+  Future<Result<List<Resource>, AppFailure>> listGames({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  }) async {
     listCalls += 1;
     return listResult;
   }

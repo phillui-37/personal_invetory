@@ -15,7 +15,20 @@ sealed class VideoEvent extends Equatable {
 }
 
 final class LoadVideos extends VideoEvent {
-  const LoadVideos();
+  const LoadVideos({
+    this.tags = const [],
+    this.sortBy,
+    this.sortOrder,
+    this.filterLogic,
+  });
+
+  final List<String> tags;
+  final String? sortBy;
+  final String? sortOrder;
+  final String? filterLogic;
+
+  @override
+  List<Object?> get props => [tags, sortBy, sortOrder, filterLogic];
 }
 
 final class SearchVideos extends VideoEvent {
@@ -159,7 +172,12 @@ final class VideoBloc extends Bloc<VideoEvent, VideoState> {
 
   Future<void> _onLoadVideos(LoadVideos event, Emitter<VideoState> emit) async {
     emit(const VideoLoading());
-    final result = await _repository.listVideos();
+    final result = await _repository.listVideos(
+      tags: event.tags,
+      sortBy: event.sortBy,
+      sortOrder: event.sortOrder,
+      filterLogic: event.filterLogic,
+    );
     result.when(
       success: (videos) => emit(VideoListLoaded(videos)),
       failure: (failure) => emit(VideoError(failure)),

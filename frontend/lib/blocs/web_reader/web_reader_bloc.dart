@@ -15,7 +15,20 @@ sealed class WebReaderEvent extends Equatable {
 }
 
 final class LoadWebReaders extends WebReaderEvent {
-  const LoadWebReaders();
+  const LoadWebReaders({
+    this.tags = const [],
+    this.sortBy,
+    this.sortOrder,
+    this.filterLogic,
+  });
+
+  final List<String> tags;
+  final String? sortBy;
+  final String? sortOrder;
+  final String? filterLogic;
+
+  @override
+  List<Object?> get props => [tags, sortBy, sortOrder, filterLogic];
 }
 
 final class SearchWebReaders extends WebReaderEvent {
@@ -211,7 +224,12 @@ final class WebReaderBloc extends Bloc<WebReaderEvent, WebReaderState> {
     Emitter<WebReaderState> emit,
   ) async {
     emit(const WebReaderLoading());
-    final result = await _repository.listWebReaders();
+    final result = await _repository.listWebReaders(
+      tags: event.tags,
+      sortBy: event.sortBy,
+      sortOrder: event.sortOrder,
+      filterLogic: event.filterLogic,
+    );
     result.when(
       success: (webReaders) => emit(WebReaderListLoaded(webReaders)),
       failure: (failure) => emit(WebReaderError(failure)),

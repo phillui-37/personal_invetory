@@ -4,7 +4,12 @@ import '../models/resources.dart';
 import '../models/result.dart';
 
 abstract interface class WebReaderRepository {
-  Future<Result<List<Resource>, AppFailure>> listWebReaders();
+  Future<Result<List<Resource>, AppFailure>> listWebReaders({
+    List<String> tags = const [],
+    String? sortBy,
+    String? sortOrder,
+    String? filterLogic,
+  });
 
   Future<Result<List<Resource>, AppFailure>> searchWebReaders(String query);
 

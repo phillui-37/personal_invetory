@@ -3,6 +3,31 @@ backend/target/
 .idea/
 *.iml
 .DS_Store
+
+# Environment & Secrets
 .env
 .env.local
 .env.*.local
+.credentials.md
+.credentials.local.md
+credentials.md
+credentials.local.md
+
+# HAR Files (contain session data & cookies)
+*.har
+
+# API Credentials & Keys (sensitive files)
+*credentials*
+*secrets*
+*keys.md
+*api_keys*
+
+# Never commit these patterns
+.aws/
+.gcloud/
+.ssh/
+
+# Generated artifacts
+flutter/build/
+backend/target/
+*.lock

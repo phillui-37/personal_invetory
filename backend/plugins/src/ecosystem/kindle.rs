@@ -10,6 +10,11 @@ const KINDLE_LOGIN_URL: &str = "https://www.amazon.co.jp/ap/signin";
 const KINDLE_LIBRARY_URL: &str =
     "https://www.amazon.co.jp/hz/mycd/digital-console/contentlist/booksAll/dateDsc/";
 
+const KINDLE_EMAIL_SELECTOR: &str = "input[name='email']";
+const KINDLE_PASSWORD_SELECTOR: &str = "input[name='password']";
+const KINDLE_SUBMIT_SELECTOR: &str = "input#signInSubmit";
+const KINDLE_OTP_SELECTOR: &str = "input[name='otpCode']";
+
 /// A Kindle book entry from the library API or CSV export.
 #[derive(Debug, Clone, Deserialize)]
 pub struct KindleBook {
@@ -34,6 +39,18 @@ pub struct KindleCsvRow {
     pub title: String,
     #[serde(rename = "Authors", default)]
     pub authors: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct KindleCredentials {
+    pub username: String,
+    pub password: String,
+    #[serde(default = "default_marketplace")]
+    pub marketplace: String,
+}
+
+fn default_marketplace() -> String {
+    "jp".to_string()
 }
 
 impl From<KindleCsvRow> for KindleBook {
@@ -97,9 +114,9 @@ impl<P: BrowserPage> KindleConnector<P> {
         // TODO(network-inspection): Implement actual Amazon auth flow.
         self.browser.navigate(KINDLE_LOGIN_URL).await?;
         if let (Some(user), Some(pass)) = (username, password) {
-            self.browser.fill("input[name='email']", user).await?;
-            self.browser.fill("input[name='password']", pass).await?;
-            self.browser.click("#signInSubmit").await?;
+            self.browser.fill(KINDLE_EMAIL_SELECTOR, user).await?;
+            self.browser.fill(KINDLE_PASSWORD_SELECTOR, pass).await?;
+            self.browser.click(KINDLE_SUBMIT_SELECTOR).await?;
         }
         Ok(())
     }
@@ -300,5 +317,26 @@ mod tests {
             .await
             .unwrap();
         assert!(items.is_empty());
+    }
+
+    #[test]
+    fn kindle_login_selectors_defined() {
+        assert!(!KINDLE_EMAIL_SELECTOR.is_empty());
+        assert!(!KINDLE_PASSWORD_SELECTOR.is_empty());
+        assert!(!KINDLE_SUBMIT_SELECTOR.is_empty());
+        assert!(!KINDLE_OTP_SELECTOR.is_empty());
+    }
+
+    #[test]
+    fn parse_kindle_credentials() {
+        let json = r#"{"username": "user@example.com", "password": "pass123", "marketplace": "jp"}"#;
+        let creds: KindleCredentials = serde_json::from_str(json).unwrap();
+        assert_eq!(creds.username, "user@example.com");
+        assert_eq!(creds.marketplace, "jp");
+    }
+
+    #[test]
+    fn kindle_library_url_is_amazon_jp() {
+        assert!(KINDLE_LIBRARY_URL.contains("amazon.co.jp"));
     }
 }

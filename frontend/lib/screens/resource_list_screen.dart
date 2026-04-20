@@ -5,6 +5,7 @@ import '../blocs/batch/batch_bloc.dart';
 import '../blocs/ebook/ebook_bloc.dart';
 import '../blocs/game/game_bloc.dart';
 import '../blocs/image/image_bloc.dart';
+import '../blocs/search_filter/search_filter_bloc.dart';
 import '../blocs/tag/tag_bloc.dart';
 import '../blocs/video/video_bloc.dart';
 import '../blocs/web_reader/web_reader_bloc.dart';
@@ -13,6 +14,7 @@ import '../models/resources.dart';
 import '../models/tag.dart';
 import '../widgets/error_display.dart';
 import '../widgets/resource_list_item.dart';
+import '../widgets/search_filter_bar.dart';
 import 'add_resource_screen.dart';
 import 'batch_operations_screen.dart';
 import 'resource_detail_screen.dart';
@@ -25,16 +27,29 @@ class ResourceListScreen extends StatefulWidget {
 }
 
 class _ResourceListScreenState extends State<ResourceListScreen> {
-  String? _activeTagName;
+  void _loadAllResources(BuildContext context) {
+    final f = context.read<SearchFilterBloc>().state;
+    context.read<EbookBloc>().add(LoadEbooks(
+      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
+    ));
+    context.read<WebReaderBloc>().add(LoadWebReaders(
+      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
+    ));
+    context.read<ImageBloc>().add(LoadImages(
+      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
+    ));
+    context.read<VideoBloc>().add(LoadVideos(
+      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
+    ));
+    context.read<GameBloc>().add(LoadGames(
+      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
+    ));
+  }
 
   @override
   void initState() {
     super.initState();
-    context.read<EbookBloc>().add(const LoadEbooks());
-    context.read<WebReaderBloc>().add(const LoadWebReaders());
-    context.read<ImageBloc>().add(const LoadImages());
-    context.read<VideoBloc>().add(const LoadVideos());
-    context.read<GameBloc>().add(const LoadGames());
+    _loadAllResources(context);
     context.read<TagBloc>().add(const LoadTags());
   }
 
@@ -84,18 +99,27 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             ],
           ),
         ),
-        body: Column(
+        body: BlocListener<SearchFilterBloc, SearchFilterState>(
+          listener: (context, state) {
+            _loadAllResources(context);
+          },
+          child: Column(
           children: [
             BlocBuilder<TagBloc, TagState>(
-              builder: (context, state) {
-                if (state is! TagListLoaded || state.tags.isEmpty) {
+              builder: (context, tagState) {
+                if (tagState is! TagListLoaded || tagState.tags.isEmpty) {
                   return const SizedBox.shrink();
                 }
-                return _TagFilterBar(
-                  tags: state.tags,
-                  activeTagName: _activeTagName,
-                  onSelect: (name) =>
-                      setState(() => _activeTagName = name),
+                return BlocBuilder<SearchFilterBloc, SearchFilterState>(
+                  builder: (context, filterState) {
+                    return SearchFilterBar(
+                      tags: tagState.tags,
+                      selectedTags: filterState.selectedTags,
+                      onTagsChanged: (tags) => context.read<SearchFilterBloc>().add(UpdateSelectedTags(tags)),
+                      onSortChanged: (sort) => context.read<SearchFilterBloc>().add(UpdateSortBy(sort)),
+                      onLogicChanged: (logic) => context.read<SearchFilterBloc>().add(UpdateFilterLogic(logic)),
+                    );
+                  },
                 );
               },
             ),
@@ -108,10 +132,9 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               failure: (state) => state is EbookError ? state.failure : null,
               resources: (state) =>
                   state is EbookListLoaded ? state.ebooks : const <Resource>[],
-              tagFilter: _activeTagName,
-              onRetry: () => context.read<EbookBloc>().add(const LoadEbooks()),
+              onRetry: () => _loadAllResources(context),
               onRefresh: () async {
-                context.read<EbookBloc>().add(const LoadEbooks());
+                _loadAllResources(context);
               },
               onTap: (resource) async {
                 await Navigator.of(context).push(
@@ -125,7 +148,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 if (!context.mounted) {
                   return;
                 }
-                context.read<EbookBloc>().add(const LoadEbooks());
+                _loadAllResources(context);
               },
             ),
             _ResourceTab<WebReaderBloc, WebReaderState>(
@@ -135,11 +158,9 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               resources: (state) => state is WebReaderListLoaded
                   ? state.webReaders
                   : const <Resource>[],
-              tagFilter: _activeTagName,
-              onRetry: () =>
-                  context.read<WebReaderBloc>().add(const LoadWebReaders()),
+              onRetry: () => _loadAllResources(context),
               onRefresh: () async {
-                context.read<WebReaderBloc>().add(const LoadWebReaders());
+                _loadAllResources(context);
               },
               onTap: (resource) async {
                 await Navigator.of(context).push(
@@ -153,7 +174,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 if (!context.mounted) {
                   return;
                 }
-                context.read<WebReaderBloc>().add(const LoadWebReaders());
+                _loadAllResources(context);
               },
             ),
             _ResourceTab<ImageBloc, ImageState>(
@@ -162,10 +183,9 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               failure: (state) => state is ImageError ? state.failure : null,
               resources: (state) =>
                   state is ImageListLoaded ? state.images : const <Resource>[],
-              tagFilter: _activeTagName,
-              onRetry: () => context.read<ImageBloc>().add(const LoadImages()),
+              onRetry: () => _loadAllResources(context),
               onRefresh: () async {
-                context.read<ImageBloc>().add(const LoadImages());
+                _loadAllResources(context);
               },
               onTap: (resource) async {
                 await Navigator.of(context).push(
@@ -179,7 +199,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 if (!context.mounted) {
                   return;
                 }
-                context.read<ImageBloc>().add(const LoadImages());
+                _loadAllResources(context);
               },
             ),
             _ResourceTab<VideoBloc, VideoState>(
@@ -188,10 +208,9 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               failure: (state) => state is VideoError ? state.failure : null,
               resources: (state) =>
                   state is VideoListLoaded ? state.videos : const <Resource>[],
-              tagFilter: _activeTagName,
-              onRetry: () => context.read<VideoBloc>().add(const LoadVideos()),
+              onRetry: () => _loadAllResources(context),
               onRefresh: () async {
-                context.read<VideoBloc>().add(const LoadVideos());
+                _loadAllResources(context);
               },
               onTap: (resource) async {
                 await Navigator.of(context).push(
@@ -205,7 +224,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 if (!context.mounted) {
                   return;
                 }
-                context.read<VideoBloc>().add(const LoadVideos());
+                _loadAllResources(context);
               },
             ),
             _ResourceTab<GameBloc, GameState>(
@@ -214,10 +233,9 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               failure: (state) => state is GameError ? state.failure : null,
               resources: (state) =>
                   state is GameListLoaded ? state.games : const <Resource>[],
-              tagFilter: _activeTagName,
-              onRetry: () => context.read<GameBloc>().add(const LoadGames()),
+              onRetry: () => _loadAllResources(context),
               onRefresh: () async {
-                context.read<GameBloc>().add(const LoadGames());
+                _loadAllResources(context);
               },
               onTap: (resource) async {
                 await Navigator.of(context).push(
@@ -231,13 +249,14 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 if (!context.mounted) {
                   return;
                 }
-                context.read<GameBloc>().add(const LoadGames());
+                _loadAllResources(context);
               },
             ),
                 ],
               ),
             ),
           ],
+        ),
         ),
         floatingActionButton: FloatingActionButton(
           key: const Key('add-resource-fab'),
@@ -250,11 +269,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             if (!context.mounted) {
               return;
             }
-            context.read<EbookBloc>().add(const LoadEbooks());
-            context.read<WebReaderBloc>().add(const LoadWebReaders());
-            context.read<ImageBloc>().add(const LoadImages());
-            context.read<VideoBloc>().add(const LoadVideos());
-            context.read<GameBloc>().add(const LoadGames());
+            _loadAllResources(context);
           },
           child: const Icon(Icons.add),
         ),
@@ -272,7 +287,6 @@ class _ResourceTab<B extends StateStreamable<S>, S> extends StatelessWidget {
     required this.onRetry,
     required this.onRefresh,
     required this.onTap,
-    this.tagFilter,
   });
 
   final bool Function(S state) isLoading;
@@ -282,7 +296,6 @@ class _ResourceTab<B extends StateStreamable<S>, S> extends StatelessWidget {
   final VoidCallback onRetry;
   final Future<void> Function() onRefresh;
   final ValueChanged<Resource> onTap;
-  final String? tagFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -327,54 +340,6 @@ class _ResourceTab<B extends StateStreamable<S>, S> extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _TagFilterBar extends StatelessWidget {
-  const _TagFilterBar({
-    required this.tags,
-    required this.activeTagName,
-    required this.onSelect,
-  });
-
-  final List<Tag> tags;
-  final String? activeTagName;
-  final ValueChanged<String?> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        children: [
-          if (activeTagName != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: InputChip(
-                key: const Key('tag-filter-clear'),
-                label: const Text('Clear filter'),
-                onDeleted: () => onSelect(null),
-                deleteIcon: const Icon(Icons.close, size: 16),
-              ),
-            ),
-          ...tags.map(
-            (tag) => Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: FilterChip(
-                key: Key('tag-filter-${tag.name}'),
-                label: Text(tag.name),
-                selected: activeTagName == tag.name,
-                onSelected: (_) => onSelect(
-                  activeTagName == tag.name ? null : tag.name,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
