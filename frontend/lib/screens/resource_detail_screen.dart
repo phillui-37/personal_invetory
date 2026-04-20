@@ -4,12 +4,18 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/ebook/ebook_bloc.dart';
 import '../blocs/game/game_bloc.dart';
 import '../blocs/image/image_bloc.dart';
+import '../blocs/progress/progress_bloc.dart';
+import '../blocs/tag/tag_bloc.dart';
 import '../blocs/video/video_bloc.dart';
 import '../blocs/web_reader/web_reader_bloc.dart';
+import '../models/progress.dart';
 import '../models/repository_inputs.dart';
 import '../models/resources.dart';
+import '../models/tag.dart';
 import '../widgets/app_failure_text.dart';
 import '../widgets/location_form_sheet.dart';
+import '../widgets/progress_editor.dart';
+import '../widgets/tag_chip_list.dart';
 import '../widgets/web_reader_progress_tracker.dart';
 import 'add_resource_screen.dart';
 
@@ -30,11 +36,21 @@ class ResourceDetailScreen extends StatefulWidget {
 class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
   WebReaderDetail? _lastWebReaderDetail;
   List<ChapterCheck> _checkHistory = const [];
+  ResourceProgress? _currentProgress;
+  List<Tag> _currentTags = const [];
+  List<Tag> _allTags = const [];
+  String? _pendingTagName;
 
   @override
   void initState() {
     super.initState();
     _loadDetail();
+    context.read<ProgressBloc>().add(
+          LoadProgress(widget.resourceType, widget.resourceId),
+        );
+    context.read<TagBloc>()
+      ..add(LoadTags())
+      ..add(LoadResourceTags(widget.resourceType, widget.resourceId));
   }
 
   void _loadDetail() {
@@ -42,7 +58,9 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
       case ResourceType.ebook:
         context.read<EbookBloc>().add(LoadEbookDetail(widget.resourceId));
       case ResourceType.webReader:
-        context.read<WebReaderBloc>().add(LoadWebReaderDetail(widget.resourceId));
+        context
+            .read<WebReaderBloc>()
+            .add(LoadWebReaderDetail(widget.resourceId));
         context.read<WebReaderBloc>().add(LoadCheckHistory(widget.resourceId));
       case ResourceType.image:
         context.read<ImageBloc>().add(LoadImageDetail(widget.resourceId));
@@ -69,17 +87,25 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
               Navigator.of(dialogContext).pop();
               switch (widget.resourceType) {
                 case ResourceType.ebook:
-                  parentContext.read<EbookBloc>().add(DeleteEbook(widget.resourceId));
+                  parentContext
+                      .read<EbookBloc>()
+                      .add(DeleteEbook(widget.resourceId));
                 case ResourceType.webReader:
                   parentContext.read<WebReaderBloc>().add(
-                    DeleteWebReader(widget.resourceId),
-                  );
+                        DeleteWebReader(widget.resourceId),
+                      );
                 case ResourceType.image:
-                  parentContext.read<ImageBloc>().add(DeleteImage(widget.resourceId));
+                  parentContext
+                      .read<ImageBloc>()
+                      .add(DeleteImage(widget.resourceId));
                 case ResourceType.video:
-                  parentContext.read<VideoBloc>().add(DeleteVideo(widget.resourceId));
+                  parentContext
+                      .read<VideoBloc>()
+                      .add(DeleteVideo(widget.resourceId));
                 case ResourceType.game:
-                  parentContext.read<GameBloc>().add(DeleteGame(widget.resourceId));
+                  parentContext
+                      .read<GameBloc>()
+                      .add(DeleteGame(widget.resourceId));
               }
             },
             child: const Text('Delete'),
@@ -96,17 +122,25 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
         onSubmit: (input) {
           switch (widget.resourceType) {
             case ResourceType.ebook:
-              context.read<EbookBloc>().add(AddEbookLocation(widget.resourceId, input));
+              context
+                  .read<EbookBloc>()
+                  .add(AddEbookLocation(widget.resourceId, input));
             case ResourceType.webReader:
               context.read<WebReaderBloc>().add(
-                AddWebReaderLocation(widget.resourceId, input),
-              );
+                    AddWebReaderLocation(widget.resourceId, input),
+                  );
             case ResourceType.image:
-              context.read<ImageBloc>().add(AddImageLocation(widget.resourceId, input));
+              context
+                  .read<ImageBloc>()
+                  .add(AddImageLocation(widget.resourceId, input));
             case ResourceType.video:
-              context.read<VideoBloc>().add(AddVideoLocation(widget.resourceId, input));
+              context
+                  .read<VideoBloc>()
+                  .add(AddVideoLocation(widget.resourceId, input));
             case ResourceType.game:
-              context.read<GameBloc>().add(AddGameLocation(widget.resourceId, input));
+              context
+                  .read<GameBloc>()
+                  .add(AddGameLocation(widget.resourceId, input));
           }
         },
       ),
@@ -130,24 +164,24 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
               switch (widget.resourceType) {
                 case ResourceType.ebook:
                   parentContext.read<EbookBloc>().add(
-                    RemoveEbookLocation(widget.resourceId, locationId),
-                  );
+                        RemoveEbookLocation(widget.resourceId, locationId),
+                      );
                 case ResourceType.webReader:
                   parentContext.read<WebReaderBloc>().add(
-                    RemoveWebReaderLocation(widget.resourceId, locationId),
-                  );
+                        RemoveWebReaderLocation(widget.resourceId, locationId),
+                      );
                 case ResourceType.image:
                   parentContext.read<ImageBloc>().add(
-                    RemoveImageLocation(widget.resourceId, locationId),
-                  );
+                        RemoveImageLocation(widget.resourceId, locationId),
+                      );
                 case ResourceType.video:
                   parentContext.read<VideoBloc>().add(
-                    RemoveVideoLocation(widget.resourceId, locationId),
-                  );
+                        RemoveVideoLocation(widget.resourceId, locationId),
+                      );
                 case ResourceType.game:
                   parentContext.read<GameBloc>().add(
-                    RemoveGameLocation(widget.resourceId, locationId),
-                  );
+                        RemoveGameLocation(widget.resourceId, locationId),
+                      );
               }
             },
             child: const Text('Remove'),
@@ -194,8 +228,10 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
                 return;
               }
               if (state.operationType == WebReaderOperationType.locationAdded ||
-                  state.operationType == WebReaderOperationType.locationRemoved ||
-                  state.operationType == WebReaderOperationType.progressTracked) {
+                  state.operationType ==
+                      WebReaderOperationType.locationRemoved ||
+                  state.operationType ==
+                      WebReaderOperationType.progressTracked) {
                 _loadDetail();
               }
             }
@@ -210,10 +246,63 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
                 ),
               );
               context.read<WebReaderBloc>().add(
-                LoadCheckHistory(widget.resourceId),
-              );
+                    LoadCheckHistory(widget.resourceId),
+                  );
             }
             if (state is WebReaderError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(appFailureMessage(state.failure))),
+              );
+            }
+          },
+        ),
+        BlocListener<ProgressBloc, ProgressState>(
+          listener: (context, state) {
+            if (state is ProgressLoaded) {
+              setState(() => _currentProgress = state.progress);
+            }
+            if (state is ProgressUpdated) {
+              setState(() => _currentProgress = state.progress);
+            }
+            if (state is ProgressError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(appFailureMessage(state.failure))),
+              );
+            }
+          },
+        ),
+        BlocListener<TagBloc, TagState>(
+          listener: (context, state) {
+            if (state is TagListLoaded) {
+              setState(() => _allTags = state.tags);
+              final pending = _pendingTagName;
+              if (pending != null) {
+                final idx = state.tags.indexWhere(
+                  (t) =>
+                      t.name.toLowerCase() == pending.toLowerCase().trim(),
+                );
+                if (idx >= 0) {
+                  setState(() => _pendingTagName = null);
+                  context.read<TagBloc>().add(
+                        AttachTag(widget.resourceType, widget.resourceId,
+                            state.tags[idx].id),
+                      );
+                }
+              }
+            }
+            if (state is ResourceTagsLoaded) {
+              setState(() => _currentTags = state.tags);
+            }
+            if (state is TagOperationSuccess) {
+              if (state.operationType == TagOperationType.created) {
+                context.read<TagBloc>().add(LoadTags());
+              } else {
+                context.read<TagBloc>().add(
+                      LoadResourceTags(widget.resourceType, widget.resourceId),
+                    );
+              }
+            }
+            if (state is TagError) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text(appFailureMessage(state.failure))),
               );
@@ -323,8 +412,13 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
             if (state is EbookDetailLoaded) {
               return _EbookDetailBody(
                 detail: state.ebook,
+                progress: _currentProgress,
+                tags: _currentTags,
                 onAddLocation: _addLocation,
                 onRemoveLocation: _removeLocation,
+                onSaveProgress: _onSaveProgress,
+                onAddTag: _onAddTag,
+                onRemoveTag: _onRemoveTag,
               );
             }
             return const Center(child: Text('No detail'));
@@ -344,18 +438,33 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
               return _WebReaderDetailBody(
                 detail: detail,
                 history: _checkHistory,
+                progress: _currentProgress,
+                tags: _currentTags,
                 onAddLocation: _addLocation,
                 onRemoveLocation: _removeLocation,
                 onProgressSignal: (signal) {
                   context.read<WebReaderBloc>().add(
-                    TrackWebReaderProgress(signal),
-                  );
+                        TrackWebReaderProgress(signal),
+                      );
+                },
+                onProgressUpdate: (chapter, progress) {
+                  context.read<ProgressBloc>().add(
+                        UpdateProgress(
+                          ResourceType.webReader,
+                          widget.resourceId,
+                          progress,
+                          notes: chapter,
+                        ),
+                      );
                 },
                 onCheckNow: () {
                   context.read<WebReaderBloc>().add(
-                    TriggerChapterCheck(widget.resourceId),
-                  );
+                        TriggerChapterCheck(widget.resourceId),
+                      );
                 },
+                onSaveProgress: _onSaveProgress,
+                onAddTag: _onAddTag,
+                onRemoveTag: _onRemoveTag,
               );
             }
             return const Center(child: Text('No detail'));
@@ -370,8 +479,13 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
             if (state is ImageDetailLoaded) {
               return _ImageDetailBody(
                 detail: state.image,
+                progress: _currentProgress,
+                tags: _currentTags,
                 onAddLocation: _addLocation,
                 onRemoveLocation: _removeLocation,
+                onSaveProgress: _onSaveProgress,
+                onAddTag: _onAddTag,
+                onRemoveTag: _onRemoveTag,
               );
             }
             return const Center(child: Text('No detail'));
@@ -386,8 +500,13 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
             if (state is VideoDetailLoaded) {
               return _VideoDetailBody(
                 detail: state.video,
+                progress: _currentProgress,
+                tags: _currentTags,
                 onAddLocation: _addLocation,
                 onRemoveLocation: _removeLocation,
+                onSaveProgress: _onSaveProgress,
+                onAddTag: _onAddTag,
+                onRemoveTag: _onRemoveTag,
               );
             }
             return const Center(child: Text('No detail'));
@@ -402,8 +521,13 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
             if (state is GameDetailLoaded) {
               return _GameDetailBody(
                 detail: state.game,
+                progress: _currentProgress,
+                tags: _currentTags,
                 onAddLocation: _addLocation,
                 onRemoveLocation: _removeLocation,
+                onSaveProgress: _onSaveProgress,
+                onAddTag: _onAddTag,
+                onRemoveTag: _onRemoveTag,
               );
             }
             return const Center(child: Text('No detail'));
@@ -411,25 +535,65 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
         );
     }
   }
+
+  void _onSaveProgress(double progress, String? notes) {
+    context.read<ProgressBloc>().add(
+          UpdateProgress(widget.resourceType, widget.resourceId, progress,
+              notes: notes),
+        );
+  }
+
+  void _onRemoveTag(String tagId) {
+    context.read<TagBloc>().add(
+          DetachTag(widget.resourceType, widget.resourceId, tagId),
+        );
+  }
+
+  void _onAddTag(String name) {
+    final trimmed = name.toLowerCase().trim();
+    final existingIdx = _allTags.indexWhere(
+      (t) => t.name.toLowerCase() == trimmed,
+    );
+    if (existingIdx >= 0) {
+      context.read<TagBloc>().add(
+            AttachTag(
+                widget.resourceType, widget.resourceId, _allTags[existingIdx].id),
+          );
+    } else {
+      setState(() => _pendingTagName = name);
+      context.read<TagBloc>().add(CreateTag(name));
+    }
+  }
 }
 
 class _EbookDetailBody extends StatelessWidget {
   const _EbookDetailBody({
     required this.detail,
+    required this.progress,
+    required this.tags,
     required this.onAddLocation,
     required this.onRemoveLocation,
+    required this.onSaveProgress,
+    required this.onAddTag,
+    required this.onRemoveTag,
   });
 
   final EbookDetail detail;
+  final ResourceProgress? progress;
+  final List<Tag> tags;
   final VoidCallback onAddLocation;
   final ValueChanged<String> onRemoveLocation;
+  final void Function(double p, String? notes) onSaveProgress;
+  final ValueChanged<String> onAddTag;
+  final ValueChanged<String> onRemoveTag;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(detail.resource.title, style: Theme.of(context).textTheme.titleLarge),
+        Text(detail.resource.title,
+            style: Theme.of(context).textTheme.titleLarge),
         Text('Author: ${detail.meta.author ?? '-'}'),
         Text('Format: ${detail.meta.fileFormat ?? '-'}'),
         const SizedBox(height: 12),
@@ -452,6 +616,11 @@ class _EbookDetailBody extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        ProgressEditor(initialProgress: progress, onSave: onSaveProgress),
+        const SizedBox(height: 12),
+        TagChipList(
+            tags: tags, onRemove: onRemoveTag, onAdd: onAddTag),
       ],
     );
   }
@@ -461,25 +630,38 @@ class _WebReaderDetailBody extends StatelessWidget {
   const _WebReaderDetailBody({
     required this.detail,
     required this.history,
+    required this.progress,
+    required this.tags,
     required this.onAddLocation,
     required this.onRemoveLocation,
     required this.onProgressSignal,
+    required this.onProgressUpdate,
     required this.onCheckNow,
+    required this.onSaveProgress,
+    required this.onAddTag,
+    required this.onRemoveTag,
   });
 
   final WebReaderDetail detail;
   final List<ChapterCheck> history;
+  final ResourceProgress? progress;
+  final List<Tag> tags;
   final VoidCallback onAddLocation;
   final ValueChanged<String> onRemoveLocation;
   final ValueChanged<WebReaderProgressSignal> onProgressSignal;
+  final void Function(String? chapter, double progress) onProgressUpdate;
   final VoidCallback onCheckNow;
+  final void Function(double p, String? notes) onSaveProgress;
+  final ValueChanged<String> onAddTag;
+  final ValueChanged<String> onRemoveTag;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(detail.resource.title, style: Theme.of(context).textTheme.titleLarge),
+        Text(detail.resource.title,
+            style: Theme.of(context).textTheme.titleLarge),
         Text('URL: ${detail.meta.url}'),
         Text('Site: ${detail.meta.siteName ?? '-'}'),
         Text('Chapter: ${detail.meta.lastReadChapter ?? '-'}'),
@@ -507,12 +689,17 @@ class _WebReaderDetailBody extends StatelessWidget {
         WebReaderProgressTracker(
           resourceId: detail.resource.id,
           onSignal: onProgressSignal,
+          onProgressUpdate: onProgressUpdate,
         ),
         const SizedBox(height: 12),
         _ChapterChecksSection(
           history: history,
           onCheckNow: onCheckNow,
         ),
+        const SizedBox(height: 12),
+        ProgressEditor(initialProgress: progress, onSave: onSaveProgress),
+        const SizedBox(height: 12),
+        TagChipList(tags: tags, onRemove: onRemoveTag, onAdd: onAddTag),
       ],
     );
   }
@@ -554,8 +741,8 @@ class _ChapterChecksSection extends StatelessWidget {
         check.latestChapter != null
             ? 'Latest: ${check.latestChapter}'
             : check.hasNewChapter
-            ? 'New chapter available'
-            : 'No new chapter',
+                ? 'New chapter available'
+                : 'No new chapter',
       ),
       subtitle: Text(check.checkedAt.toLocal().toString()),
       trailing: check.errorMessage != null
@@ -571,20 +758,31 @@ class _ChapterChecksSection extends StatelessWidget {
 class _ImageDetailBody extends StatelessWidget {
   const _ImageDetailBody({
     required this.detail,
+    required this.progress,
+    required this.tags,
     required this.onAddLocation,
     required this.onRemoveLocation,
+    required this.onSaveProgress,
+    required this.onAddTag,
+    required this.onRemoveTag,
   });
 
   final ImageDetail detail;
+  final ResourceProgress? progress;
+  final List<Tag> tags;
   final VoidCallback onAddLocation;
   final ValueChanged<String> onRemoveLocation;
+  final void Function(double p, String? notes) onSaveProgress;
+  final ValueChanged<String> onAddTag;
+  final ValueChanged<String> onRemoveTag;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(detail.resource.title, style: Theme.of(context).textTheme.titleLarge),
+        Text(detail.resource.title,
+            style: Theme.of(context).textTheme.titleLarge),
         Text('Width: ${detail.meta.width ?? '-'}'),
         Text('Height: ${detail.meta.height ?? '-'}'),
         Text('Format: ${detail.meta.fileFormat ?? '-'}'),
@@ -592,6 +790,10 @@ class _ImageDetailBody extends StatelessWidget {
         const SizedBox(height: 12),
         const Text('Locations'),
         ..._locationTiles(detail.locations, onRemoveLocation),
+        const SizedBox(height: 12),
+        ProgressEditor(initialProgress: progress, onSave: onSaveProgress),
+        const SizedBox(height: 12),
+        TagChipList(tags: tags, onRemove: onRemoveTag, onAdd: onAddTag),
       ],
     );
   }
@@ -600,20 +802,31 @@ class _ImageDetailBody extends StatelessWidget {
 class _VideoDetailBody extends StatelessWidget {
   const _VideoDetailBody({
     required this.detail,
+    required this.progress,
+    required this.tags,
     required this.onAddLocation,
     required this.onRemoveLocation,
+    required this.onSaveProgress,
+    required this.onAddTag,
+    required this.onRemoveTag,
   });
 
   final VideoDetail detail;
+  final ResourceProgress? progress;
+  final List<Tag> tags;
   final VoidCallback onAddLocation;
   final ValueChanged<String> onRemoveLocation;
+  final void Function(double p, String? notes) onSaveProgress;
+  final ValueChanged<String> onAddTag;
+  final ValueChanged<String> onRemoveTag;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(detail.resource.title, style: Theme.of(context).textTheme.titleLarge),
+        Text(detail.resource.title,
+            style: Theme.of(context).textTheme.titleLarge),
         Text('Duration (secs): ${detail.meta.durationSecs ?? '-'}'),
         Text('Format: ${detail.meta.fileFormat ?? '-'}'),
         Text('Resolution: ${detail.meta.resolution ?? '-'}'),
@@ -621,6 +834,10 @@ class _VideoDetailBody extends StatelessWidget {
         const SizedBox(height: 12),
         const Text('Locations'),
         ..._locationTiles(detail.locations, onRemoveLocation),
+        const SizedBox(height: 12),
+        ProgressEditor(initialProgress: progress, onSave: onSaveProgress),
+        const SizedBox(height: 12),
+        TagChipList(tags: tags, onRemove: onRemoveTag, onAdd: onAddTag),
       ],
     );
   }
@@ -629,20 +846,31 @@ class _VideoDetailBody extends StatelessWidget {
 class _GameDetailBody extends StatelessWidget {
   const _GameDetailBody({
     required this.detail,
+    required this.progress,
+    required this.tags,
     required this.onAddLocation,
     required this.onRemoveLocation,
+    required this.onSaveProgress,
+    required this.onAddTag,
+    required this.onRemoveTag,
   });
 
   final GameDetail detail;
+  final ResourceProgress? progress;
+  final List<Tag> tags;
   final VoidCallback onAddLocation;
   final ValueChanged<String> onRemoveLocation;
+  final void Function(double p, String? notes) onSaveProgress;
+  final ValueChanged<String> onAddTag;
+  final ValueChanged<String> onRemoveTag;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(detail.resource.title, style: Theme.of(context).textTheme.titleLarge),
+        Text(detail.resource.title,
+            style: Theme.of(context).textTheme.titleLarge),
         Text('Platform: ${detail.meta.platform ?? '-'}'),
         Text('Store: ${detail.meta.store ?? '-'}'),
         Text('Developer: ${detail.meta.developer ?? '-'}'),
@@ -652,6 +880,10 @@ class _GameDetailBody extends StatelessWidget {
         const SizedBox(height: 12),
         const Text('Locations'),
         ..._locationTiles(detail.locations, onRemoveLocation),
+        const SizedBox(height: 12),
+        ProgressEditor(initialProgress: progress, onSave: onSaveProgress),
+        const SizedBox(height: 12),
+        TagChipList(tags: tags, onRemove: onRemoveTag, onAdd: onAddTag),
       ],
     );
   }
@@ -661,22 +893,24 @@ List<Widget> _locationTiles(
   List<ResourceLocation> locations,
   ValueChanged<String> onRemoveLocation,
 ) {
-  return locations.map(
-    (location) => ListTile(
-      title: Text(location.pathOrUrl),
-      subtitle: Text(location.deviceId),
-      trailing: Wrap(
-        spacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Chip(label: Text(location.storageType.name)),
-          IconButton(
-            key: Key('remove-location-${location.id}'),
-            onPressed: () => onRemoveLocation(location.id),
-            icon: const Icon(Icons.delete_outline),
+  return locations
+      .map(
+        (location) => ListTile(
+          title: Text(location.pathOrUrl),
+          subtitle: Text(location.deviceId),
+          trailing: Wrap(
+            spacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Chip(label: Text(location.storageType.name)),
+              IconButton(
+                key: Key('remove-location-${location.id}'),
+                onPressed: () => onRemoveLocation(location.id),
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
           ),
-        ],
-      ),
-    ),
-  ).toList();
+        ),
+      )
+      .toList();
 }

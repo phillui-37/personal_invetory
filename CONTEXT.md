@@ -279,3 +279,19 @@ Implemented device management as a first-class feature:
 - Phase 4 design spec: `docs/superpowers/specs/2026-04-18-phase4-ecosystem-integrations-design.md`
 - Phase 4 Plan 1: `docs/superpowers/plans/2026-04-18-phase4-plan1-foundations-steam.md`
 - Phase 4 Plan 2: `docs/superpowers/plans/2026-04-19-phase4-plan2-frontend-ecosystem-ux.md`
+
+## 2026-04-19 — Phase 6 P6-O TagBloc
+
+- Scope locked to Flutter frontend P6-O only. No UI wiring, no unrelated screen changes.
+- Plan: add `TagBloc` in `frontend/lib/blocs/tag/tag_bloc.dart` using the same Result-based BLoC pattern as `DeviceBloc` and `WebReaderBloc`.
+- Events/states for current phase only: load tags, create/delete tag, load resource tags, attach/detach tag; states stay narrow (`Initial`, `Loading`, list/resource-loaded, operation-success, error).
+- TDD order: write `frontend/test/blocs/tag/tag_bloc_test.dart`, run it red, then implement minimal bloc code and rerun relevant Flutter tests green.
+- Result: `TagBloc` added with `TagOperationType { created, deleted, attached, detached }`, load/resource-load states, and Result.when-based success/error folding. New bloc tests cover all six Phase 6 events; relevant Flutter tag tests are green.
+
+## 2026-04-19 — Phase 6 P6-N ProgressBloc
+
+- Scope locked to Flutter frontend P6-N only. No tag UI work, no broad screen rewrites.
+- TDD order kept: added `frontend/test/blocs/progress/progress_bloc_test.dart`, ran it red on missing `ProgressBloc`, then implemented the bloc and rewired the web reader tracker path.
+- Result: `frontend/lib/blocs/progress/progress_bloc.dart` now handles `LoadProgress` and `UpdateProgress` with `Result.when`, emitting `ProgressInitial`, `ProgressLoading`, `ProgressLoaded`, `ProgressUpdated`, and `ProgressError`.
+- Wiring: `ResourceDetailScreen` now routes `WebReaderProgressTracker.onProgressUpdate` into `ProgressBloc(UpdateProgress(...))`, reloads web reader detail after successful progress updates, and shows snackbar errors from `ProgressError`.
+- Provider: app-level `ProgressBloc` added in `frontend/lib/main.dart` using the existing in-memory repository wiring pattern already used by the current app shell.

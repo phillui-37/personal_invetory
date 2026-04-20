@@ -1,14 +1,47 @@
 import '../models/batch_operations.dart';
 import '../models/failures.dart';
+import '../models/progress.dart';
 import '../models/repository_inputs.dart';
 import '../models/resources.dart';
 import '../models/result.dart';
+import '../models/tag.dart';
 import 'batch_operation_repository.dart';
 import 'ebook_repository.dart';
 import 'game_repository.dart';
 import 'image_repository.dart';
+import 'progress_repository.dart';
+import 'tag_repository.dart';
 import 'video_repository.dart';
 import 'web_reader_repository.dart';
+
+class InMemoryProgressRepository implements ProgressRepository {
+  final Map<String, ResourceProgress> _items = <String, ResourceProgress>{};
+
+  @override
+  Future<Result<ResourceProgress?, AppFailure>> getProgress(
+    ResourceType resourceType,
+    String resourceId,
+  ) async {
+    return Success<ResourceProgress?, AppFailure>(_items[resourceId]);
+  }
+
+  @override
+  Future<Result<ResourceProgress, AppFailure>> upsertProgress(
+    ResourceType resourceType,
+    String resourceId,
+    double progress, {
+    String? notes,
+  }) async {
+    final record = ResourceProgress(
+      resourceId: resourceId,
+      progress: progress,
+      notes: notes,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    _items[resourceId] = record;
+    return Success<ResourceProgress, AppFailure>(record);
+  }
+}
 
 class InMemoryEbookRepository implements EbookRepository {
   final Map<String, EbookDetail> _items = <String, EbookDetail>{};
@@ -162,6 +195,84 @@ class InMemoryEbookRepository implements EbookRepository {
     }
 
     return Success(BatchImportResult(succeeded: succeeded, failed: failed));
+  }
+}
+
+class InMemoryTagRepository implements TagRepository {
+  final Map<String, Tag> _tags = <String, Tag>{};
+  final Map<String, Set<String>> _resourceTagIds = <String, Set<String>>{};
+
+  @override
+  Future<Result<List<Tag>, AppFailure>> listTags() async {
+    final tags = _tags.values.toList()..sort((a, b) => a.name.compareTo(b.name));
+    return Success<List<Tag>, AppFailure>(tags);
+  }
+
+  @override
+  Future<Result<Tag, AppFailure>> createTag(String name) async {
+    final normalized = name.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return const Failure<Tag, AppFailure>(LocalFailure('tag name must not be empty'));
+    }
+    if (_tags.values.any((tag) => tag.name == normalized)) {
+      return const Failure<Tag, AppFailure>(ServerFailure(409));
+    }
+
+    final tag = Tag(
+      id: 'tag-${DateTime.now().microsecondsSinceEpoch}',
+      name: normalized,
+      createdAt: DateTime.now().toUtc(),
+    );
+    _tags[tag.id] = tag;
+    return Success<Tag, AppFailure>(tag);
+  }
+
+  @override
+  Future<Result<void, AppFailure>> deleteTag(String id) async {
+    _tags.remove(id);
+    for (final tagIds in _resourceTagIds.values) {
+      tagIds.remove(id);
+    }
+    return const Success<void, AppFailure>(null);
+  }
+
+  @override
+  Future<Result<List<Tag>, AppFailure>> tagsForResource(
+    ResourceType resourceType,
+    String resourceId,
+  ) async {
+    final tagIds = _resourceTagIds[resourceId] ?? <String>{};
+    final tags = tagIds
+        .map((tagId) => _tags[tagId])
+        .whereType<Tag>()
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    return Success<List<Tag>, AppFailure>(tags);
+  }
+
+  @override
+  Future<Result<void, AppFailure>> attachTag(
+    ResourceType resourceType,
+    String resourceId,
+    String tagId,
+  ) async {
+    if (!_tags.containsKey(tagId)) {
+      return Failure<void, AppFailure>(NotFoundFailure(tagId));
+    }
+    final tagIds = _resourceTagIds.putIfAbsent(resourceId, () => <String>{});
+    tagIds.add(tagId);
+    return const Success<void, AppFailure>(null);
+  }
+
+  @override
+  Future<Result<void, AppFailure>> detachTag(
+    ResourceType resourceType,
+    String resourceId,
+    String tagId,
+  ) async {
+    final tagIds = _resourceTagIds[resourceId];
+    tagIds?.remove(tagId);
+    return const Success<void, AppFailure>(null);
   }
 }
 

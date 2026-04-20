@@ -12,7 +12,10 @@ use services::{NewLocationInput, NewVideoInput, UpdateVideoInput, VideoDetail};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{ApiError, AppState};
+use crate::{
+    tag_filter::{resolve_tag_filter_ids, ListQuery},
+    ApiError, AppState,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct SearchQuery {
@@ -56,6 +59,7 @@ pub struct AddLocationRequest {
 #[utoipa::path(
     get,
     path = "/api/v1/inventory/videos/list",
+    params(("tag" = Option<String>, Query, description = "Optional tag name filter")),
     responses(
         (status = 200, description = "List of videos", body = Vec<Resource>),
     ),
@@ -64,8 +68,10 @@ pub struct AddLocationRequest {
 )]
 pub async fn list_videos(
     State(state): State<Arc<AppState>>,
+    Query(query): Query<ListQuery>,
 ) -> Result<Json<Vec<Resource>>, ApiError> {
-    let result = state.video_service.list_videos().await?;
+    let allowed_ids = resolve_tag_filter_ids(&state, query.tag.as_deref()).await?;
+    let result = state.video_service.list_videos(allowed_ids.as_ref()).await?;
     Ok(Json(result))
 }
 

@@ -7,7 +7,8 @@ use infrastructure::{resolve_search_strategy, AdapterFactory};
 use plugins::{PluginRegistry, PluginsConfig, PluginsToml, WebChecker, WebCheckerConfig};
 use services::{
     ChapterCheckService, DedupService, DeviceService, EbookService, GameService, ImageService,
-    SearchConfig, SyncService, VaultService, VideoService, WebReaderService,
+    ProgressService, SearchConfig, SyncService, TagService, VaultService, VideoService,
+    WebReaderService,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -85,6 +86,11 @@ pub fn build_app_router(
         config.device_id.clone(),
         effective_hostname,
     ));
+    let progress_service = Arc::new(ProgressService::new(bundle.progress_repo.clone()));
+    let tag_service = Arc::new(TagService::new(
+        bundle.tag_repo.clone(),
+        bundle.resource_tag_repo.clone(),
+    ));
 
     let mut state = AppState::new(
         ebook_service,
@@ -123,6 +129,8 @@ pub fn build_app_router(
     state = state.with_dedup_service(dedup_service);
     state = state.with_sync_service(sync_service);
     state = state.with_device_service(device_service);
+    state = state.with_progress_service(progress_service);
+    state = state.with_tag_service(tag_service);
     state.plugin_registry = Arc::new(plugin_registry);
     state.openapi_json = generate_openapi_json();
     if config.scheduler_enabled {
@@ -177,9 +185,11 @@ fn scheduler_default_interval(config: &WebCheckerConfig) -> std::time::Duration 
 #[cfg(test)]
 mod tests {
     use axum::{
+        body::to_bytes,
         body::Body,
         http::{Request, StatusCode},
     };
+    use serde_json::{json, Value};
     use tower::ServiceExt;
 
     use super::build_app_router;
@@ -334,5 +344,86 @@ mod tests {
             .expect("response");
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn app_router_wires_progress_service() {
+        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+
+        let create_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/inventory/ebooks/add")
+                    .header("authorization", "Bearer secret")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "title": "Progress Test",
+                            "author": "Tester",
+                            "file_format": "epub"
+                        })
+                        .to_string(),
+                    ))
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+        assert_eq!(create_response.status(), StatusCode::OK);
+        let create_body = to_bytes(create_response.into_body(), usize::MAX)
+            .await
+            .expect("create body");
+        let created: Value = serde_json::from_slice(&create_body).expect("valid json");
+        let resource_id = created["resource"]["id"]
+            .as_str()
+            .expect("resource id")
+            .to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/v1/inventory/ebooks/{resource_id}/progress"))
+                    .header("authorization", "Bearer secret")
+                    .header("content-type", "application/json")
+                    .body(Body::from(json!({"progress": 0.5}).to_string()))
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn app_router_wires_tag_service() {
+        let app = build_app_router(&test_config(), "secret".to_string()).expect("build router");
+
+        let tag_list_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/tags")
+                    .header("authorization", "Bearer secret")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+        assert_eq!(tag_list_response.status(), StatusCode::OK);
+
+        let filtered_list_response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/inventory/ebooks/list?tag=sci-fi")
+                    .header("authorization", "Bearer secret")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(filtered_list_response.status(), StatusCode::OK);
     }
 }

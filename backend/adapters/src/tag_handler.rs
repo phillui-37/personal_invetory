@@ -155,9 +155,9 @@ pub async fn delete_tag(
 /// List tags attached to a resource.
 #[utoipa::path(
     get,
-    path = "/api/v1/inventory/{resource_type}/{id}/tags",
+    path = "/api/v1/inventory/{type}/{id}/tags",
     params(
-        ("resource_type" = String, Path, description = "Resource type (ebooks, web-readers, images, videos, games)"),
+        ("type" = String, Path, description = "Resource type (ebooks, web-readers, images, videos, games)"),
         ("id" = Uuid, Path, description = "Resource UUID"),
     ),
     responses(
@@ -186,9 +186,9 @@ pub async fn list_resource_tags(
 /// Attach a tag to a resource.
 #[utoipa::path(
     post,
-    path = "/api/v1/inventory/{resource_type}/{id}/tags",
+    path = "/api/v1/inventory/{type}/{id}/tags",
     params(
-        ("resource_type" = String, Path, description = "Resource type"),
+        ("type" = String, Path, description = "Resource type"),
         ("id" = Uuid, Path, description = "Resource UUID"),
     ),
     request_body = AttachTagRequest,
@@ -216,9 +216,9 @@ pub async fn attach_tag(
 /// Detach a tag from a resource.
 #[utoipa::path(
     delete,
-    path = "/api/v1/inventory/{resource_type}/{id}/tags/{tag_id}",
+    path = "/api/v1/inventory/{type}/{id}/tags/{tag_id}",
     params(
-        ("resource_type" = String, Path, description = "Resource type"),
+        ("type" = String, Path, description = "Resource type"),
         ("id" = Uuid, Path, description = "Resource UUID"),
         ("tag_id" = String, Path, description = "Tag ID"),
     ),

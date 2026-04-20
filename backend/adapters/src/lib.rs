@@ -7,6 +7,7 @@ mod ebook;
 mod error;
 mod game;
 mod image;
+mod tag_filter;
 mod notifications;
 mod openapi;
 mod progress_handler;

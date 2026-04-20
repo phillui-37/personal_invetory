@@ -1,14 +1,52 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_inventory_frontend/models/failures.dart';
+import 'package:personal_inventory_frontend/models/progress.dart';
 import 'package:personal_inventory_frontend/models/repository_inputs.dart';
 import 'package:personal_inventory_frontend/models/resources.dart';
 import 'package:personal_inventory_frontend/models/result.dart';
+import 'package:personal_inventory_frontend/models/tag.dart';
 import 'package:personal_inventory_frontend/repositories/image_repository.dart';
 import 'package:personal_inventory_frontend/repositories/in_memory_repositories.dart';
 import 'package:personal_inventory_frontend/repositories/video_repository.dart';
 import 'package:personal_inventory_frontend/repositories/game_repository.dart';
 
 void main() {
+  group('InMemoryProgressRepository', () {
+    late InMemoryProgressRepository repo;
+
+    setUp(() {
+      repo = InMemoryProgressRepository();
+    });
+
+    test('getProgress returns null when no record exists', () async {
+      final result = await repo.getProgress(ResourceType.ebook, 'res-1');
+
+      expect(result, isA<Success<ResourceProgress?, AppFailure>>());
+      expect((result as Success<ResourceProgress?, AppFailure>).value, isNull);
+    });
+
+    test('upsertProgress stores and returns the record', () async {
+      final result = await repo.upsertProgress(
+        ResourceType.ebook,
+        'res-1',
+        0.4,
+        notes: 'chapter 5',
+      );
+
+      expect(result, isA<Success<ResourceProgress, AppFailure>>());
+      final progress = (result as Success<ResourceProgress, AppFailure>).value;
+      expect(progress.resourceId, 'res-1');
+      expect(progress.progress, 0.4);
+      expect(progress.notes, 'chapter 5');
+
+      final stored = await repo.getProgress(ResourceType.ebook, 'res-1');
+      expect(
+        (stored as Success<ResourceProgress?, AppFailure>).value,
+        equals(progress),
+      );
+    });
+  });
+
   group('InMemoryImageRepository', () {
     late InMemoryImageRepository repo;
 
@@ -125,6 +163,65 @@ void main() {
     test('removeLocation returns NotFoundFailure for missing resource', () async {
       final result = await repo.removeLocation('no-id', 'loc-1');
       expect(result, isA<Failure<void, AppFailure>>());
+    });
+  });
+
+  group('InMemoryTagRepository', () {
+    late InMemoryTagRepository repo;
+
+    setUp(() {
+      repo = InMemoryTagRepository();
+    });
+
+    test('listTags returns empty initially', () async {
+      final result = await repo.listTags();
+
+      expect(result, isA<Success<List<Tag>, AppFailure>>());
+      expect((result as Success<List<Tag>, AppFailure>).value, isEmpty);
+    });
+
+    test('createTag stores normalized tag and listTags returns it', () async {
+      final createResult = await repo.createTag('  Sci-Fi  ');
+
+      expect(createResult, isA<Success<Tag, AppFailure>>());
+      final created = (createResult as Success<Tag, AppFailure>).value;
+      expect(created.name, 'sci-fi');
+
+      final listResult = await repo.listTags();
+      final tags = (listResult as Success<List<Tag>, AppFailure>).value;
+      expect(tags, contains(created));
+    });
+
+    test('tagsForResource returns tags attached to a resource', () async {
+      final created = (await repo.createTag('fantasy') as Success<Tag, AppFailure>).value;
+      await repo.attachTag(ResourceType.ebook, 'res-1', created.id);
+
+      final tagsResult = await repo.tagsForResource(ResourceType.ebook, 'res-1');
+      final tags = (tagsResult as Success<List<Tag>, AppFailure>).value;
+
+      expect(tags, equals([created]));
+    });
+
+    test('detachTag removes resource association', () async {
+      final created = (await repo.createTag('mystery') as Success<Tag, AppFailure>).value;
+      await repo.attachTag(ResourceType.ebook, 'res-1', created.id);
+
+      await repo.detachTag(ResourceType.ebook, 'res-1', created.id);
+
+      final tagsResult = await repo.tagsForResource(ResourceType.ebook, 'res-1');
+      expect((tagsResult as Success<List<Tag>, AppFailure>).value, isEmpty);
+    });
+
+    test('deleteTag removes tag and cascades resource associations', () async {
+      final created = (await repo.createTag('history') as Success<Tag, AppFailure>).value;
+      await repo.attachTag(ResourceType.ebook, 'res-1', created.id);
+
+      await repo.deleteTag(created.id);
+
+      final tagsResult = await repo.tagsForResource(ResourceType.ebook, 'res-1');
+      expect((tagsResult as Success<List<Tag>, AppFailure>).value, isEmpty);
+      final listResult = await repo.listTags();
+      expect((listResult as Success<List<Tag>, AppFailure>).value, isEmpty);
     });
   });
 
