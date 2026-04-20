@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-19 (Phase 4 complete — all P4-A through P4-H done)
+2026-04-20 (Phase 6 complete — progress tracking + tags fully merged to main)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
@@ -93,7 +93,8 @@ Deps: `adapters` → `services` → `use_cases` + `domain` ← `infrastructure`
 - **Phase 2**: Real plugin implementations, scheduler, notifications, batch import, OpenAPI refresh, and Flutter metadata/check-history UX. **✅ Implemented.**
 - **Phase 3**: Image/video/game resource types. **✅ Implemented.**
 - **Phase 4**: Ecosystem integrations (BookWalker, Kindle, Steam/DLSite/FANZA). **✅ Complete.** All Plans 1–3 implemented: vault, dedup, Steam connector, 4 additional connectors (DLSite/FANZA/BookWalker/Kindle), multi-platform SyncService, sync API, Flutter sync dashboard + ecosystem settings.
-- **Phase 5**: Optimization and hardening.
+- **Phase 5**: Optimization and hardening. ✅ Complete (device management).
+- **Phase 6**: Progress tracking + tags. **✅ Complete.** Backend domain/infra/services/adapters for progress and tags; frontend models/repos/blocs/widgets/screens; 318 backend + 204 frontend tests green.
 
 ## Phase 1 Deferred Items
 - Tags and tag-based search
