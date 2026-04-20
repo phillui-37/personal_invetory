@@ -144,6 +144,35 @@ impl EbookService {
         (updated, failed)
     }
 
+    pub async fn batch_copy_ebook_meta(
+        &self,
+        source_id: Uuid,
+        target_ids: Vec<Uuid>,
+    ) -> (usize, Vec<(Uuid, String)>) {
+        let source_meta = match self.ebook_meta_repo.get(source_id).await {
+            Ok(m) => m,
+            Err(e) => return (0, target_ids.into_iter().map(|id| (id, format!("{e:?}"))).collect()),
+        };
+        let input = UpdateEbookInput {
+            title: None,
+            notes: None,
+            author: source_meta.author.clone(),
+            isbn: source_meta.isbn.clone(),
+            publisher: source_meta.publisher.clone(),
+            language: source_meta.language.clone(),
+            file_format: source_meta.file_format.clone(),
+        };
+        let mut updated = 0usize;
+        let mut failed = Vec::new();
+        for id in target_ids {
+            match self.update_ebook(id, input.clone()).await {
+                Ok(_) => updated += 1,
+                Err(e) => failed.push((id, format!("{e:?}"))),
+            }
+        }
+        (updated, failed)
+    }
+
     pub async fn add_ebook_location(
         &self,
         resource_id: Uuid,

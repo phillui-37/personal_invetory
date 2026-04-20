@@ -2738,3 +2738,140 @@ async fn handler_batch_update_ebooks_reports_invalid_uuid_in_failed() {
     assert_eq!(json["failed"].as_array().unwrap().len(), 1);
     assert_eq!(json["failed"][0]["id"], "not-a-uuid");
 }
+
+// ── Batch copy-meta tests ─────────────────────────────────────────────────
+
+fn app_for_batch_copy_ebook_meta(source_id: Uuid, target_ids: &[Uuid]) -> axum::Router {
+    let mut all_ids = vec![source_id];
+    all_ids.extend_from_slice(target_ids);
+    let resources: Vec<Resource> = all_ids.iter().map(|&id| make_ebook_resource(id)).collect();
+    let resource_repo: Arc<dyn ResourceRepository> =
+        FakeUpdatableResourceRepo::with_resources(resources);
+    let ebook_meta = Arc::new(FakeMultiIdEbookMetaRepo::new(all_ids));
+    let location_repo = Arc::new(FakeHandlerLocationRepo);
+    let ebook_service = Arc::new(EbookService::new(
+        resource_repo.clone(),
+        ebook_meta,
+        location_repo.clone(),
+    ));
+    let web_reader_service = Arc::new(WebReaderService::new(
+        resource_repo.clone(),
+        FakeHandlerWebReaderMetaRepo::empty(),
+        location_repo.clone(),
+    ));
+    let image_service = Arc::new(ImageService::new(
+        resource_repo.clone(),
+        FakeHandlerImageMetaRepo::empty(),
+        location_repo.clone(),
+    ));
+    let video_service = Arc::new(VideoService::new(
+        resource_repo.clone(),
+        FakeHandlerVideoMetaRepo::empty(),
+        location_repo.clone(),
+    ));
+    let game_service = Arc::new(GameService::new(
+        resource_repo,
+        FakeHandlerGameMetaRepo::empty(),
+        location_repo,
+    ));
+    let state = AppState::new(
+        ebook_service,
+        web_reader_service,
+        image_service,
+        video_service,
+        game_service,
+        "secret-key".to_string(),
+    );
+    build_router(Arc::new(state))
+}
+
+#[tokio::test]
+async fn handler_batch_copy_ebook_meta_returns_updated_count() {
+    let source_id = Uuid::new_v4();
+    let target1 = Uuid::new_v4();
+    let target2 = Uuid::new_v4();
+    let app = app_for_batch_copy_ebook_meta(source_id, &[target1, target2]);
+
+    let body = json!({
+        "source_id": source_id.to_string(),
+        "target_ids": [target1.to_string(), target2.to_string()]
+    });
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/inventory/ebooks/batch-copy-meta")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::from(serde_json::to_string(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["updated"], 2);
+    assert_eq!(json["failed"].as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn handler_batch_copy_ebook_meta_invalid_source_id_returns_400() {
+    let target1 = Uuid::new_v4();
+    let app = app_for_batch_copy_ebook_meta(Uuid::new_v4(), &[target1]);
+
+    let body = json!({
+        "source_id": "not-a-uuid",
+        "target_ids": [target1.to_string()]
+    });
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/inventory/ebooks/batch-copy-meta")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::from(serde_json::to_string(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn handler_batch_copy_ebook_meta_unknown_source_reports_all_failed() {
+    let source_id = Uuid::new_v4();
+    let unknown_source = Uuid::new_v4();
+    let target1 = Uuid::new_v4();
+    // Only seed source_id in repo, not unknown_source
+    let app = app_for_batch_copy_ebook_meta(source_id, &[target1]);
+
+    let body = json!({
+        "source_id": unknown_source.to_string(),
+        "target_ids": [target1.to_string()]
+    });
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/inventory/ebooks/batch-copy-meta")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer secret-key")
+                .body(Body::from(serde_json::to_string(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["updated"], 0);
+    assert_eq!(json["failed"].as_array().unwrap().len(), 1);
+}

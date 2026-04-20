@@ -23,6 +23,14 @@ pub struct BatchUpdateRequest {
     pub fields: serde_json::Value,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct BatchCopyMetaRequest {
+    /// UUID of the source resource to copy metadata from.
+    pub source_id: String,
+    /// UUIDs of target resources to apply the copied metadata to.
+    pub target_ids: Vec<String>,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BatchUpdateResponse {
     pub updated: usize,
@@ -158,3 +166,64 @@ pub async fn batch_update_web_readers(
     failed.extend(service_failures(svc_failed));
     Ok(Json(BatchUpdateResponse { updated, failed }))
 }
+
+pub async fn batch_copy_ebook_meta(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BatchCopyMetaRequest>,
+) -> Result<Json<BatchUpdateResponse>, ApiError> {
+    let source_id = Uuid::parse_str(&req.source_id)
+        .map_err(|_| ApiError::bad_request("invalid source_id UUID".to_string()))?;
+    let (target_ids, mut failed) = parse_ids(&req.target_ids);
+    let (updated, svc_failed) = state.ebook_service.batch_copy_ebook_meta(source_id, target_ids).await;
+    failed.extend(service_failures(svc_failed));
+    Ok(Json(BatchUpdateResponse { updated, failed }))
+}
+
+pub async fn batch_copy_image_meta(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BatchCopyMetaRequest>,
+) -> Result<Json<BatchUpdateResponse>, ApiError> {
+    let source_id = Uuid::parse_str(&req.source_id)
+        .map_err(|_| ApiError::bad_request("invalid source_id UUID".to_string()))?;
+    let (target_ids, mut failed) = parse_ids(&req.target_ids);
+    let (updated, svc_failed) = state.image_service.batch_copy_image_meta(source_id, target_ids).await;
+    failed.extend(service_failures(svc_failed));
+    Ok(Json(BatchUpdateResponse { updated, failed }))
+}
+
+pub async fn batch_copy_video_meta(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BatchCopyMetaRequest>,
+) -> Result<Json<BatchUpdateResponse>, ApiError> {
+    let source_id = Uuid::parse_str(&req.source_id)
+        .map_err(|_| ApiError::bad_request("invalid source_id UUID".to_string()))?;
+    let (target_ids, mut failed) = parse_ids(&req.target_ids);
+    let (updated, svc_failed) = state.video_service.batch_copy_video_meta(source_id, target_ids).await;
+    failed.extend(service_failures(svc_failed));
+    Ok(Json(BatchUpdateResponse { updated, failed }))
+}
+
+pub async fn batch_copy_game_meta(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BatchCopyMetaRequest>,
+) -> Result<Json<BatchUpdateResponse>, ApiError> {
+    let source_id = Uuid::parse_str(&req.source_id)
+        .map_err(|_| ApiError::bad_request("invalid source_id UUID".to_string()))?;
+    let (target_ids, mut failed) = parse_ids(&req.target_ids);
+    let (updated, svc_failed) = state.game_service.batch_copy_game_meta(source_id, target_ids).await;
+    failed.extend(service_failures(svc_failed));
+    Ok(Json(BatchUpdateResponse { updated, failed }))
+}
+
+pub async fn batch_copy_web_reader_meta(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BatchCopyMetaRequest>,
+) -> Result<Json<BatchUpdateResponse>, ApiError> {
+    let source_id = Uuid::parse_str(&req.source_id)
+        .map_err(|_| ApiError::bad_request("invalid source_id UUID".to_string()))?;
+    let (target_ids, mut failed) = parse_ids(&req.target_ids);
+    let (updated, svc_failed) = state.web_reader_service.batch_copy_web_reader_meta(source_id, target_ids).await;
+    failed.extend(service_failures(svc_failed));
+    Ok(Json(BatchUpdateResponse { updated, failed }))
+}
+

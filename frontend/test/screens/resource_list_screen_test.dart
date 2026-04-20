@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:personal_inventory_frontend/blocs/batch/batch_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/ebook/ebook_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/game/game_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/image/image_bloc.dart';
@@ -35,6 +36,8 @@ void main() {
           BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
           BlocProvider(create: (_) => TagBloc(FakeTagRepository())),
           BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),
+          BlocProvider(
+              create: (_) => BatchBloc(FakeBatchOperationRepository())),
         ],
         child: const MaterialApp(
           home: ResourceListScreen(),
@@ -47,14 +50,42 @@ void main() {
     expect(find.byKey(const Key('add-resource-fab')), findsOneWidget);
   });
 
-  testWidgets('ResourceListScreen reloads list after returning from detail', (tester) async {
+  testWidgets('ResourceListScreen shows batch operations icon button',
+      (tester) async {
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => EbookBloc(FakeEbookRepository())),
+          BlocProvider(
+              create: (_) => WebReaderBloc(FakeWebReaderRepository())),
+          BlocProvider(create: (_) => ImageBloc(FakeImageRepository())),
+          BlocProvider(create: (_) => VideoBloc(FakeVideoRepository())),
+          BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
+          BlocProvider(create: (_) => TagBloc(FakeTagRepository())),
+          BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),
+          BlocProvider(
+              create: (_) => BatchBloc(FakeBatchOperationRepository())),
+        ],
+        child: const MaterialApp(
+          home: ResourceListScreen(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    expect(find.byKey(const Key('batch-operations-icon')), findsOneWidget);
+  });
+
+  testWidgets('ResourceListScreen reloads list after returning from detail',
+      (tester) async {
     final ebookRepo = FakeEbookRepository(
       listResult: const Success([
         Resource(id: 'e1', title: 'Book One', resourceType: ResourceType.ebook),
       ]),
       detailResult: const Success(
         EbookDetail(
-          resource: Resource(id: 'e1', title: 'Book One', resourceType: ResourceType.ebook),
+          resource:
+              Resource(id: 'e1', title: 'Book One', resourceType: ResourceType.ebook),
           meta: EbookMeta(resourceId: 'e1'),
           locations: [],
         ),
@@ -74,6 +105,8 @@ void main() {
           BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
           BlocProvider(create: (_) => TagBloc(FakeTagRepository())),
           BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),
+          BlocProvider(
+              create: (_) => BatchBloc(FakeBatchOperationRepository())),
         ],
         child: const MaterialApp(
           home: ResourceListScreen(),

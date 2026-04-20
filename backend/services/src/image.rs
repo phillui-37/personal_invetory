@@ -145,6 +145,34 @@ impl ImageService {
         (updated, failed)
     }
 
+    pub async fn batch_copy_image_meta(
+        &self,
+        source_id: Uuid,
+        target_ids: Vec<Uuid>,
+    ) -> (usize, Vec<(Uuid, String)>) {
+        let source_meta = match self.image_meta_repo.get(source_id).await {
+            Ok(m) => m,
+            Err(e) => return (0, target_ids.into_iter().map(|id| (id, format!("{e:?}"))).collect()),
+        };
+        let input = UpdateImageInput {
+            title: None,
+            notes: None,
+            width: source_meta.width,
+            height: source_meta.height,
+            file_format: source_meta.file_format.clone(),
+            file_size_bytes: source_meta.file_size_bytes,
+        };
+        let mut updated = 0usize;
+        let mut failed = Vec::new();
+        for id in target_ids {
+            match self.update_image(id, input.clone()).await {
+                Ok(_) => updated += 1,
+                Err(e) => failed.push((id, format!("{e:?}"))),
+            }
+        }
+        (updated, failed)
+    }
+
     pub async fn add_image_location(
         &self,
         resource_id: Uuid,

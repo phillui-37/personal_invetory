@@ -156,6 +156,35 @@ impl WebReaderService {
         (updated, failed)
     }
 
+    pub async fn batch_copy_web_reader_meta(
+        &self,
+        source_id: Uuid,
+        target_ids: Vec<Uuid>,
+    ) -> (usize, Vec<(Uuid, String)>) {
+        let source_meta = match self.web_reader_meta_repo.get(source_id).await {
+            Ok(m) => m,
+            Err(e) => return (0, target_ids.into_iter().map(|id| (id, format!("{e:?}"))).collect()),
+        };
+        let input = UpdateWebReaderInput {
+            title: None,
+            notes: None,
+            url: None,
+            site_name: source_meta.site_name.clone(),
+            last_checked_chapter: source_meta.last_checked_chapter.clone(),
+            check_interval_secs: source_meta.check_interval_secs,
+            progress_css_selector: source_meta.progress_css_selector.clone(),
+        };
+        let mut updated = 0usize;
+        let mut failed = Vec::new();
+        for id in target_ids {
+            match self.update_web_reader(id, input.clone()).await {
+                Ok(_) => updated += 1,
+                Err(e) => failed.push((id, format!("{e:?}"))),
+            }
+        }
+        (updated, failed)
+    }
+
     pub async fn add_web_reader_location(
         &self,
         resource_id: Uuid,

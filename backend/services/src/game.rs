@@ -145,6 +145,35 @@ impl GameService {
         (updated, failed)
     }
 
+    pub async fn batch_copy_game_meta(
+        &self,
+        source_id: Uuid,
+        target_ids: Vec<Uuid>,
+    ) -> (usize, Vec<(Uuid, String)>) {
+        let source_meta = match self.game_meta_repo.get(source_id).await {
+            Ok(m) => m,
+            Err(e) => return (0, target_ids.into_iter().map(|id| (id, format!("{e:?}"))).collect()),
+        };
+        let input = UpdateGameInput {
+            title: None,
+            notes: None,
+            platform: source_meta.platform.clone(),
+            store: source_meta.store.clone(),
+            developer: source_meta.developer.clone(),
+            publisher: source_meta.publisher.clone(),
+            manual_notes: source_meta.manual_notes.clone(),
+        };
+        let mut updated = 0usize;
+        let mut failed = Vec::new();
+        for id in target_ids {
+            match self.update_game(id, input.clone()).await {
+                Ok(_) => updated += 1,
+                Err(e) => failed.push((id, format!("{e:?}"))),
+            }
+        }
+        (updated, failed)
+    }
+
     pub async fn add_game_location(
         &self,
         resource_id: Uuid,

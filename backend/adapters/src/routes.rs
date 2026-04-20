@@ -10,8 +10,9 @@ use crate::{
     auth_middleware,
     batch_import::batch_import_ebooks,
     batch_update::{
-        batch_update_ebooks, batch_update_games, batch_update_images, batch_update_videos,
-        batch_update_web_readers,
+        batch_copy_ebook_meta, batch_copy_game_meta, batch_copy_image_meta,
+        batch_copy_video_meta, batch_copy_web_reader_meta, batch_update_ebooks,
+        batch_update_games, batch_update_images, batch_update_videos, batch_update_web_readers,
     },
     chapter_check::{list_chapter_checks, trigger_chapter_check},
     dedup_handler::{dismiss_warning, list_pending_warnings, merge_resources, scan_duplicates},
@@ -242,6 +243,27 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/api/v1/inventory/web-readers/batch-update",
             patch(batch_update_web_readers),
+        )
+        // Batch copy metadata
+        .route(
+            "/api/v1/inventory/ebooks/batch-copy-meta",
+            post(batch_copy_ebook_meta),
+        )
+        .route(
+            "/api/v1/inventory/images/batch-copy-meta",
+            post(batch_copy_image_meta),
+        )
+        .route(
+            "/api/v1/inventory/videos/batch-copy-meta",
+            post(batch_copy_video_meta),
+        )
+        .route(
+            "/api/v1/inventory/games/batch-copy-meta",
+            post(batch_copy_game_meta),
+        )
+        .route(
+            "/api/v1/inventory/web-readers/batch-copy-meta",
+            post(batch_copy_web_reader_meta),
         )
         // Tags
         .route("/api/v1/tags", get(list_tags).post(create_tag))

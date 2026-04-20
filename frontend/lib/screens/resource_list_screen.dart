@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../blocs/batch/batch_bloc.dart';
 import '../blocs/ebook/ebook_bloc.dart';
 import '../blocs/game/game_bloc.dart';
 import '../blocs/image/image_bloc.dart';
@@ -12,6 +13,7 @@ import '../models/tag.dart';
 import '../widgets/app_failure_text.dart';
 import '../widgets/resource_list_item.dart';
 import 'add_resource_screen.dart';
+import 'batch_operations_screen.dart';
 import 'resource_detail_screen.dart';
 
 class ResourceListScreen extends StatefulWidget {
@@ -42,6 +44,34 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Resources'),
+          actions: [
+            IconButton(
+              key: const Key('batch-operations-icon'),
+              icon: const Icon(Icons.library_books),
+              tooltip: 'Batch operations',
+              onPressed: () {
+                final batchBloc = context.read<BatchBloc>();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => BlocProvider.value(
+                      value: batchBloc,
+                      child: BatchOperationsScreen(
+                        onImport: (req) => batchBloc.add(
+                          BatchImportRequested(req),
+                        ),
+                        onUpdate: (req) => batchBloc.add(
+                          BatchUpdateMetadataRequested(req),
+                        ),
+                        onCopy: (req) => batchBloc.add(
+                          BatchCopyMetadataRequested(req),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
           bottom: const TabBar(
             isScrollable: true,
             tabs: [

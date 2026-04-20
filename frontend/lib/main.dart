@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'blocs/batch/batch_bloc.dart';
 import 'blocs/dedup/dedup_bloc.dart';
 import 'blocs/device/device_bloc.dart';
 import 'blocs/ebook/ebook_bloc.dart';
@@ -13,6 +14,8 @@ import 'blocs/vault/vault_bloc.dart';
 import 'blocs/video/video_bloc.dart';
 import 'blocs/web_reader/web_reader_bloc.dart';
 import 'config/app_config.dart';
+import 'models/resources.dart';
+import 'repositories/http_batch_operation_repository.dart';
 import 'repositories/http_dedup_repository.dart';
 import 'repositories/http_device_repository.dart';
 import 'repositories/http_sync_repository.dart';
@@ -44,6 +47,10 @@ class PersonalInventoryApp extends StatelessWidget {
     final dedupRepository = HttpDedupRepository(config: config);
     final syncRepository = HttpSyncRepository(config: config);
     final deviceRepository = HttpDeviceRepository(config: config);
+    final batchRepository = HttpBatchOperationRepository(
+      config: config,
+      resourceType: ResourceType.ebook,
+    );
 
     return MultiBlocProvider(
       providers: [
@@ -60,6 +67,7 @@ class PersonalInventoryApp extends StatelessWidget {
         BlocProvider<DedupBloc>(create: (_) => DedupBloc(dedupRepository)),
         BlocProvider<SyncBloc>(create: (_) => SyncBloc(syncRepository)),
         BlocProvider<DeviceBloc>(create: (_) => DeviceBloc(deviceRepository)),
+        BlocProvider<BatchBloc>(create: (_) => BatchBloc(batchRepository)),
       ],
       child: MaterialApp(
         home: _AppShell(ebookRepository: ebookRepository),

@@ -145,6 +145,34 @@ impl VideoService {
         (updated, failed)
     }
 
+    pub async fn batch_copy_video_meta(
+        &self,
+        source_id: Uuid,
+        target_ids: Vec<Uuid>,
+    ) -> (usize, Vec<(Uuid, String)>) {
+        let source_meta = match self.video_meta_repo.get(source_id).await {
+            Ok(m) => m,
+            Err(e) => return (0, target_ids.into_iter().map(|id| (id, format!("{e:?}"))).collect()),
+        };
+        let input = UpdateVideoInput {
+            title: None,
+            notes: None,
+            duration_secs: source_meta.duration_secs,
+            file_format: source_meta.file_format.clone(),
+            resolution: source_meta.resolution.clone(),
+            file_size_bytes: source_meta.file_size_bytes,
+        };
+        let mut updated = 0usize;
+        let mut failed = Vec::new();
+        for id in target_ids {
+            match self.update_video(id, input.clone()).await {
+                Ok(_) => updated += 1,
+                Err(e) => failed.push((id, format!("{e:?}"))),
+            }
+        }
+        (updated, failed)
+    }
+
     pub async fn add_video_location(
         &self,
         resource_id: Uuid,

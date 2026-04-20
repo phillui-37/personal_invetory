@@ -10,6 +10,7 @@ import 'package:personal_inventory_frontend/models/tag.dart';
 import 'package:personal_inventory_frontend/models/vault.dart';
 import 'package:personal_inventory_frontend/repositories/dedup_repository.dart';
 import 'package:personal_inventory_frontend/repositories/device_repository.dart';
+import 'package:personal_inventory_frontend/repositories/batch_operation_repository.dart';
 import 'package:personal_inventory_frontend/repositories/ebook_repository.dart';
 import 'package:personal_inventory_frontend/repositories/game_repository.dart';
 import 'package:personal_inventory_frontend/repositories/image_repository.dart';
@@ -860,5 +861,60 @@ class FakeDeviceRepository implements DeviceRepository {
   Future<Result<void, AppFailure>> delinkDevice(String deviceId) async {
     lastDelinkId = deviceId;
     return delinkResult;
+  }
+}
+
+class FakeBatchOperationRepository implements BatchOperationRepository {
+  FakeBatchOperationRepository({
+    this.importResult = const Success(BatchOperationResponse(
+      type: BatchOperationType.importResources,
+      results: [],
+    )),
+    this.updateResult = const Success(BatchOperationResponse(
+      type: BatchOperationType.updateMetadata,
+      results: [],
+    )),
+    this.copyResult = const Success(BatchOperationResponse(
+      type: BatchOperationType.copyMetadata,
+      results: [],
+    )),
+  });
+
+  Result<BatchOperationResponse, AppFailure> importResult;
+  Result<BatchOperationResponse, AppFailure> updateResult;
+  Result<BatchOperationResponse, AppFailure> copyResult;
+
+  int importCalls = 0;
+  int updateCalls = 0;
+  int copyCalls = 0;
+  BatchImportRequest? lastImportRequest;
+  BatchMetadataUpdateRequest? lastUpdateRequest;
+  BatchMetadataCopyRequest? lastCopyRequest;
+
+  @override
+  Future<Result<BatchOperationResponse, AppFailure>> batchImport(
+    BatchImportRequest request,
+  ) async {
+    importCalls += 1;
+    lastImportRequest = request;
+    return importResult;
+  }
+
+  @override
+  Future<Result<BatchOperationResponse, AppFailure>> batchUpdateMetadata(
+    BatchMetadataUpdateRequest request,
+  ) async {
+    updateCalls += 1;
+    lastUpdateRequest = request;
+    return updateResult;
+  }
+
+  @override
+  Future<Result<BatchOperationResponse, AppFailure>> batchCopyMetadata(
+    BatchMetadataCopyRequest request,
+  ) async {
+    copyCalls += 1;
+    lastCopyRequest = request;
+    return copyResult;
   }
 }
