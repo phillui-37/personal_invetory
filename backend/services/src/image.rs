@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use domain::{
     DomainError, ImageMeta, ImageMetaRepository, LocationRepository, Resource, ResourceLocation,
@@ -6,7 +6,7 @@ use domain::{
 };
 use uuid::Uuid;
 
-use crate::{map_validation_error, NewLocationInput};
+use crate::{filter_resources_by_type, map_validation_error, NewLocationInput};
 use crate::{search::build_search_strategy, SearchConfig};
 use use_cases::image::{NewImageInput, UpdateImageInput};
 
@@ -52,14 +52,15 @@ impl ImageService {
         }
     }
 
-    pub async fn list_images(&self) -> Result<Vec<Resource>, DomainError> {
-        Ok(self
-            .resource_repo
-            .list()
-            .await?
-            .into_iter()
-            .filter(|r| r.resource_type == domain::ResourceType::Image)
-            .collect())
+    pub async fn list_images(
+        &self,
+        allowed_ids: Option<&HashSet<Uuid>>,
+    ) -> Result<Vec<Resource>, DomainError> {
+        Ok(filter_resources_by_type(
+            self.resource_repo.list().await?,
+            domain::ResourceType::Image,
+            allowed_ids,
+        ))
     }
 
     pub async fn search_images(&self, query: &str) -> Result<Vec<Resource>, DomainError> {

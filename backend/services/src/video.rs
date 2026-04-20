@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use domain::{
     DomainError, LocationRepository, Resource, ResourceLocation, ResourceRepository, VideoMeta,
@@ -6,7 +6,7 @@ use domain::{
 };
 use uuid::Uuid;
 
-use crate::{map_validation_error, NewLocationInput};
+use crate::{filter_resources_by_type, map_validation_error, NewLocationInput};
 use crate::{search::build_search_strategy, SearchConfig};
 use use_cases::video::{NewVideoInput, UpdateVideoInput};
 
@@ -52,14 +52,15 @@ impl VideoService {
         }
     }
 
-    pub async fn list_videos(&self) -> Result<Vec<Resource>, DomainError> {
-        Ok(self
-            .resource_repo
-            .list()
-            .await?
-            .into_iter()
-            .filter(|r| r.resource_type == domain::ResourceType::Video)
-            .collect())
+    pub async fn list_videos(
+        &self,
+        allowed_ids: Option<&HashSet<Uuid>>,
+    ) -> Result<Vec<Resource>, DomainError> {
+        Ok(filter_resources_by_type(
+            self.resource_repo.list().await?,
+            domain::ResourceType::Video,
+            allowed_ids,
+        ))
     }
 
     pub async fn search_videos(&self, query: &str) -> Result<Vec<Resource>, DomainError> {

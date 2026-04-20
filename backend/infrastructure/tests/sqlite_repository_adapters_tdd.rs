@@ -885,3 +885,254 @@ fn sqlite_device_repository_register_is_atomic() {
         );
     });
 }
+
+#[test]
+fn sqlite_progress_repository_upsert_rejects_missing_resource() {
+    let bundle = sqlite_bundle();
+    let result = block_on(bundle.progress_repo.upsert("missing-resource", 0.25, None));
+    assert!(
+        matches!(result, Err(DomainError::NotFound(_))),
+        "expected NotFound for missing FK, got: {result:?}"
+    );
+}
+
+#[test]
+fn sqlite_progress_repository_upsert_rejects_invalid_progress() {
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Check Constraint Test Book".to_string(),
+                notes: None,
+                resource_type: ResourceType::Ebook,
+            })
+            .await
+            .expect("create resource");
+
+        let resource_id = resource.id.to_string();
+        let result = bundle.progress_repo.upsert(&resource_id, 1.5, None).await;
+        assert!(
+            matches!(result, Err(DomainError::Conflict(_))),
+            "expected Conflict for CHECK constraint violation, got: {result:?}"
+        );
+    });
+}
+
+#[test]
+fn sqlite_progress_repository_get_returns_none_when_no_row() {
+    let bundle = sqlite_bundle();
+    let result = block_on(bundle.progress_repo.get("nonexistent-resource-id")).unwrap();
+    assert!(result.is_none());
+}
+
+#[test]
+fn sqlite_progress_repository_upsert_creates_and_updates() {
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Progress Test Book".to_string(),
+                notes: None,
+                resource_type: ResourceType::Ebook,
+            })
+            .await
+            .expect("create resource");
+
+        let resource_id = resource.id.to_string();
+
+        // First upsert (create)
+        let p1 = bundle
+            .progress_repo
+            .upsert(&resource_id, 0.25, Some("just started"))
+            .await
+            .expect("first upsert");
+        assert_eq!(p1.resource_id, resource_id);
+        assert!((p1.progress - 0.25).abs() < f64::EPSILON);
+        assert_eq!(p1.notes, Some("just started".to_string()));
+
+        // Get should return the row
+        let fetched = bundle
+            .progress_repo
+            .get(&resource_id)
+            .await
+            .expect("get after first upsert")
+            .expect("row should exist");
+        assert_eq!(fetched.resource_id, resource_id);
+        assert!((fetched.progress - 0.25).abs() < f64::EPSILON);
+
+        // Second upsert (update)
+        let p2 = bundle
+            .progress_repo
+            .upsert(&resource_id, 0.75, None)
+            .await
+            .expect("second upsert");
+        assert!((p2.progress - 0.75).abs() < f64::EPSILON);
+        assert_eq!(p2.notes, None);
+
+        // Confirm update persisted
+        let final_p = bundle
+            .progress_repo
+            .get(&resource_id)
+            .await
+            .expect("get after second upsert")
+            .expect("row should still exist");
+        assert!((final_p.progress - 0.75).abs() < f64::EPSILON);
+        assert_eq!(final_p.notes, None);
+    });
+}
+
+#[test]
+fn sqlite_tag_repository_create_and_list() {
+    use domain::tag::{TagRepository, ResourceTagRepository};
+
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        // Empty list initially
+        let empty = bundle.tag_repo.list().await.expect("list tags on empty db");
+        assert!(empty.is_empty());
+
+        // Create two tags
+        let sci_fi = bundle.tag_repo.create("sci-fi").await.expect("create sci-fi");
+        let backlog = bundle.tag_repo.create("backlog").await.expect("create backlog");
+
+        // list() returns both ordered by name
+        let all = bundle.tag_repo.list().await.expect("list after create");
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[0].name, "backlog");
+        assert_eq!(all[1].name, "sci-fi");
+
+        // get_by_name
+        let found = bundle.tag_repo.get_by_name("sci-fi").await.expect("get_by_name sci-fi");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, sci_fi.id);
+
+        // get_by_id
+        let by_id = bundle.tag_repo.get_by_id(&backlog.id).await.expect("get_by_id backlog");
+        assert!(by_id.is_some());
+        assert_eq!(by_id.unwrap().name, "backlog");
+
+        // get_by_id missing
+        let missing = bundle.tag_repo.get_by_id("nonexistent").await.expect("get_by_id missing");
+        assert!(missing.is_none());
+
+        // create duplicate → Conflict
+        let dup = bundle.tag_repo.create("sci-fi").await;
+        assert!(matches!(dup, Err(DomainError::Conflict(_))), "duplicate name must be Conflict, got: {dup:?}");
+    });
+}
+
+#[test]
+fn sqlite_tag_repository_delete_cascades_resource_tags() {
+    use domain::tag::{TagRepository, ResourceTagRepository};
+
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        let resource = bundle
+            .resource_repo
+            .create(NewResource {
+                title: "Tag Cascade Test Book".to_string(),
+                notes: None,
+                resource_type: ResourceType::Ebook,
+            })
+            .await
+            .expect("create resource");
+        let resource_id = resource.id.to_string();
+
+        let tag = bundle.tag_repo.create("to-delete").await.expect("create tag");
+
+        bundle.resource_tag_repo.attach(&resource_id, &tag.id).await.expect("attach tag");
+
+        // Confirm attached
+        let tags_before = bundle.resource_tag_repo.tags_for_resource(&resource_id).await.expect("tags before delete");
+        assert_eq!(tags_before.len(), 1);
+
+        // Delete tag cascades resource_tags
+        bundle.tag_repo.delete(&tag.id).await.expect("delete tag");
+
+        let tags_after = bundle.resource_tag_repo.tags_for_resource(&resource_id).await.expect("tags after delete");
+        assert!(tags_after.is_empty(), "resource_tags must be empty after tag deletion");
+
+        let gone = bundle.tag_repo.get_by_id(&tag.id).await.expect("get_by_id after delete");
+        assert!(gone.is_none(), "tag must not be found after deletion");
+
+        // delete unknown → NotFound
+        let err = bundle.tag_repo.delete("nonexistent-tag").await;
+        assert!(matches!(err, Err(DomainError::NotFound(_))), "deleting unknown tag must be NotFound");
+    });
+}
+
+#[test]
+fn sqlite_resource_tag_repository_attach_detach_and_filter() {
+    use domain::tag::{TagRepository, ResourceTagRepository};
+
+    let bundle = sqlite_bundle();
+
+    block_on(async {
+        // Create 2 resources and 2 tags
+        let r1 = bundle.resource_repo.create(NewResource {
+            title: "Resource One".to_string(),
+            notes: None,
+            resource_type: ResourceType::Ebook,
+        }).await.expect("create r1");
+        let r2 = bundle.resource_repo.create(NewResource {
+            title: "Resource Two".to_string(),
+            notes: None,
+            resource_type: ResourceType::Ebook,
+        }).await.expect("create r2");
+
+        let tag_a = bundle.tag_repo.create("tag-a").await.expect("create tag-a");
+        let tag_b = bundle.tag_repo.create("tag-b").await.expect("create tag-b");
+
+        let r1_id = r1.id.to_string();
+        let r2_id = r2.id.to_string();
+
+        // Attach tag A to both resources, tag B to r1 only
+        bundle.resource_tag_repo.attach(&r1_id, &tag_a.id).await.expect("attach tag-a to r1");
+        bundle.resource_tag_repo.attach(&r2_id, &tag_a.id).await.expect("attach tag-a to r2");
+        bundle.resource_tag_repo.attach(&r1_id, &tag_b.id).await.expect("attach tag-b to r1");
+
+        // tags_for_resource(r1) = [tag_a, tag_b] ordered by name
+        let r1_tags = bundle.resource_tag_repo.tags_for_resource(&r1_id).await.expect("tags for r1");
+        assert_eq!(r1_tags.len(), 2);
+        assert_eq!(r1_tags[0].name, "tag-a");
+        assert_eq!(r1_tags[1].name, "tag-b");
+
+        // resource_ids_with_tag_id(tag_a) returns both resource IDs
+        let with_tag_a = bundle.resource_tag_repo.resource_ids_with_tag_id(&tag_a.id).await.expect("resource_ids_with_tag_id");
+        assert_eq!(with_tag_a.len(), 2);
+        assert!(with_tag_a.contains(&r1_id));
+        assert!(with_tag_a.contains(&r2_id));
+
+        // Detach tag B from r1
+        bundle.resource_tag_repo.detach(&r1_id, &tag_b.id).await.expect("detach tag-b from r1");
+
+        // r1 now only has tag_a
+        let r1_tags_after = bundle.resource_tag_repo.tags_for_resource(&r1_id).await.expect("tags for r1 after detach");
+        assert_eq!(r1_tags_after.len(), 1);
+        assert_eq!(r1_tags_after[0].name, "tag-a");
+
+        // detach same association again → NotFound
+        let err = bundle.resource_tag_repo.detach(&r1_id, &tag_b.id).await;
+        assert!(matches!(err, Err(DomainError::NotFound(_))), "detach non-existent must be NotFound, got: {err:?}");
+
+        // re-attach existing association is idempotent
+        bundle.resource_tag_repo.attach(&r1_id, &tag_a.id).await.expect("re-attach tag-a to r1 must be idempotent");
+
+        // Verify no duplicate association was created
+        let r1_tags_after_reattach = bundle.resource_tag_repo.tags_for_resource(&r1_id).await.expect("tags for r1 after reattach");
+        assert_eq!(r1_tags_after_reattach.len(), 1, "re-attach should not create duplicate");
+        assert_eq!(r1_tags_after_reattach[0].name, "tag-a");
+
+        // Stronger check: verify resource_ids_with_tag_id still has exactly 2 unique resource IDs for tag_a
+        let with_tag_a_after = bundle.resource_tag_repo.resource_ids_with_tag_id(&tag_a.id).await.expect("resource_ids_with_tag_id after reattach");
+        assert_eq!(with_tag_a_after.len(), 2, "tag-a should still be attached to exactly 2 resources");
+        assert!(with_tag_a_after.contains(&r1_id));
+        assert!(with_tag_a_after.contains(&r2_id));
+    });
+}

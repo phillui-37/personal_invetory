@@ -6,7 +6,9 @@ import 'blocs/device/device_bloc.dart';
 import 'blocs/ebook/ebook_bloc.dart';
 import 'blocs/game/game_bloc.dart';
 import 'blocs/image/image_bloc.dart';
+import 'blocs/progress/progress_bloc.dart';
 import 'blocs/sync/sync_bloc.dart';
+import 'blocs/tag/tag_bloc.dart';
 import 'blocs/vault/vault_bloc.dart';
 import 'blocs/video/video_bloc.dart';
 import 'blocs/web_reader/web_reader_bloc.dart';
@@ -35,6 +37,8 @@ class PersonalInventoryApp extends StatelessWidget {
     final imageRepository = InMemoryImageRepository();
     final videoRepository = InMemoryVideoRepository();
     final gameRepository = InMemoryGameRepository();
+    final progressRepository = InMemoryProgressRepository();
+    final tagRepository = InMemoryTagRepository();
     final config = AppConfig.fromEnvironment();
     final vaultRepository = HttpVaultRepository(config: config);
     final dedupRepository = HttpDedupRepository(config: config);
@@ -44,10 +48,14 @@ class PersonalInventoryApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider<EbookBloc>(create: (_) => EbookBloc(ebookRepository)),
-        BlocProvider<WebReaderBloc>(create: (_) => WebReaderBloc(webReaderRepository)),
+        BlocProvider<WebReaderBloc>(
+            create: (_) => WebReaderBloc(webReaderRepository)),
         BlocProvider<ImageBloc>(create: (_) => ImageBloc(imageRepository)),
         BlocProvider<VideoBloc>(create: (_) => VideoBloc(videoRepository)),
         BlocProvider<GameBloc>(create: (_) => GameBloc(gameRepository)),
+        BlocProvider<ProgressBloc>(
+            create: (_) => ProgressBloc(progressRepository)),
+        BlocProvider<TagBloc>(create: (_) => TagBloc(tagRepository)),
         BlocProvider<VaultBloc>(create: (_) => VaultBloc(vaultRepository)),
         BlocProvider<DedupBloc>(create: (_) => DedupBloc(dedupRepository)),
         BlocProvider<SyncBloc>(create: (_) => SyncBloc(syncRepository)),
@@ -89,10 +97,13 @@ class _AppShellState extends State<_AppShell> {
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.inventory_2), label: 'Inventory'),
+          NavigationDestination(
+              icon: Icon(Icons.inventory_2), label: 'Inventory'),
           NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
-          NavigationDestination(icon: Icon(Icons.batch_prediction), label: 'Batch'),
-          NavigationDestination(icon: Icon(Icons.cloud_sync), label: 'Ecosystem'),
+          NavigationDestination(
+              icon: Icon(Icons.batch_prediction), label: 'Batch'),
+          NavigationDestination(
+              icon: Icon(Icons.cloud_sync), label: 'Ecosystem'),
         ],
       ),
     );

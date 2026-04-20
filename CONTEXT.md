@@ -259,40 +259,28 @@ Implemented device management as a first-class feature:
 - **Database**: `owner_id` legacy field: set to `device_id` value on all new inserts.
 - **Test Count**: Backend 261 (baseline 251). Flutter 174 (baseline 159).
 
-## Phase 6 — Backend Progress
+## Phase 6 — Progress + Tags (✅ Complete)
 
-- **P6-H review hardening**: tag handlers now have negative-path coverage for duplicate tag creation (409), missing-tag attach (404), unsupported resource type (422), and OpenAPI smoke coverage for all tag routes. Tag OpenAPI path params were standardized to `{type}`.
-- **P6-I tag filtering**: all 5 inventory list endpoints now accept optional `?tag=<name>` filters. Blank `?tag=` is ignored. Adapters share a tag-filter resolver, and services share a typed resource filter helper so filtering logic stays consistent across ebook/web-reader/image/video/game lists.
-- **P6-J runtime wiring**: `ProgressService` and `TagService` are now constructed in `backend/app/src/runtime.rs` and attached to `AppState`, so progress routes, tag routes, and tag-filtered list endpoints are live in the real app runtime.
-- **Verification**: `cd backend && cargo test`; `cd frontend && flutter test`.
+### Backend (P6-A through P6-J)
+- **Domain**: `ResourceProgress` (progress f64 0–1, notes, updated_at) + `ProgressRepository` trait; `Tag` + `TagRepository` trait.
+- **Infrastructure**: Migrations 0019 (`resource_progress`) + 0020 (`tags`, `resource_tags`). `SqliteProgressRepository`, `SqliteTagRepository`.
+- **Services**: `ProgressService` (get/upsert), `TagService` (create/delete/list/attach/detach/list-by-resource).
+- **Adapters**: Progress routes (`GET/POST /api/v1/inventory/:type/:id/progress`); Tag routes (CRUD + attach/detach + list-by-resource). Tag-filter resolver shared across all 5 inventory list endpoints (`?tag=<name>`).
+- **Runtime**: `ProgressService` + `TagService` wired into `AppState` in `backend/app/src/runtime.rs`.
+- **Tests**: 318 backend tests green.
 
-## Phase 6 — P6-P Frontend Integration (IN PROGRESS)
-
-**Branch**: `feature/phase6-progress-tags` in worktree `.worktrees/feature-phase6-progress-tags`
-
-**Status**: All 16 tasks P6-A through P6-O complete. P6-P (widget integration) is ~95% done.
-
-**What's done in P6-P**:
-- `ProgressEditor` + `TagChipList` widgets created and GREEN (8 widget tests passing)
-- `main.dart`: `InMemoryTagRepository` + `TagBloc` wired
-- `resource_detail_screen.dart`: Full rewrite — TagBloc + ProgressBloc listeners, state vars (`_currentProgress`, `_currentTags`, `_allTags`, `_pendingTagName`), create-then-attach tag flow, all 5 body types updated with ProgressEditor + TagChipList
-- `resource_list_screen.dart`: TagBloc + `_TagFilterBar` widget with FilterChips, `_activeTagName` state, `tagFilter` param on `_ResourceTab`
-- Test fixes: All screen tests have `TagBloc(FakeTagRepository())` providers
-
-**What remains before commit**:
-1. Fix 1 failing test: `resource_list_screen_test.dart` "reloads list after returning from detail"
-   - **Root cause**: Second `MultiBlocProvider` in that test (lines 67–80) is missing `ProgressBloc` provider
-   - **Fix applied**: Added `ProgressBloc` import + provider to first test setup already; second setup still needs `ProgressBloc` added (line 75 block, lines 66-80)
-   - **Exact change needed**: Add `BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),` after line 75 in `test/screens/resource_list_screen_test.dart`
-2. Run full flutter test to confirm 0 failures
-3. Run `cd backend && cargo test` to confirm no regressions
-4. Commit to `feature/phase6-progress-tags`
-5. Merge/finish branch via `finishing-a-development-branch` skill
+### Frontend (P6-K through P6-P)
+- **Models**: `ResourceProgress`, `Tag` + JSON serialization.
+- **Repositories**: `ProgressRepository` + `HttpProgressRepository`; `TagRepository` + `HttpTagRepository`.
+- **BLoCs**: `ProgressBloc` (LoadProgress, UpdateProgress); `TagBloc` (LoadTags, LoadResourceTags, CreateTag, DeleteTag, AttachTag, DetachTag).
+- **Widgets**: `ProgressEditor`, `TagChipList`.
+- **Screens**: `resource_detail_screen.dart` — full rewrite with TagBloc + ProgressBloc, create-then-attach tag flow; `resource_list_screen.dart` — `_TagFilterBar` with FilterChips.
+- **Tests**: 204 frontend tests green.
 
 **Key technical notes**:
-- `DateTime.utc()` is NOT a compile-time const in Dart — do not use as const sentinel
-- Create-then-attach flow: check `_allTags` via `indexWhere` → if found dispatch AttachTag; if not, set `_pendingTagName`, dispatch CreateTag → on TagOperationSuccess(created) dispatch LoadTags → on TagListLoaded with pending name, dispatch AttachTag
-- Every screen test's `MultiBlocProvider` needs both `ProgressBloc(FakeProgressRepository())` AND `TagBloc(FakeTagRepository())`
+- `DateTime.utc()` is NOT a compile-time const in Dart — do not use as const sentinel.
+- Create-then-attach flow: `indexWhere` in `_allTags` → if found dispatch AttachTag; if not, set `_pendingTagName`, dispatch CreateTag → on TagOperationSuccess(created) dispatch LoadTags → on TagListLoaded with pending name, dispatch AttachTag.
+- Every screen test's `MultiBlocProvider` needs both `ProgressBloc(FakeProgressRepository())` AND `TagBloc(FakeTagRepository())`.
 
 ## References
 - Requirements: `TODO.md`
@@ -303,3 +291,19 @@ Implemented device management as a first-class feature:
 - Phase 4 design spec: `docs/superpowers/specs/2026-04-18-phase4-ecosystem-integrations-design.md`
 - Phase 4 Plan 1: `docs/superpowers/plans/2026-04-18-phase4-plan1-foundations-steam.md`
 - Phase 4 Plan 2: `docs/superpowers/plans/2026-04-19-phase4-plan2-frontend-ecosystem-ux.md`
+
+## 2026-04-19 — Phase 6 P6-O TagBloc
+
+- Scope locked to Flutter frontend P6-O only. No UI wiring, no unrelated screen changes.
+- Plan: add `TagBloc` in `frontend/lib/blocs/tag/tag_bloc.dart` using the same Result-based BLoC pattern as `DeviceBloc` and `WebReaderBloc`.
+- Events/states for current phase only: load tags, create/delete tag, load resource tags, attach/detach tag; states stay narrow (`Initial`, `Loading`, list/resource-loaded, operation-success, error).
+- TDD order: write `frontend/test/blocs/tag/tag_bloc_test.dart`, run it red, then implement minimal bloc code and rerun relevant Flutter tests green.
+- Result: `TagBloc` added with `TagOperationType { created, deleted, attached, detached }`, load/resource-load states, and Result.when-based success/error folding. New bloc tests cover all six Phase 6 events; relevant Flutter tag tests are green.
+
+## 2026-04-19 — Phase 6 P6-N ProgressBloc
+
+- Scope locked to Flutter frontend P6-N only. No tag UI work, no broad screen rewrites.
+- TDD order kept: added `frontend/test/blocs/progress/progress_bloc_test.dart`, ran it red on missing `ProgressBloc`, then implemented the bloc and rewired the web reader tracker path.
+- Result: `frontend/lib/blocs/progress/progress_bloc.dart` now handles `LoadProgress` and `UpdateProgress` with `Result.when`, emitting `ProgressInitial`, `ProgressLoading`, `ProgressLoaded`, `ProgressUpdated`, and `ProgressError`.
+- Wiring: `ResourceDetailScreen` now routes `WebReaderProgressTracker.onProgressUpdate` into `ProgressBloc(UpdateProgress(...))`, reloads web reader detail after successful progress updates, and shows snackbar errors from `ProgressError`.
+- Provider: app-level `ProgressBloc` added in `frontend/lib/main.dart` using the existing in-memory repository wiring pattern already used by the current app shell.

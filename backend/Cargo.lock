@@ -112,6 +112,7 @@ dependencies = [
  "hostname",
  "infrastructure",
  "plugins",
+ "serde_json",
  "services",
  "tokio",
  "tokio-util",

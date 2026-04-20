@@ -29,6 +29,9 @@ pub struct AdapterBundle {
     pub sync_job_repo: Arc<dyn domain::sync::SyncJobRepository>,
     pub dedup_warning_repo: Arc<dyn domain::dedup::DedupWarningRepository>,
     pub device_repo: Arc<dyn domain::device::DeviceRepository>,
+    pub progress_repo: Arc<dyn domain::progress::ProgressRepository>,
+    pub tag_repo: Arc<dyn domain::tag::TagRepository>,
+    pub resource_tag_repo: Arc<dyn domain::tag::ResourceTagRepository>,
 }
 
 pub struct AdapterFactory;
@@ -38,6 +41,7 @@ impl AdapterFactory {
         if database_url.starts_with("sqlite://") {
             let conn = sqlite::open_sqlite_connection(database_url)?;
             let shared = Arc::new(std::sync::Mutex::new(conn));
+            let tag_repo = Arc::new(sqlite::tag::SqliteTagRepository::new(shared.clone()));
             return Ok(AdapterBundle {
                 database: DatabaseAdapter::Sqlite,
                 database_url: database_url.to_string(),
@@ -75,7 +79,12 @@ impl AdapterFactory {
                 dedup_warning_repo: Arc::new(sqlite::dedup::SqliteDedupWarningRepository::new(
                     shared.clone(),
                 )),
-                device_repo: Arc::new(sqlite::device::SqliteDeviceRepository::new(shared)),
+                device_repo: Arc::new(sqlite::device::SqliteDeviceRepository::new(
+                    shared.clone(),
+                )),
+                progress_repo: Arc::new(sqlite::progress::SqliteProgressRepository::new(shared.clone())),
+                tag_repo: tag_repo.clone() as Arc<dyn domain::tag::TagRepository>,
+                resource_tag_repo: tag_repo as Arc<dyn domain::tag::ResourceTagRepository>,
             });
         }
 

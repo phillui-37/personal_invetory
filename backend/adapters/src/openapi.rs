@@ -14,11 +14,13 @@ use crate::{
     ebook::{AddEbookRequest, AddLocationRequest as EbookAddLocationRequest, EbookDetailResponse, UpdateEbookRequest},
     game::{AddGameRequest, AddLocationRequest as GameAddLocationRequest, GameDetailResponse, UpdateGameRequest},
     image::{AddImageRequest, AddLocationRequest as ImageAddLocationRequest, ImageDetailResponse, UpdateImageRequest},
+    progress_handler::{PatchProgressRequest, ProgressResponse},
     state::NotificationEvent,
     sync_handler::{
         DiscoveredItemInput, EcosystemStatusResponse, PlatformStatus, SyncJobListResponse,
         SyncJobResponse, TriggerSyncRequest, TriggerSyncResponse,
     },
+    tag_handler::{AttachTagRequest, CreateTagRequest, TagResponse},
     video::{AddLocationRequest as VideoAddLocationRequest, AddVideoRequest, UpdateVideoRequest, VideoDetailResponse},
     web_reader::{
         AddLocationRequest as WebReaderAddLocationRequest, UpsertWebReaderRequest,
@@ -102,6 +104,22 @@ impl Modify for SecurityAddon {
         crate::device_handler::current_device,
         crate::device_handler::register_device,
         crate::device_handler::delink_device,
+        crate::progress_handler::get_ebook_progress,
+        crate::progress_handler::patch_ebook_progress,
+        crate::progress_handler::get_web_reader_progress,
+        crate::progress_handler::patch_web_reader_progress,
+        crate::progress_handler::get_image_progress,
+        crate::progress_handler::patch_image_progress,
+        crate::progress_handler::get_video_progress,
+        crate::progress_handler::patch_video_progress,
+        crate::progress_handler::get_game_progress,
+        crate::progress_handler::patch_game_progress,
+        crate::tag_handler::list_tags,
+        crate::tag_handler::create_tag,
+        crate::tag_handler::delete_tag,
+        crate::tag_handler::list_resource_tags,
+        crate::tag_handler::attach_tag,
+        crate::tag_handler::detach_tag,
     ),
     components(
         schemas(
@@ -151,6 +169,11 @@ impl Modify for SecurityAddon {
             PlatformStatus,
             DeviceResponse,
             RegisterDeviceRequest,
+            ProgressResponse,
+            PatchProgressRequest,
+            TagResponse,
+            CreateTagRequest,
+            AttachTagRequest,
         )
     ),
     info(

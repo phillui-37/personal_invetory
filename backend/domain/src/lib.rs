@@ -1,7 +1,9 @@
 pub mod dedup;
 pub mod device;
 pub mod ecosystem;
+pub mod progress;
 pub mod sync;
+pub mod tag;
 pub mod vault;
 
 use async_trait::async_trait;
@@ -451,6 +453,52 @@ mod tests {
         };
         assert_eq!(input.platform.as_deref(), Some("Steam"));
     }
+
+    #[test]
+    fn resource_progress_struct_shape() {
+        use crate::progress::ResourceProgress;
+        
+        let now = Utc::now();
+        let progress = ResourceProgress {
+            resource_id: "res-123".to_string(),
+            progress: 0.5,
+            notes: Some("Half-way through".to_string()),
+            updated_at: now,
+        };
+        
+        assert_eq!(progress.resource_id, "res-123");
+        assert_eq!(progress.progress, 0.5);
+        assert_eq!(progress.notes, Some("Half-way through".to_string()));
+        assert_eq!(progress.updated_at, now);
+    }
+
+    #[test]
+    fn tag_struct_shape() {
+        use crate::tag::Tag;
+        
+        let now = Utc::now();
+        let tag = Tag {
+            id: "tag-001".to_string(),
+            name: "favorite".to_string(),
+            created_at: now,
+        };
+        
+        assert_eq!(tag.id, "tag-001");
+        assert_eq!(tag.name, "favorite");
+        assert_eq!(tag.created_at, now);
+    }
+
+    // Type-witness to ensure ProgressRepository is object-safe at compile time.
+    #[allow(dead_code)]
+    fn _assert_progress_repo_is_object_safe(_: &dyn crate::progress::ProgressRepository) {}
+
+    // Type-witness to ensure TagRepository is object-safe at compile time.
+    #[allow(dead_code)]
+    fn _assert_tag_repo_is_object_safe(_: &dyn crate::tag::TagRepository) {}
+
+    // Type-witness to ensure ResourceTagRepository is object-safe at compile time.
+    #[allow(dead_code)]
+    fn _assert_resource_tag_repo_is_object_safe(_: &dyn crate::tag::ResourceTagRepository) {}
 }
 
 #[cfg(test)]
@@ -1064,4 +1112,5 @@ mod repository_contract_tests {
         assert_eq!(notification.message, deserialized.message);
         assert!(!deserialized.read);
     }
+
 }

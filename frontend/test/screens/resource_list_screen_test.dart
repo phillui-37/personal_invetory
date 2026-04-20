@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_inventory_frontend/blocs/ebook/ebook_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/game/game_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/image/image_bloc.dart';
+import 'package:personal_inventory_frontend/blocs/progress/progress_bloc.dart';
+import 'package:personal_inventory_frontend/blocs/tag/tag_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/video/video_bloc.dart';
 import 'package:personal_inventory_frontend/blocs/web_reader/web_reader_bloc.dart';
 import 'package:personal_inventory_frontend/models/resources.dart';
@@ -31,6 +33,8 @@ void main() {
           BlocProvider(create: (_) => ImageBloc(FakeImageRepository())),
           BlocProvider(create: (_) => VideoBloc(FakeVideoRepository())),
           BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
+          BlocProvider(create: (_) => TagBloc(FakeTagRepository())),
+          BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),
         ],
         child: const MaterialApp(
           home: ResourceListScreen(),
@@ -68,6 +72,8 @@ void main() {
           BlocProvider(create: (_) => ImageBloc(FakeImageRepository())),
           BlocProvider(create: (_) => VideoBloc(FakeVideoRepository())),
           BlocProvider(create: (_) => GameBloc(FakeGameRepository())),
+          BlocProvider(create: (_) => TagBloc(FakeTagRepository())),
+          BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),
         ],
         child: const MaterialApp(
           home: ResourceListScreen(),

@@ -25,8 +25,14 @@ use crate::{
         remove_image_location, search_images, update_image,
     },
     notifications::{list_notifications, mark_notification_read, notifications_stream},
+    progress_handler::{
+        get_ebook_progress, get_game_progress, get_image_progress, get_video_progress,
+        get_web_reader_progress, patch_ebook_progress, patch_game_progress, patch_image_progress,
+        patch_video_progress, patch_web_reader_progress,
+    },
     sync_handler::{ecosystem_status, get_sync_job, list_platform_syncs, trigger_sync},
     system::{health, openapi},
+    tag_handler::{attach_tag, create_tag, delete_tag, detach_tag, list_resource_tags, list_tags},
     vault_handler::{
         delete_credential, initialize_vault, list_vault_platforms, lock_vault,
         retrieve_credential, store_credential, unlock_vault, vault_status,
@@ -191,6 +197,38 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/devices/current", get(current_device))
         .route("/api/v1/devices/register", post(register_device))
         .route("/api/v1/devices/:device_id/delink", post(delink_device))
+        // Progress
+        .route(
+            "/api/v1/inventory/ebooks/:id/progress",
+            get(get_ebook_progress).patch(patch_ebook_progress),
+        )
+        .route(
+            "/api/v1/inventory/web-readers/:id/progress",
+            get(get_web_reader_progress).patch(patch_web_reader_progress),
+        )
+        .route(
+            "/api/v1/inventory/images/:id/progress",
+            get(get_image_progress).patch(patch_image_progress),
+        )
+        .route(
+            "/api/v1/inventory/videos/:id/progress",
+            get(get_video_progress).patch(patch_video_progress),
+        )
+        .route(
+            "/api/v1/inventory/games/:id/progress",
+            get(get_game_progress).patch(patch_game_progress),
+        )
+        // Tags
+        .route("/api/v1/tags", get(list_tags).post(create_tag))
+        .route("/api/v1/tags/:id", delete(delete_tag))
+        .route(
+            "/api/v1/inventory/:type/:id/tags",
+            get(list_resource_tags).post(attach_tag),
+        )
+        .route(
+            "/api/v1/inventory/:type/:id/tags/:tag_id",
+            delete(detach_tag),
+        )
         .layer(from_fn_with_state(state.clone(), auth_middleware))
         .with_state(state)
 }

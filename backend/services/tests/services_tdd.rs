@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -8,10 +8,12 @@ use domain::{
     NewResourceLocation, NewWebReaderMeta, Resource, ResourceLocation, ResourceRepository,
     ResourceType, StorageType, UpdateResource, WebReaderMeta, WebReaderMetaRepository,
 };
+use domain::progress::{ProgressRepository, ResourceProgress};
+use domain::tag::{ResourceTagRepository, Tag, TagRepository};
 use futures::executor::block_on;
 use services::{
-    EbookService, NewEbookInput, NewLocationInput, NewWebReaderInput, UpdateEbookInput,
-    WebReaderService,
+    EbookService, NewEbookInput, NewLocationInput, NewWebReaderInput, TagService, UpdateEbookInput,
+    WebReaderService, ProgressService,
 };
 use uuid::Uuid;
 
@@ -1140,4 +1142,413 @@ async fn device_service_delink_other_device_succeeds() {
     repo.register("dev2", None).await.unwrap();
     let svc = services::DeviceService::new(repo, "dev1".into(), "h".into());
     svc.delink("dev2").await.expect("delink other device");
+}
+
+// ── ProgressService mock & tests ─────────────────────────────────────────────
+
+#[derive(Default)]
+struct MockProgressRepository {
+    storage: Mutex<HashMap<String, ResourceProgress>>,
+    upsert_calls: Mutex<usize>,
+}
+
+#[async_trait]
+impl ProgressRepository for MockProgressRepository {
+    async fn get(&self, resource_id: &str) -> Result<Option<ResourceProgress>, DomainError> {
+        Ok(self
+            .storage
+            .lock()
+            .expect("progress storage lock")
+            .get(resource_id)
+            .cloned())
+    }
+
+    async fn upsert(
+        &self,
+        resource_id: &str,
+        progress: f64,
+        notes: Option<&str>,
+    ) -> Result<ResourceProgress, DomainError> {
+        *self.upsert_calls.lock().expect("upsert calls lock") += 1;
+        let record = ResourceProgress {
+            resource_id: resource_id.to_string(),
+            progress,
+            notes: notes.map(|s| s.to_string()),
+            updated_at: Utc::now(),
+        };
+        self.storage
+            .lock()
+            .expect("progress storage lock")
+            .insert(resource_id.to_string(), record.clone());
+        Ok(record)
+    }
+}
+
+#[tokio::test]
+async fn progress_service_get_returns_none_when_not_set() {
+    let repo = Arc::new(MockProgressRepository::default());
+    let svc = ProgressService::new(repo);
+    let result = svc.get("resource-1").await.expect("get must not error");
+    assert!(result.is_none());
+}
+
+#[tokio::test]
+async fn progress_service_upsert_validates_range() {
+    let repo = Arc::new(MockProgressRepository::default());
+    let svc = ProgressService::new(Arc::clone(&repo) as Arc<dyn ProgressRepository>);
+
+    let err_high = svc
+        .upsert("resource-1", 1.5, None)
+        .await
+        .expect_err("progress > 1.0 must fail");
+    assert!(matches!(err_high, DomainError::ValidationError(_)));
+
+    let err_low = svc
+        .upsert("resource-1", -0.1, None)
+        .await
+        .expect_err("progress < 0.0 must fail");
+    assert!(matches!(err_low, DomainError::ValidationError(_)));
+
+    let success_min = svc
+        .upsert("resource-1", 0.0, None)
+        .await
+        .expect("progress = 0.0 must succeed");
+    assert_eq!(success_min.progress, 0.0);
+
+    let success_max = svc
+        .upsert("resource-1", 1.0, None)
+        .await
+        .expect("progress = 1.0 must succeed");
+    assert_eq!(success_max.progress, 1.0);
+
+    let calls = *repo.upsert_calls.lock().expect("upsert calls lock");
+    assert_eq!(calls, 2, "repo.upsert must be called twice for both valid boundary values");
+}
+
+#[tokio::test]
+async fn progress_service_upsert_round_trips() {
+    let repo: Arc<dyn ProgressRepository> = Arc::new(MockProgressRepository::default());
+    let svc = ProgressService::new(Arc::clone(&repo));
+
+    let created = svc
+        .upsert("resource-1", 0.25, Some("start"))
+        .await
+        .expect("upsert must succeed");
+    assert_eq!(created.resource_id, "resource-1");
+    assert_eq!(created.progress, 0.25);
+    assert_eq!(created.notes, Some("start".to_string()));
+
+    let fetched = svc
+        .get("resource-1")
+        .await
+        .expect("get must not error")
+        .expect("must have value after upsert");
+    assert_eq!(fetched.progress, 0.25);
+    assert_eq!(fetched.notes, Some("start".to_string()));
+
+    svc.upsert("resource-1", 0.75, None)
+        .await
+        .expect("second upsert must succeed");
+
+    let updated = svc
+        .get("resource-1")
+        .await
+        .expect("get must not error")
+        .expect("must have value after second upsert");
+    assert_eq!(updated.progress, 0.75);
+    assert!(updated.notes.is_none());
+}
+
+// ── TagService mocks & tests ──────────────────────────────────────────────────
+
+#[derive(Default)]
+struct MockTagRepository {
+    tags: Mutex<HashMap<String, Tag>>,
+    create_calls: Mutex<usize>,
+    created_names: Mutex<Vec<String>>,
+}
+
+#[async_trait]
+impl TagRepository for MockTagRepository {
+    async fn list(&self) -> Result<Vec<Tag>, DomainError> {
+        Ok(self.tags.lock().unwrap().values().cloned().collect())
+    }
+
+    async fn get_by_id(&self, id: &str) -> Result<Option<Tag>, DomainError> {
+        Ok(self
+            .tags
+            .lock()
+            .unwrap()
+            .values()
+            .find(|t| t.id == id)
+            .cloned())
+    }
+
+    async fn get_by_name(&self, name: &str) -> Result<Option<Tag>, DomainError> {
+        Ok(self
+            .tags
+            .lock()
+            .unwrap()
+            .values()
+            .find(|t| t.name == name)
+            .cloned())
+    }
+
+    async fn create(&self, name: &str) -> Result<Tag, DomainError> {
+        *self.create_calls.lock().unwrap() += 1;
+        self.created_names.lock().unwrap().push(name.to_string());
+        let tag = Tag {
+            id: Uuid::new_v4().to_string(),
+            name: name.to_string(),
+            created_at: Utc::now(),
+        };
+        self.tags
+            .lock()
+            .unwrap()
+            .insert(tag.id.clone(), tag.clone());
+        Ok(tag)
+    }
+
+    async fn delete(&self, id: &str) -> Result<(), DomainError> {
+        self.tags
+            .lock()
+            .unwrap()
+            .remove(id)
+            .map(|_| ())
+            .ok_or_else(|| DomainError::NotFound(id.to_string()))
+    }
+}
+
+#[derive(Default)]
+struct MockResourceTagRepository {
+    associations: Mutex<HashSet<(String, String)>>,
+    tag_store: Arc<MockTagRepository>,
+}
+
+impl MockResourceTagRepository {
+    fn with_tags(tag_store: Arc<MockTagRepository>) -> Self {
+        Self {
+            associations: Mutex::default(),
+            tag_store,
+        }
+    }
+}
+
+#[async_trait]
+impl ResourceTagRepository for MockResourceTagRepository {
+    async fn tags_for_resource(&self, resource_id: &str) -> Result<Vec<Tag>, DomainError> {
+        let assocs = self.associations.lock().unwrap();
+        let tag_ids: Vec<String> = assocs
+            .iter()
+            .filter(|(rid, _)| rid == resource_id)
+            .map(|(_, tid)| tid.clone())
+            .collect();
+        let tags_map = self.tag_store.tags.lock().unwrap();
+        Ok(tag_ids
+            .iter()
+            .filter_map(|id| tags_map.get(id).cloned())
+            .collect())
+    }
+
+    async fn attach(&self, resource_id: &str, tag_id: &str) -> Result<(), DomainError> {
+        self.associations
+            .lock()
+            .unwrap()
+            .insert((resource_id.to_string(), tag_id.to_string()));
+        Ok(())
+    }
+
+    async fn detach(&self, resource_id: &str, tag_id: &str) -> Result<(), DomainError> {
+        let removed = self
+            .associations
+            .lock()
+            .unwrap()
+            .remove(&(resource_id.to_string(), tag_id.to_string()));
+        if removed {
+            Ok(())
+        } else {
+            Err(DomainError::NotFound(format!(
+                "association ({resource_id}, {tag_id}) not found"
+            )))
+        }
+    }
+
+    async fn resource_ids_with_tag_id(&self, tag_id: &str) -> Result<Vec<String>, DomainError> {
+        Ok(self
+            .associations
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, tid)| tid == tag_id)
+            .map(|(rid, _)| rid.clone())
+            .collect())
+    }
+}
+
+fn make_tag_service() -> (Arc<MockTagRepository>, Arc<MockResourceTagRepository>, TagService) {
+    let tag_repo = Arc::new(MockTagRepository::default());
+    let resource_tag_repo = Arc::new(MockResourceTagRepository::with_tags(Arc::clone(&tag_repo)));
+    let svc = TagService::new(
+        Arc::clone(&tag_repo) as Arc<dyn TagRepository>,
+        Arc::clone(&resource_tag_repo) as Arc<dyn ResourceTagRepository>,
+    );
+    (tag_repo, resource_tag_repo, svc)
+}
+
+#[tokio::test]
+async fn tag_service_create_normalises_name() {
+    let (tag_repo, _, svc) = make_tag_service();
+
+    let tag = svc.create("  Sci-Fi  ").await.expect("create must succeed");
+    assert_eq!(tag.name, "sci-fi");
+
+    let created_names = tag_repo.created_names.lock().unwrap();
+    assert_eq!(created_names.as_slice(), &["sci-fi"]);
+}
+
+#[tokio::test]
+async fn tag_service_create_rejects_empty_name() {
+    let (tag_repo, _, svc) = make_tag_service();
+
+    let err = svc
+        .create("   ")
+        .await
+        .expect_err("whitespace-only must fail");
+    assert!(matches!(err, DomainError::ValidationError(_)));
+
+    let calls = *tag_repo.create_calls.lock().unwrap();
+    assert_eq!(calls, 0, "repo.create must NOT be called on validation failure");
+}
+
+#[tokio::test]
+async fn tag_service_attach_tag_to_resource() {
+    let (tag_repo, resource_tag_repo, svc) = make_tag_service();
+
+    let tag = tag_repo.create("action").await.expect("seed tag");
+    svc.attach_tag("res-1", &tag.id)
+        .await
+        .expect("attach must succeed");
+
+    let assocs = resource_tag_repo.associations.lock().unwrap();
+    assert!(assocs.contains(&("res-1".to_string(), tag.id.clone())));
+}
+
+#[tokio::test]
+async fn tag_service_detach_tag_from_resource() {
+    let (tag_repo, resource_tag_repo, svc) = make_tag_service();
+
+    let tag = tag_repo.create("action").await.expect("seed tag");
+    resource_tag_repo
+        .associations
+        .lock()
+        .unwrap()
+        .insert(("res-1".to_string(), tag.id.clone()));
+
+    svc.detach_tag("res-1", &tag.id)
+        .await
+        .expect("detach must succeed");
+
+    let assocs = resource_tag_repo.associations.lock().unwrap();
+    assert!(!assocs.contains(&("res-1".to_string(), tag.id.clone())));
+}
+
+#[tokio::test]
+async fn tag_service_tags_for_resource() {
+    let (tag_repo, resource_tag_repo, svc) = make_tag_service();
+
+    let t1 = tag_repo.create("sci-fi").await.expect("seed t1");
+    let t2 = tag_repo.create("action").await.expect("seed t2");
+    {
+        let mut assocs = resource_tag_repo.associations.lock().unwrap();
+        assocs.insert(("res-1".to_string(), t1.id.clone()));
+        assocs.insert(("res-1".to_string(), t2.id.clone()));
+    }
+
+    let mut tags = svc
+        .tags_for_resource("res-1")
+        .await
+        .expect("tags_for_resource must succeed");
+    tags.sort_by(|a, b| a.name.cmp(&b.name));
+
+    assert_eq!(tags.len(), 2);
+    assert_eq!(tags[0].name, "action");
+    assert_eq!(tags[1].name, "sci-fi");
+}
+
+#[tokio::test]
+async fn tag_service_filter_resource_ids_by_tag() {
+    let (tag_repo, resource_tag_repo, svc) = make_tag_service();
+
+    // Seed via service so normalization is exercised end-to-end
+    let tag = svc
+        .create("  Sci-Fi  ")
+        .await
+        .expect("create must succeed");
+    assert_eq!(tag.name, "sci-fi");
+
+    {
+        let mut assocs = resource_tag_repo.associations.lock().unwrap();
+        assocs.insert(("res-a".to_string(), tag.id.clone()));
+        assocs.insert(("res-b".to_string(), tag.id.clone()));
+    }
+
+    let mut ids = svc
+        .resource_ids_for_tag_name(" sci-fi ")
+        .await
+        .expect("lookup must succeed");
+    ids.sort();
+    assert_eq!(ids, vec!["res-a".to_string(), "res-b".to_string()]);
+
+    // Unknown tag → empty vec, not an error
+    let empty = svc
+        .resource_ids_for_tag_name("unknown")
+        .await
+        .expect("unknown tag must return empty vec");
+    assert!(empty.is_empty());
+
+    // Whitespace-only → ValidationError
+    let err = svc
+        .resource_ids_for_tag_name("   ")
+        .await
+        .expect_err("empty name must fail");
+    assert!(matches!(err, DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
+async fn tag_service_list_returns_all_tags() {
+    let (tag_repo, _, svc) = make_tag_service();
+
+    let t1 = tag_repo.create("action").await.expect("seed t1");
+    let t2 = tag_repo.create("sci-fi").await.expect("seed t2");
+
+    let mut tags = svc.list().await.expect("list must succeed");
+    tags.sort_by(|a, b| a.name.cmp(&b.name));
+
+    assert_eq!(tags.len(), 2);
+    assert_eq!(tags[0].id, t1.id);
+    assert_eq!(tags[0].name, "action");
+    assert_eq!(tags[1].id, t2.id);
+    assert_eq!(tags[1].name, "sci-fi");
+}
+
+#[tokio::test]
+async fn tag_service_delete_propagates_not_found() {
+    let (tag_repo, _, svc) = make_tag_service();
+
+    let err = svc
+        .delete("missing-tag")
+        .await
+        .expect_err("delete of missing tag must fail");
+    assert!(matches!(err, DomainError::NotFound(_)));
+
+    let tag = tag_repo.create("action").await.expect("create tag");
+    svc.delete(&tag.id)
+        .await
+        .expect("delete of existing tag must succeed");
+
+    let fetched = tag_repo
+        .get_by_id(&tag.id)
+        .await
+        .expect("get_by_id must succeed");
+    assert!(fetched.is_none(), "tag must be deleted");
 }

@@ -1,19 +1,76 @@
 import 'package:personal_inventory_frontend/models/dedup.dart';
 import 'package:personal_inventory_frontend/models/device.dart';
 import 'package:personal_inventory_frontend/models/failures.dart';
+import 'package:personal_inventory_frontend/models/progress.dart';
 import 'package:personal_inventory_frontend/models/batch_operations.dart';
 import 'package:personal_inventory_frontend/models/repository_inputs.dart';
 import 'package:personal_inventory_frontend/models/resources.dart';
 import 'package:personal_inventory_frontend/models/result.dart';
+import 'package:personal_inventory_frontend/models/tag.dart';
 import 'package:personal_inventory_frontend/models/vault.dart';
 import 'package:personal_inventory_frontend/repositories/dedup_repository.dart';
 import 'package:personal_inventory_frontend/repositories/device_repository.dart';
 import 'package:personal_inventory_frontend/repositories/ebook_repository.dart';
 import 'package:personal_inventory_frontend/repositories/game_repository.dart';
 import 'package:personal_inventory_frontend/repositories/image_repository.dart';
+import 'package:personal_inventory_frontend/repositories/progress_repository.dart';
+import 'package:personal_inventory_frontend/repositories/tag_repository.dart';
 import 'package:personal_inventory_frontend/repositories/vault_repository.dart';
 import 'package:personal_inventory_frontend/repositories/video_repository.dart';
 import 'package:personal_inventory_frontend/repositories/web_reader_repository.dart';
+
+class FakeProgressRepository implements ProgressRepository {
+  FakeProgressRepository({
+    this.getResult = const Success<ResourceProgress?, AppFailure>(null),
+    this.upsertResult,
+  });
+
+  Result<ResourceProgress?, AppFailure> getResult;
+  Result<ResourceProgress, AppFailure>? upsertResult;
+
+  int getCalls = 0;
+  int upsertCalls = 0;
+  ResourceType? lastGetResourceType;
+  String? lastGetResourceId;
+  ResourceType? lastUpsertResourceType;
+  String? lastUpsertResourceId;
+  double? lastUpsertProgress;
+  String? lastUpsertNotes;
+
+  @override
+  Future<Result<ResourceProgress?, AppFailure>> getProgress(
+    ResourceType resourceType,
+    String resourceId,
+  ) async {
+    getCalls += 1;
+    lastGetResourceType = resourceType;
+    lastGetResourceId = resourceId;
+    return getResult;
+  }
+
+  @override
+  Future<Result<ResourceProgress, AppFailure>> upsertProgress(
+    ResourceType resourceType,
+    String resourceId,
+    double progress, {
+    String? notes,
+  }) async {
+    upsertCalls += 1;
+    lastUpsertResourceType = resourceType;
+    lastUpsertResourceId = resourceId;
+    lastUpsertProgress = progress;
+    lastUpsertNotes = notes;
+    return upsertResult ??
+        Success<ResourceProgress, AppFailure>(
+          ResourceProgress(
+            resourceId: resourceId,
+            progress: progress,
+            notes: notes,
+            updatedAt: DateTime.now().toUtc(),
+          ),
+        );
+  }
+}
 
 class FakeEbookRepository implements EbookRepository {
   FakeEbookRepository({
@@ -130,6 +187,105 @@ class FakeEbookRepository implements EbookRepository {
     lastUpdateId = id;
     lastUpdateInput = input;
     return updateResult ?? const Failure(ServerFailure(500));
+  }
+}
+
+class FakeTagRepository implements TagRepository {
+  FakeTagRepository({
+    this.listResult = const Success<List<Tag>, AppFailure>([]),
+    this.createResult,
+    this.deleteResult = const Success<void, AppFailure>(null),
+    this.tagsForResourceResult = const Success<List<Tag>, AppFailure>([]),
+    this.attachResult = const Success<void, AppFailure>(null),
+    this.detachResult = const Success<void, AppFailure>(null),
+  });
+
+  Result<List<Tag>, AppFailure> listResult;
+  Result<Tag, AppFailure>? createResult;
+  Result<void, AppFailure> deleteResult;
+  Result<List<Tag>, AppFailure> tagsForResourceResult;
+  Result<void, AppFailure> attachResult;
+  Result<void, AppFailure> detachResult;
+
+  int listCalls = 0;
+  int createCalls = 0;
+  int deleteCalls = 0;
+  int tagsForResourceCalls = 0;
+  int attachCalls = 0;
+  int detachCalls = 0;
+  String? lastCreateName;
+  String? lastDeleteId;
+  ResourceType? lastTagsForResourceType;
+  String? lastTagsForResourceId;
+  ResourceType? lastAttachType;
+  String? lastAttachResourceId;
+  String? lastAttachTagId;
+  ResourceType? lastDetachType;
+  String? lastDetachResourceId;
+  String? lastDetachTagId;
+
+  @override
+  Future<Result<List<Tag>, AppFailure>> listTags() async {
+    listCalls += 1;
+    return listResult;
+  }
+
+  @override
+  Future<Result<Tag, AppFailure>> createTag(String name) async {
+    createCalls += 1;
+    lastCreateName = name;
+    return createResult ??
+        Success<Tag, AppFailure>(
+          Tag(
+            id: 'tag-1',
+            name: name.trim().toLowerCase(),
+            createdAt: DateTime.now().toUtc(),
+          ),
+        );
+  }
+
+  @override
+  Future<Result<void, AppFailure>> deleteTag(String id) async {
+    deleteCalls += 1;
+    lastDeleteId = id;
+    return deleteResult;
+  }
+
+  @override
+  Future<Result<List<Tag>, AppFailure>> tagsForResource(
+    ResourceType resourceType,
+    String resourceId,
+  ) async {
+    tagsForResourceCalls += 1;
+    lastTagsForResourceType = resourceType;
+    lastTagsForResourceId = resourceId;
+    return tagsForResourceResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> attachTag(
+    ResourceType resourceType,
+    String resourceId,
+    String tagId,
+  ) async {
+    attachCalls += 1;
+    lastAttachType = resourceType;
+    lastAttachResourceId = resourceId;
+    lastAttachTagId = tagId;
+    return attachResult;
+  }
+
+  @override
+  Future<Result<void, AppFailure>> detachTag(
+    ResourceType resourceType,
+    String resourceId,
+    String tagId,
+  ) async {
+    detachCalls += 1;
+    lastDetachType = resourceType;
+    lastDetachResourceId = resourceId;
+    lastDetachTagId = tagId;
+    return detachResult;
   }
 }
 

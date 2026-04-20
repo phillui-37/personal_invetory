@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use domain::{
     DomainError, EbookMeta, EbookMetaRepository, LocationRepository, Resource, ResourceLocation,
@@ -6,7 +6,7 @@ use domain::{
 };
 use uuid::Uuid;
 
-use crate::{map_validation_error, NewEbookInput, NewLocationInput, UpdateEbookInput};
+use crate::{filter_resources_by_type, map_validation_error, NewEbookInput, NewLocationInput, UpdateEbookInput};
 use crate::{search::build_search_strategy, SearchConfig};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,14 +51,15 @@ impl EbookService {
         }
     }
 
-    pub async fn list_ebooks(&self) -> Result<Vec<Resource>, DomainError> {
-        Ok(self
-            .resource_repo
-            .list()
-            .await?
-            .into_iter()
-            .filter(|r| r.resource_type == domain::ResourceType::Ebook)
-            .collect())
+    pub async fn list_ebooks(
+        &self,
+        allowed_ids: Option<&HashSet<Uuid>>,
+    ) -> Result<Vec<Resource>, DomainError> {
+        Ok(filter_resources_by_type(
+            self.resource_repo.list().await?,
+            domain::ResourceType::Ebook,
+            allowed_ids,
+        ))
     }
 
     pub async fn search_ebooks(&self, query: &str) -> Result<Vec<Resource>, DomainError> {
