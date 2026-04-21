@@ -7,7 +7,24 @@
 - Java 17 (`java -version`)
 - `ANDROID_HOME` env var pointing to the SDK directory
 
-## Build
+## Repo verification rule
+
+Do not run the Flutter suite cold.
+
+`frontend/test/android_build_test.dart` checks for `build/app/outputs/flutter-apk/app-debug.apk`, so every clean checkout or cleaned `build/` dir needs a fresh debug APK before `flutter test`.
+
+```bash
+cd frontend
+flutter pub get
+flutter build apk --debug
+flutter test
+```
+
+Current CI does **not** run `flutter test` in the same job after the debug APK build.
+`.github/workflows/mobile-builds.yml` validates the APK in `build-apk`, then runs `flutter test --coverage` separately in `run-flutter-tests`.
+Treat the command block above as the local repo gate for this APK-before-tests contract.
+
+## Build commands
 
 ```bash
 cd frontend
