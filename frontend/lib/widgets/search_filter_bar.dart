@@ -9,7 +9,7 @@ class SearchFilterBar extends StatefulWidget {
     required this.onTagsChanged,
     required this.onSortChanged,
     required this.onLogicChanged,
-    this.sortOption = 'date_added',
+    this.sortOption = 'title',
     this.filterLogic = 'and',
     super.key,
   });
@@ -124,14 +124,8 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
                       key: const Key('clear-filters-chip'),
                       label: const Text('Clear'),
                       onDeleted: () {
-                        setState(() {
-                          _selectedTags.clear();
-                          _sortOption = 'date_added';
-                          _filterLogic = 'and';
-                        });
+                        setState(() => _selectedTags.clear());
                         widget.onTagsChanged(_selectedTags);
-                        widget.onSortChanged(_sortOption);
-                        widget.onLogicChanged(_filterLogic);
                       },
                       deleteIcon: const Icon(Icons.close, size: 16),
                     ),

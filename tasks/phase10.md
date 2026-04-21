@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Carry only real unfinished work forward after Phase 9 while also complementing repo-wide documentation and regression coverage: finish the ecosystem connectors that still have production gaps, complete the deferred search UX, harden mobile release packaging, and backfill the docs/tests that the next phase depends on.
+**Goal:** Carry only real unfinished work forward after Phase 9: finish the ecosystem connectors that still have production gaps, complete the deferred search UX, harden mobile release packaging, and polish the highest-friction performance and batch flows.
 
 **Architecture:** Keep the existing hexagonal boundaries. Backend connector work stays in `backend/plugins` and `backend/services`; frontend search and batch UX stays in widgets, services, BLoCs, and repositories; mobile hardening stays in platform build files, docs, and CI. Treat stale Phase 9 checklist drift as historical noise, not new scope.
 
@@ -24,7 +24,6 @@
 | Bucket | Why it is still open | Current evidence |
 |---|---|---|
 | Connector hardening | `bookwalker.rs`, `dlsite.rs`, `fanza.rs`, and `kindle.rs` still contain `TODO(network-inspection)` comments and placeholder assumptions in auth or library fetch flow. | `backend/plugins/src/ecosystem/*.rs` |
-| Repo-wide docs + tests complement | Important verification rules and operator knowledge are still scattered across task docs, test files, and `CONTEXT.md`; some already-shipped flows still rely on narrow happy-path tests only. | `frontend/test/android_build_test.dart`, `CONTEXT.md`, `tasks/*.md` |
 | Search UX completion | Search history is still in-memory only; no replay widget or facet UI is wired; tag entry is still plain text without suggestions. | `CONTEXT.md:567-572`, `frontend/lib/services/search_history_service.dart`, `frontend/lib/widgets/search_filter_bar.dart`, `frontend/lib/widgets/tag_chip_list.dart` |
 | Mobile release readiness | Android release build still uses debug signing and example app ID; iOS verification exists, but device/release signing flow is still only partially documented. | `frontend/android/app/build.gradle.kts`, `docs/build-android.md`, `frontend/test/ios_build_config_test.dart` |
 | Performance + batch polish | The codebase calls this out as future work, and the current batch screen is still raw text-field driven rather than a polished bulk workflow. | `CONTEXT.md:684-686`, `frontend/lib/screens/batch_operations_screen.dart` |
@@ -40,27 +39,6 @@ The frontend baseline requires the debug APK first because `frontend/test/androi
 
 ---
 
-## Cross-Cutting Documentation and Verification Rules
-
-### Documentation Rule
-
-Every Phase 10 task must leave behind repo-facing documentation, not just code:
-
-1. **Connector tasks** update `docs/har_extraction_guide.md` with the verified endpoint, selector, header, cookie, and sanitization rules they depend on.
-2. **Search and batch UX tasks** append the shipped behavior, user-facing constraints, and state rules to `CONTEXT.md`.
-3. **Mobile tasks** update the concrete build guides (`docs/build-android.md`, `docs/build-ios-device.md`) and keep CI expectations aligned with those guides.
-4. **Performance tasks** record baseline numbers, what changed, and post-fix measurements in `CONTEXT.md` so later phases do not repeat the same profiling work.
-
-### Verification Rule
-
-Every Phase 10 task needs both **narrow tests** and **broader regression coverage**:
-
-1. **Backend connector work** must pass the targeted connector test file **and** the full plugin suite: `cd backend && cargo test -p plugins`.
-2. **Frontend search, mobile, and batch work** must pass targeted tests **and** the broader Flutter suite: `cd frontend && flutter build apk --debug && flutter test`.
-3. No task is done when only the new test passes but the surrounding package or screen regressions are unverified.
-
----
-
 ## File Map
 
 ### New Files
@@ -68,9 +46,7 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 | File | Responsibility |
 |---|---|
 | `backend/plugins/tests/ecosystem_bookwalker_test.rs` | BookWalker connector tests with captured-response fixtures and selector/auth checks |
-| `backend/plugins/tests/ecosystem_kindle_test.rs` | Kindle-specific auth/library regression tests instead of hiding Kindle coverage in unrelated plugin files |
 | `backend/plugins/tests/fixtures/real/bookwalker_library.json` | Real-structure BookWalker library fixture captured from HAR/session data |
-| `docs/testing-matrix.md` | Repo-wide test commands, prerequisites, and suite ownership for already-shipped and Phase 10 work |
 | `frontend/lib/services/search_history_storage.dart` | Durable persistence seam for `SearchHistoryService` |
 | `frontend/lib/widgets/search_history_panel.dart` | Search history replay UI with remove/clear/reapply actions |
 | `frontend/lib/widgets/facet_summary_bar.dart` | Format facet summary chips/counters for the list screen |
@@ -79,9 +55,6 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 | `frontend/test/widgets/search_history_panel_test.dart` | Widget tests for replay/remove/clear flows |
 | `frontend/test/widgets/facet_summary_bar_test.dart` | Widget tests for facet rendering and selection |
 | `frontend/test/widgets/tag_autocomplete_field_test.dart` | Widget tests for tag suggestion and selection behavior |
-| `frontend/test/screens/resource_list_screen_search_history_test.dart` | Resource-list integration tests for history replay and persisted filter restoration |
-| `frontend/test/screens/resource_list_screen_facets_test.dart` | Resource-list integration tests for facet rendering and selection |
-| `frontend/test/screens/batch_operations_validation_test.dart` | Batch-flow validation/progress tests beyond the existing happy-path screen checks |
 | `docs/build-ios-device.md` | Concrete iOS device-signing and release-export steps |
 
 ### Modified Files
@@ -93,44 +66,16 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 | `backend/plugins/src/ecosystem/kindle.rs` | Replace placeholder Amazon auth/library assumptions with verified flow or explicit fallback contract |
 | `backend/plugins/src/ecosystem/bookwalker.rs` | Implement real BookWalker session/library flow instead of placeholder login assumptions |
 | `backend/plugins/tests/ecosystem_dlsite_fanza_test.rs` | Harden DLSite/FANZA fixture and selector regression coverage |
-| `docs/har_extraction_guide.md` | Keep connector capture, sanitization, endpoint, and selector guidance in sync with shipped code |
-| `backend/services/tests/services_tdd.rs` | Strengthen service-level regression coverage for already-shipped sync/search flows that Phase 10 extends |
 | `backend/plugins/src/browser_session.rs` | Extend browser-session helpers only if connector hardening exposes missing primitives |
 | `frontend/lib/services/search_history_service.dart` | Delegate persistence/load/save instead of in-memory-only behavior |
 | `frontend/lib/widgets/search_filter_bar.dart` | Add facet rendering hook and tag-autocomplete entry path |
 | `frontend/lib/widgets/tag_chip_list.dart` | Replace free-text tag add flow with suggestion-aware input |
 | `frontend/lib/screens/resource_list_screen.dart` | Render search-history replay and facet summary alongside existing filter controls |
-| `frontend/test/screens/resource_list_screen_test.dart` | Backfill regression coverage for already-shipped list/filter flows while Phase 10 extends the screen |
-| `frontend/test/screens/batch_operations_screen_test.dart` | Backfill validation/progress regressions in the existing batch screen |
 | `frontend/lib/main.dart` | Provide any new persistence dependency needed by search history |
 | `frontend/lib/repositories/*_repository.dart` | Parse facet envelopes or expose facet-ready list result types if UI needs them |
 | `frontend/android/app/build.gradle.kts` | Replace example app ID and debug-signed release config with env-driven release settings |
 | `.github/workflows/mobile-builds.yml` | Add release-path validation when signing secrets/config are available |
 | `docs/build-android.md` | Replace partial release guidance with exact repo-compatible signing/config steps |
-| `CONTEXT.md` | Record shipped UX rules, profiling results, and final Phase 10 behavior summaries |
-
----
-
-## Track 0 — Overall Documentation and Regression Complement
-
-### Task P10-A0: Backfill Repo-Wide Docs and Regression Coverage
-
-**Goal:** Complement the overall project docs and tests so the repo stops depending on tribal knowledge and narrow happy-path checks for already-shipped features.
-
-**Files:**
-- Create: `docs/testing-matrix.md`
-- Modify: `CONTEXT.md`
-- Modify: `docs/build-android.md`
-- Modify: `docs/har_extraction_guide.md`
-- Modify: `backend/services/tests/services_tdd.rs`
-- Modify: `frontend/test/screens/resource_list_screen_test.dart`
-- Modify: `frontend/test/screens/batch_operations_screen_test.dart`
-
-- [ ] Build a shipped-feature matrix covering backend workspace tests, Flutter test prerequisites, ecosystem capture docs, search/filter flows, and batch workflows.
-- [ ] Write `docs/testing-matrix.md` with exact commands, prerequisites, and suite ownership, including the `flutter build apk --debug` prerequisite for the Flutter suite.
-- [ ] Strengthen existing service-level and screen-level regression tests for already-shipped flows that Phase 10 will extend.
-- [ ] Append the repo-wide documentation/testing complement summary to `CONTEXT.md`.
-- [ ] Verify with `cd backend && cargo test && cd ../frontend && flutter build apk --debug && flutter test`
 
 ---
 
@@ -146,14 +91,12 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 - Modify: `backend/plugins/tests/ecosystem_dlsite_fanza_test.rs`
 - Modify: `backend/plugins/tests/fixtures/real/dlsite_library.json`
 - Modify: `backend/plugins/tests/fixtures/real/fanza_library.json`
-- Modify: `docs/har_extraction_guide.md`
 
 - [ ] Confirm the actual auth-check URL, library endpoint, and required headers from the captured HAR/session data.
 - [ ] Replace the placeholder `navigate(login)`/`?output=json` assumptions with verified request targets and selector-based session validation.
 - [ ] Remove stale `TODO(network-inspection)` comments once the code reflects the captured flow.
-- [ ] Update `docs/har_extraction_guide.md` with the verified DLSite/FANZA capture steps, headers, selectors, and sanitization notes.
 - [ ] Expand regression coverage for selector presence, cookie-header usage, parser structure, and non-200 responses.
-- [ ] Verify with `cd backend && cargo test -p plugins ecosystem_dlsite_fanza_test -- --nocapture && cargo test -p plugins`
+- [ ] Verify with `cd backend && cargo test -p plugins ecosystem_dlsite_fanza_test -- --nocapture`
 
 ### Task P10-A2: Finish Kindle Browser Sync Hardening
 
@@ -162,15 +105,13 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 **Files:**
 - Modify: `backend/plugins/src/ecosystem/kindle.rs`
 - Modify: `backend/plugins/src/browser_session.rs` (only if a missing browser primitive blocks the real flow)
-- Create: `backend/plugins/tests/ecosystem_kindle_test.rs`
-- Modify: `docs/har_extraction_guide.md`
+- Modify: `backend/plugins/tests/ecosystem_dlsite_fanza_test.rs` or create Kindle-specific plugin tests if coverage becomes too broad
 
 - [ ] Verify the real Kindle library endpoint and required request headers/cookies from captured traffic or exported-library flow.
 - [ ] Replace `TODO(network-inspection)` auth and library placeholders with either a verified browser sync flow or an explicit “CSV-only browser fallback” contract.
 - [ ] Keep OTP behavior aligned with the existing backend OTP endpoint; do not introduce a second flow.
-- [ ] Add Kindle-specific parser/auth regression tests in `backend/plugins/tests/ecosystem_kindle_test.rs`.
-- [ ] Update `docs/har_extraction_guide.md` with the chosen Kindle sync path, fallback rules, and required captured artifacts.
-- [ ] Verify with `cd backend && cargo test -p plugins ecosystem_kindle_test -- --nocapture && cargo test -p plugins`
+- [ ] Add or refresh parser/auth tests for the chosen contract.
+- [ ] Verify with `cd backend && cargo test -p plugins kindle -- --nocapture`
 
 ### Task P10-A3: Add Real BookWalker Integration
 
@@ -180,13 +121,12 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 - Modify: `backend/plugins/src/ecosystem/bookwalker.rs`
 - Create: `backend/plugins/tests/ecosystem_bookwalker_test.rs`
 - Create: `backend/plugins/tests/fixtures/real/bookwalker_library.json`
-- Modify: `docs/har_extraction_guide.md`
+- Modify: `docs/har_extraction_guide.md` (only if BookWalker capture steps need to be recorded)
 
 - [ ] Capture BookWalker HAR/session data and store a sanitized real-structure fixture.
 - [ ] Replace placeholder login selectors and placeholder library URL assumptions with verified ones.
 - [ ] Add parser/auth regression tests covering JSON shape, login form selectors, and non-success responses.
-- [ ] Extend `docs/har_extraction_guide.md` with BookWalker-specific capture and sanitization steps so the connector can be refreshed later.
-- [ ] Verify with `cd backend && cargo test -p plugins ecosystem_bookwalker_test -- --nocapture && cargo test -p plugins`
+- [ ] Verify with `cd backend && cargo test -p plugins ecosystem_bookwalker_test -- --nocapture`
 
 ---
 
@@ -200,15 +140,13 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 - Modify: `frontend/lib/services/search_history_service.dart`
 - Create: `frontend/lib/services/search_history_storage.dart`
 - Modify: `frontend/lib/main.dart`
-- Modify: `CONTEXT.md`
 - Test: `frontend/test/services/search_history_service_test.dart`
 - Create: `frontend/test/services/search_history_storage_test.dart`
 
 - [ ] Introduce a storage seam so `SearchHistoryService` can load/save history instead of keeping everything process-local.
 - [ ] Preserve the existing max-history and LIFO behavior.
 - [ ] Keep serialization compatible with the existing `SearchHistory` JSON shape.
-- [ ] Record the durable history contract and storage rules in `CONTEXT.md`.
-- [ ] Verify with `cd frontend && flutter test test/services/search_history_service_test.dart test/services/search_history_storage_test.dart && flutter build apk --debug && flutter test`
+- [ ] Verify with `cd frontend && flutter test test/services/search_history_service_test.dart test/services/search_history_storage_test.dart`
 
 ### Task P10-B2: Add Search History Replay UI
 
@@ -218,15 +156,12 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 - Create: `frontend/lib/widgets/search_history_panel.dart`
 - Modify: `frontend/lib/screens/resource_list_screen.dart`
 - Modify: `frontend/lib/widgets/search_filter_bar.dart`
-- Modify: `CONTEXT.md`
 - Create: `frontend/test/widgets/search_history_panel_test.dart`
-- Create: `frontend/test/screens/resource_list_screen_search_history_test.dart`
 
 - [ ] Render recent searches near the existing filter controls instead of leaving history as a hidden service.
 - [ ] Replaying a saved search must restore query/tags/sort/filter logic together, not only the free-text query.
 - [ ] Support per-item delete and full clear behavior.
-- [ ] Document replay behavior, history limits, and clear/remove semantics in `CONTEXT.md`.
-- [ ] Verify with `cd frontend && flutter test test/widgets/search_history_panel_test.dart test/screens/resource_list_screen_search_history_test.dart && flutter build apk --debug && flutter test`
+- [ ] Verify with `cd frontend && flutter test test/widgets/search_history_panel_test.dart`
 
 ### Task P10-B3: Surface Facets in the UI
 
@@ -240,15 +175,12 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 - Modify: `frontend/lib/repositories/video_repository.dart`
 - Modify: `frontend/lib/repositories/game_repository.dart`
 - Modify: `frontend/lib/repositories/web_reader_repository.dart`
-- Modify: `CONTEXT.md`
 - Create: `frontend/test/widgets/facet_summary_bar_test.dart`
-- Create: `frontend/test/screens/resource_list_screen_facets_test.dart`
 
 - [ ] Request and parse facet-aware list responses without breaking the plain-array response path.
 - [ ] Render returned format counts as tappable facet chips or counters in the list UI.
 - [ ] Keep facet state aligned with the existing `SearchFilterBloc` so refinements survive tab reloads.
-- [ ] Document the facet response shape and UI refinement rules in `CONTEXT.md`.
-- [ ] Verify with `cd frontend && flutter test test/widgets/facet_summary_bar_test.dart test/screens/resource_list_screen_facets_test.dart && flutter build apk --debug && flutter test`
+- [ ] Verify with `cd frontend && flutter test test/widgets/facet_summary_bar_test.dart`
 
 ### Task P10-B4: Add Tag Autocomplete / Typeahead
 
@@ -258,15 +190,13 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 - Create: `frontend/lib/widgets/tag_autocomplete_field.dart`
 - Modify: `frontend/lib/widgets/search_filter_bar.dart`
 - Modify: `frontend/lib/widgets/tag_chip_list.dart`
-- Modify: `CONTEXT.md`
 - Create: `frontend/test/widgets/tag_autocomplete_field_test.dart`
 - Test: `frontend/test/widgets/tag_chip_list_test.dart`
 
 - [ ] Reuse existing tag models instead of creating a second tag shape.
 - [ ] Suggest known tags while still allowing a new tag to be created explicitly.
 - [ ] Keep current chip add/remove behavior working for both detail and search flows.
-- [ ] Document suggestion, creation, and duplicate-handling rules in `CONTEXT.md`.
-- [ ] Verify with `cd frontend && flutter test test/widgets/tag_autocomplete_field_test.dart test/widgets/tag_chip_list_test.dart && flutter build apk --debug && flutter test`
+- [ ] Verify with `cd frontend && flutter test test/widgets/tag_autocomplete_field_test.dart test/widgets/tag_chip_list_test.dart`
 
 ---
 
@@ -285,8 +215,7 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 - [ ] Replace the example `applicationId` with a repo-owned configurable value.
 - [ ] Load release-signing settings from ignored local files and/or CI secrets instead of using debug signing for release.
 - [ ] Keep debug APK verification intact while adding a release-path guardrail for configured environments.
-- [ ] Expand `docs/build-android.md` so the local and CI release paths use the same signing/config contract.
-- [ ] Verify with `cd frontend && flutter build apk --debug && flutter test test/android_build_test.dart && flutter build apk --debug && flutter test`
+- [ ] Verify with `cd frontend && flutter build apk --debug && flutter test test/android_build_test.dart`
 
 ### Task P10-C2: Add iOS Device-Signing and Release-Export Runbook
 
@@ -300,7 +229,7 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 - [ ] Document the exact provisioning, signing, bundle-ID, and archive/export steps needed for this project.
 - [ ] Add CI checks that validate the presence and shape of any repo-tracked iOS configuration files that the runbook depends on.
 - [ ] Keep secrets and signing assets out of git; document only the expected file names and environment variables.
-- [ ] Verify with `cd frontend && flutter test test/ios_build_config_test.dart && flutter build apk --debug && flutter test`
+- [ ] Verify with `cd frontend && flutter test test/ios_build_config_test.dart`
 
 ---
 
@@ -314,12 +243,11 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 - Modify: `frontend/lib/screens/resource_list_screen.dart`
 - Modify: `frontend/lib/widgets/search_filter_bar.dart`
 - Modify: `frontend/lib/blocs/search_filter/search_filter_bloc.dart`
-- Modify: `CONTEXT.md`
+- Modify: `docs/` performance notes only if measurements need to be recorded
 
 - [ ] Capture baseline timings for tab switch, filter apply, and large-list rebuilds in profile mode.
 - [ ] Fix only the hot spots confirmed by the measurements (for example: unnecessary rebuilds, repeated fetches, or large synchronous transforms).
 - [ ] Keep the optimization local; do not redesign the whole search stack unless the profile data demands it.
-- [ ] Record the measured baseline, chosen fixes, and post-fix numbers in `CONTEXT.md`.
 - [ ] Verify with `cd frontend && flutter test`
 
 ### Task P10-D2: Polish Batch Operations UX
@@ -329,16 +257,13 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 **Files:**
 - Modify: `frontend/lib/screens/batch_operations_screen.dart`
 - Modify: `frontend/lib/widgets/loading_widgets.dart`
-- Modify: `CONTEXT.md`
 - Test: `frontend/test/screens/batch_operations_screen_test.dart`
-- Create: `frontend/test/screens/batch_operations_validation_test.dart`
 - Test: `frontend/test/widgets/loading_widgets_test.dart`
 
 - [ ] Replace the most error-prone raw text-field flows with clearer affordances where the current UI is obviously brittle.
 - [ ] Surface validation and progress feedback inline instead of making batch actions feel fire-and-forget.
 - [ ] Preserve the existing backend API shape; this is polish on top of working endpoints, not a new protocol.
-- [ ] Document the final batch validation and progress rules in `CONTEXT.md`.
-- [ ] Verify with `cd frontend && flutter test test/screens/batch_operations_screen_test.dart test/screens/batch_operations_validation_test.dart test/widgets/loading_widgets_test.dart && flutter build apk --debug && flutter test`
+- [ ] Verify with `cd frontend && flutter test test/screens/batch_operations_screen_test.dart test/widgets/loading_widgets_test.dart`
 
 ---
 
@@ -346,7 +271,6 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 
 ```
 Parallelizable first:
-  P10-A0 (repo-wide docs/tests complement)
   P10-B1 (durable history)
   P10-C1 (Android release hardening)
   P10-D2 (batch UX polish)
@@ -384,5 +308,3 @@ Phase 10 is complete when all of the following are true:
 5. The repo has a concrete iOS device/release runbook.
 6. Batch operations feel guided and validated instead of raw and brittle.
 7. The Phase 9 stale checklist is explicitly treated as historical documentation, not unfinished scope.
-8. Every Phase 10 track lands repo-facing documentation and stronger regression coverage, not only narrow happy-path changes.
-9. The repo has one clear testing reference (`docs/testing-matrix.md`) for the commands and prerequisites that Phase 10 relies on.
