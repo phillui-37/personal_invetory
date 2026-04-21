@@ -3,17 +3,17 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use chrono::Utc;
+use domain::progress::{ProgressRepository, ResourceProgress};
+use domain::tag::{ResourceTagRepository, Tag, TagRepository};
 use domain::{
     DomainError, EbookMeta, EbookMetaRepository, LocationRepository, NewEbookMeta, NewResource,
     NewResourceLocation, NewWebReaderMeta, Resource, ResourceLocation, ResourceRepository,
     ResourceType, StorageType, UpdateResource, WebReaderMeta, WebReaderMetaRepository,
 };
-use domain::progress::{ProgressRepository, ResourceProgress};
-use domain::tag::{ResourceTagRepository, Tag, TagRepository};
 use futures::executor::block_on;
 use services::{
-    EbookService, NewEbookInput, NewLocationInput, NewWebReaderInput, TagService, UpdateEbookInput,
-    WebReaderService, ProgressService,
+    EbookService, NewEbookInput, NewLocationInput, NewWebReaderInput, ProgressService, TagService,
+    UpdateEbookInput, WebReaderService,
 };
 use uuid::Uuid;
 
@@ -547,6 +547,61 @@ fn ebook_location_validation_maps_to_domain_validation_error() {
 }
 
 #[test]
+fn ebook_batch_update_reports_partial_failures_without_dropping_successes() {
+    let resource_repo = Arc::new(MockResourceRepository::default());
+    let first_id = seed_ebook_resource(&resource_repo);
+    let second_id = seed_ebook_resource(&resource_repo);
+    let missing_id = Uuid::new_v4();
+
+    let ebook_meta_repo = Arc::new(MockEbookMetaRepository::default());
+    for resource_id in [first_id, second_id] {
+        ebook_meta_repo
+            .metas
+            .lock()
+            .expect("ebook meta lock")
+            .insert(
+                resource_id,
+                EbookMeta {
+                    resource_id,
+                    author: Some("Original".to_string()),
+                    isbn: None,
+                    publisher: None,
+                    language: Some("en".to_string()),
+                    file_format: Some("pdf".to_string()),
+                },
+            );
+    }
+    let location_repo = Arc::new(MockLocationRepository::default());
+    let service = EbookService::new(resource_repo, ebook_meta_repo.clone(), location_repo);
+
+    let (updated, failed) = block_on(service.batch_update_ebooks(
+        vec![first_id, missing_id, second_id],
+        UpdateEbookInput {
+            title: Some("Retitled".to_string()),
+            notes: Some("updated in bulk".to_string()),
+            author: Some("Batch Author".to_string()),
+            isbn: None,
+            publisher: Some("Batch Publisher".to_string()),
+            language: Some("ja".to_string()),
+            file_format: Some("epub".to_string()),
+        },
+    ));
+
+    assert_eq!(updated, 2);
+    assert_eq!(failed.len(), 1);
+    assert_eq!(failed[0].0, missing_id);
+    assert!(failed[0].1.contains("NotFound"));
+
+    for resource_id in [first_id, second_id] {
+        let meta = block_on(ebook_meta_repo.get(resource_id)).expect("updated ebook meta");
+        assert_eq!(meta.author.as_deref(), Some("Batch Author"));
+        assert_eq!(meta.publisher.as_deref(), Some("Batch Publisher"));
+        assert_eq!(meta.language.as_deref(), Some("ja"));
+        assert_eq!(meta.file_format.as_deref(), Some("epub"));
+    }
+}
+
+#[test]
 fn web_reader_happy_path_adds_resource_and_meta() {
     let resource_repo = Arc::new(MockResourceRepository::default());
     let web_reader_meta_repo = Arc::new(MockWebReaderMetaRepository::default());
@@ -700,6 +755,78 @@ fn web_reader_location_happy_path_adds_location() {
     });
 }
 
+#[test]
+fn web_reader_batch_copy_preserves_urls_while_copying_shared_meta_fields() {
+    let resource_repo = Arc::new(MockResourceRepository::default());
+    let source_id = seed_web_reader_resource(&resource_repo);
+    let first_target_id = seed_web_reader_resource(&resource_repo);
+    let second_target_id = seed_web_reader_resource(&resource_repo);
+    let web_reader_meta_repo = Arc::new(MockWebReaderMetaRepository::default());
+    {
+        let mut metas = web_reader_meta_repo
+            .metas
+            .lock()
+            .expect("web reader meta lock");
+        metas.insert(
+            source_id,
+            WebReaderMeta {
+                resource_id: source_id,
+                url: "https://source.example/series".to_string(),
+                site_name: Some("Source Site".to_string()),
+                last_checked_chapter: Some("ch-42".to_string()),
+                check_interval_secs: Some(7200),
+                last_checked_at: None,
+                progress_css_selector: Some(".chapter.current".to_string()),
+            },
+        );
+        for (resource_id, url) in [
+            (first_target_id, "https://target-one.example/series"),
+            (second_target_id, "https://target-two.example/series"),
+        ] {
+            metas.insert(
+                resource_id,
+                WebReaderMeta {
+                    resource_id,
+                    url: url.to_string(),
+                    site_name: Some("Old Site".to_string()),
+                    last_checked_chapter: Some("old".to_string()),
+                    check_interval_secs: Some(60),
+                    last_checked_at: None,
+                    progress_css_selector: Some(".old-selector".to_string()),
+                },
+            );
+        }
+    }
+    let location_repo = Arc::new(MockLocationRepository::default());
+    let service = WebReaderService::new(resource_repo, web_reader_meta_repo.clone(), location_repo);
+
+    let (updated, failed) = block_on(
+        service.batch_copy_web_reader_meta(source_id, vec![first_target_id, second_target_id]),
+    );
+
+    assert_eq!(updated, 2);
+    assert!(failed.is_empty());
+
+    let metas = web_reader_meta_repo
+        .metas
+        .lock()
+        .expect("web reader meta lock");
+    for (resource_id, expected_url) in [
+        (first_target_id, "https://target-one.example/series"),
+        (second_target_id, "https://target-two.example/series"),
+    ] {
+        let meta = metas.get(&resource_id).expect("target meta");
+        assert_eq!(meta.url, expected_url);
+        assert_eq!(meta.site_name.as_deref(), Some("Source Site"));
+        assert_eq!(meta.last_checked_chapter.as_deref(), Some("ch-42"));
+        assert_eq!(meta.check_interval_secs, Some(7200));
+        assert_eq!(
+            meta.progress_css_selector.as_deref(),
+            Some(".chapter.current")
+        );
+    }
+}
+
 // ── ChapterCheckService tests ──────────────────────────────────────────────
 
 use domain::{ChapterCheck, ChapterCheckRepository, Notification, NotificationRepository};
@@ -822,7 +949,10 @@ impl NotificationRepository for MockNotificationRepository {
             created_at: Utc::now(),
             read: false,
         };
-        self.notifications.lock().expect("notif lock").push(n.clone());
+        self.notifications
+            .lock()
+            .expect("notif lock")
+            .push(n.clone());
         Ok(n)
     }
 
@@ -867,7 +997,12 @@ fn build_chapter_check_service(
     checker: Arc<MockWebChecker>,
     web_meta_repo: Arc<MockWebReaderMetaRepository>,
 ) -> (
-    ChapterCheckService<MockWebChecker, MockChapterCheckRepository, MockNotificationRepository, MockWebReaderMetaRepository>,
+    ChapterCheckService<
+        MockWebChecker,
+        MockChapterCheckRepository,
+        MockNotificationRepository,
+        MockWebReaderMetaRepository,
+    >,
     Arc<MockChapterCheckRepository>,
     Arc<MockNotificationRepository>,
 ) {
@@ -923,8 +1058,7 @@ async fn chapter_check_service_no_new_chapter_skips_notification() {
         has_new: false,
         latest_chapter: Some("ch-1".to_string()),
     }));
-    let (service, _, notif_repo) =
-        build_chapter_check_service(checker, web_meta_repo.clone());
+    let (service, _, notif_repo) = build_chapter_check_service(checker, web_meta_repo.clone());
 
     let check = service
         .check_resource(resource_id)
@@ -950,8 +1084,7 @@ async fn chapter_check_service_io_error_records_error_check() {
     let checker = Arc::new(MockWebChecker::new_erroring(PluginError::IoError(
         "connection timeout".to_string(),
     )));
-    let (service, check_repo, notif_repo) =
-        build_chapter_check_service(checker, web_meta_repo);
+    let (service, check_repo, notif_repo) = build_chapter_check_service(checker, web_meta_repo);
 
     let check = service
         .check_resource(resource_id)
@@ -1058,13 +1191,17 @@ impl DeviceRepository for FakeDeviceRepo {
         let mut devices = self.devices.lock().unwrap();
         let total = devices.iter().filter(|d| d.device_id == device_id).count();
         if total == 0 {
-            return Err(domain::DomainError::NotFound(format!("{device_id} not found")));
+            return Err(domain::DomainError::NotFound(format!(
+                "{device_id} not found"
+            )));
         }
         let active = devices
             .iter_mut()
             .find(|d| d.device_id == device_id && d.delinked_at.is_none());
         match active {
-            None => Err(domain::DomainError::Conflict(format!("{device_id} already delinked"))),
+            None => Err(domain::DomainError::Conflict(format!(
+                "{device_id} already delinked"
+            ))),
             Some(d) => {
                 d.delinked_at = Some(at);
                 Ok(())
@@ -1222,7 +1359,10 @@ async fn progress_service_upsert_validates_range() {
     assert_eq!(success_max.progress, 1.0);
 
     let calls = *repo.upsert_calls.lock().expect("upsert calls lock");
-    assert_eq!(calls, 2, "repo.upsert must be called twice for both valid boundary values");
+    assert_eq!(
+        calls, 2,
+        "repo.upsert must be called twice for both valid boundary values"
+    );
 }
 
 #[tokio::test]
@@ -1385,7 +1525,11 @@ impl ResourceTagRepository for MockResourceTagRepository {
     }
 }
 
-fn make_tag_service() -> (Arc<MockTagRepository>, Arc<MockResourceTagRepository>, TagService) {
+fn make_tag_service() -> (
+    Arc<MockTagRepository>,
+    Arc<MockResourceTagRepository>,
+    TagService,
+) {
     let tag_repo = Arc::new(MockTagRepository::default());
     let resource_tag_repo = Arc::new(MockResourceTagRepository::with_tags(Arc::clone(&tag_repo)));
     let svc = TagService::new(
@@ -1417,7 +1561,10 @@ async fn tag_service_create_rejects_empty_name() {
     assert!(matches!(err, DomainError::ValidationError(_)));
 
     let calls = *tag_repo.create_calls.lock().unwrap();
-    assert_eq!(calls, 0, "repo.create must NOT be called on validation failure");
+    assert_eq!(
+        calls, 0,
+        "repo.create must NOT be called on validation failure"
+    );
 }
 
 #[tokio::test]
@@ -1480,10 +1627,7 @@ async fn tag_service_filter_resource_ids_by_tag() {
     let (tag_repo, resource_tag_repo, svc) = make_tag_service();
 
     // Seed via service so normalization is exercised end-to-end
-    let tag = svc
-        .create("  Sci-Fi  ")
-        .await
-        .expect("create must succeed");
+    let tag = svc.create("  Sci-Fi  ").await.expect("create must succeed");
     assert_eq!(tag.name, "sci-fi");
 
     {

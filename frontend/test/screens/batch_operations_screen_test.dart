@@ -36,19 +36,22 @@ void main() {
       await tester.pumpWidget(buildScreen());
       await tester.enterText(
         find.byKey(const Key('batch-import-paths')),
-        '/a, /b',
+        ' /a , , /b ',
       );
+      await tester.tap(find.text('Recursive'));
+      await tester.pump();
       await tester.tap(find.byKey(const Key('batch-import-submit')));
       await tester.pump();
       expect(importCalls, hasLength(1));
       expect(importCalls.first.paths, ['/a', '/b']);
+      expect(importCalls.first.recursive, isTrue);
     });
 
     testWidgets('calls onUpdate with entered field key/value', (tester) async {
       await tester.pumpWidget(buildScreen());
       await tester.enterText(
         find.byKey(const Key('batch-update-ids')),
-        'id1, id2',
+        ' id1, , id2 ',
       );
       await tester.enterText(
         find.byKey(const Key('batch-update-field-key')),
@@ -85,13 +88,50 @@ void main() {
       );
       await tester.enterText(
         find.byKey(const Key('batch-copy-target-ids')),
-        'tgt1, tgt2',
+        ' tgt1, , tgt2 ',
       );
       await tester.tap(find.byKey(const Key('batch-copy-submit')));
       await tester.pump();
       expect(copyCalls, hasLength(1));
       expect(copyCalls.first.sourceResourceId, 'src1');
       expect(copyCalls.first.targetResourceIds, ['tgt1', 'tgt2']);
+    });
+
+    testWidgets(
+        'keeps callbacks untouched until the matching submit button is pressed',
+        (tester) async {
+      await tester.pumpWidget(
+        SizedBox(
+          width: 400,
+          height: 800,
+          child: buildScreen(),
+        ),
+      );
+      await tester.enterText(
+        find.byKey(const Key('batch-import-paths')),
+        '/import-me',
+      );
+      await tester.enterText(
+        find.byKey(const Key('batch-update-ids')),
+        'id1',
+      );
+      await tester.enterText(
+        find.byKey(const Key('batch-copy-source-id')),
+        'src1',
+      );
+
+      expect(importCalls, isEmpty);
+      expect(updateCalls, isEmpty);
+      expect(copyCalls, isEmpty);
+
+      await tester.ensureVisible(find.byKey(const Key('batch-update-submit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('batch-update-submit')));
+      await tester.pump();
+
+      expect(importCalls, isEmpty);
+      expect(updateCalls, hasLength(1));
+      expect(copyCalls, isEmpty);
     });
   });
 }

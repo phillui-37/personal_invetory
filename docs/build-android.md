@@ -7,7 +7,22 @@
 - Java 17 (`java -version`)
 - `ANDROID_HOME` env var pointing to the SDK directory
 
-## Build
+## Repo verification rule
+
+Do not run the Flutter suite cold.
+
+`frontend/test/android_build_test.dart` checks for `build/app/outputs/flutter-apk/app-debug.apk`, so every clean checkout or cleaned `build/` dir needs a fresh debug APK before `flutter test`.
+
+```bash
+cd frontend
+flutter pub get
+flutter build apk --debug
+flutter test
+```
+
+CI follows the same contract in `.github/workflows/mobile-builds.yml`.
+
+## Build commands
 
 ```bash
 cd frontend

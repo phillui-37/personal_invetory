@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-21 (Phase 9 Task P9-B4 complete — repository filter/sort params added)
+2026-04-21 (Phase 10 Task P10-A0 complete — repo-wide docs/testing complement backfilled)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
@@ -774,9 +774,8 @@ Deferred pending clarification on:
 **Discovery**: Phil has already captured real API credentials and session data in `.credentials.md` and HAR files.
 
 ### Credentials Captured
-1. **Steam API Key**: `C1AE1AEA9578207CC02DCBC27FCA6E0E`
-   - Domain: https://kgy-production.xyz
-   - Status: ✅ Ready to use immediately
+1. **Steam API credentials**: captured locally in private credential storage
+   - Status: ✅ Ready to use locally after secure retrieval
 
 2. **DLSite**: Session cookies captured in HAR file
    - File: `www.dlsite.com_Archive [26-04-20 22-21-11].har` (108KB)
@@ -930,3 +929,23 @@ Deferred pending clarification on:
 ### What Was Explicitly Not Carried Forward
 - The unchecked Phase 9 checklist in `tasks/phase9.md` was treated as stale documentation, not unfinished implementation.
 - Existing foundations already shipped in earlier phases stay out of Phase 10 scope: batch update/copy/import APIs and screen, search history core model/service, Android debug build verification, and the existing mobile CI baseline.
+
+## Phase 10 Task P10-A0 — Repo-Wide Docs and Regression Complement (✅ Complete)
+
+- **Date**: 2026-04-21
+- **Docs added/updated**:
+  - Added `docs/testing-matrix.md` as the repo-wide command/prerequisite/ownership map.
+  - Updated `docs/build-android.md` to make the Flutter gate explicit: `flutter build apk --debug` must run before `flutter test` because `test/android_build_test.dart` reads `build/app/outputs/flutter-apk/app-debug.apk`.
+  - Rewrote `docs/har_extraction_guide.md` into a safe runbook: local captures only, sanitized header/cookie names only, no raw HAR content or secret values in committed docs.
+- **Backend regression coverage**:
+  - `backend/services/tests/services_tdd.rs` now covers shipped batch-service behavior that later Phase 10 work builds on:
+    - ebook batch update keeps successful records even when one ID fails
+    - web-reader metadata copy clones shared fields while preserving target URLs
+- **Frontend regression coverage**:
+  - `frontend/test/screens/resource_list_screen_test.dart` now checks shipped filter wiring across all five list tabs and verifies the filter bar stays hidden when no tags exist.
+  - `frontend/test/screens/batch_operations_screen_test.dart` now covers recursive import toggling, whitespace-trimmed CSV parsing, and submit-button isolation between import/update/copy sections.
+- **Search/filter behavior note**:
+  - `SearchFilterBar` default sort now matches `SearchFilterBloc` (`date_added`), and the clear chip resets sort/filter logic back to repo defaults instead of leaving stale state behind.
+- **Verification**:
+  - Backend: `cd backend && cargo test`
+  - Frontend: `cd frontend && flutter build apk --debug && flutter test`

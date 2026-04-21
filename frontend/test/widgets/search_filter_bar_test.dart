@@ -108,6 +108,38 @@ void main() {
       expect(find.byKey(const Key('sort-dropdown')), findsNothing);
       expect(find.byKey(const Key('logic-dropdown')), findsNothing);
     });
+
+    testWidgets('clear chip resets tags sort and logic to repo defaults',
+        (WidgetTester tester) async {
+      List<String>? changedTags;
+      String? changedSort;
+      String? changedLogic;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SearchFilterBar(
+              tags: testTags,
+              selectedTags: ['fiction'],
+              sortOption: 'title',
+              filterLogic: 'or',
+              onTagsChanged: (tags) => changedTags = tags,
+              onSortChanged: (sort) => changedSort = sort,
+              onLogicChanged: (logic) => changedLogic = logic,
+            ),
+          ),
+        ),
+      );
+
+      final clearChip = tester.widget<InputChip>(
+        find.byKey(const Key('clear-filters-chip')),
+      );
+      clearChip.onDeleted!.call();
+      await tester.pump();
+
+      expect(changedTags, isEmpty);
+      expect(changedSort, 'date_added');
+      expect(changedLogic, 'and');
+    });
   });
 }
-
