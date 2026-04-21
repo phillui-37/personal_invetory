@@ -942,3 +942,9 @@ Deferred pending clarification on:
 - **Verification**:
   - Backend: `cd backend && cargo test`
   - Frontend: `cd frontend && flutter build apk --debug && flutter test`
+
+## Root README Added
+
+- **Date**: 2026-04-21
+- **File**: `README.md`
+- **Purpose**: Add a repo-entry guide that points readers to `CONTEXT.md`, `docs/testing-matrix.md`, key operator docs, and the current Phase 10 backlog.
