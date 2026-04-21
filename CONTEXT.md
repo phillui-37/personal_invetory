@@ -934,6 +934,7 @@ Deferred pending clarification on:
   - `frontend/test/screens/batch_operations_screen_test.dart` now covers recursive import toggling, whitespace-trimmed CSV parsing, and submit-button isolation between import/update/copy sections.
 - **Scope guard**:
   - Spec-review cleanup removed accidental `tasks/phase10.md` and `SearchFilterBar` edits so P10-A0 stays docs + regression backfill only.
+  - Follow-up doc fix made `docs/testing-matrix.md` truthful at current HEAD: the ecosystem row is now an explicit audit that prints the still-open `TODO(network-inspection)` markers instead of claiming a clean no-TODO gate.
 - **Verification**:
   - Backend: `cd backend && cargo test`
   - Frontend: `cd frontend && flutter build apk --debug && flutter test`
