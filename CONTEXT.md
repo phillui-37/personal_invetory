@@ -918,12 +918,14 @@ Deferred pending clarification on:
 - **Date**: 2026-04-21
 - **Task File**: `tasks/phase10.md`
 - **Purpose**: Carry only genuine unfinished work forward after Phase 9 instead of blindly copying stale unchecked boxes from `tasks/phase9.md`.
+- **Scope Correction**: Phase 10 now also includes an **overall documentation and test complement** pass for already-shipped features, not only new Phase 10 feature work.
 
 ### What Phase 10 Now Contains
-1. **Connector hardening** — DLSite, FANZA, Kindle, and BookWalker connector work that still has `TODO(network-inspection)` debt or placeholder auth/library assumptions in code.
-2. **Search UX completion** — durable search history, history replay UI, facet UI, and tag autocomplete/typeahead.
-3. **Mobile release readiness** — Android release identity/signing cleanup plus an iOS device-signing and release-export runbook.
-4. **Performance and batch polish** — measured list/filter optimization plus safer batch operation UX.
+1. **Repo-wide documentation and regression complement** — central test-command reference plus stronger regression coverage for already-shipped flows that later Phase 10 work extends.
+2. **Connector hardening** — DLSite, FANZA, Kindle, and BookWalker connector work that still has `TODO(network-inspection)` debt or placeholder auth/library assumptions in code.
+3. **Search UX completion** — durable search history, history replay UI, facet UI, and tag autocomplete/typeahead.
+4. **Mobile release readiness** — Android release identity/signing cleanup plus an iOS device-signing and release-export runbook.
+5. **Performance and batch polish** — measured list/filter optimization plus safer batch operation UX.
 
 ### What Was Explicitly Not Carried Forward
 - The unchecked Phase 9 checklist in `tasks/phase9.md` was treated as stale documentation, not unfinished implementation.
