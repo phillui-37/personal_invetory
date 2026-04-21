@@ -896,3 +896,35 @@ Deferred pending clarification on:
 - OTP service uses tokio oneshot channels for pause/resume state machine
 - Repository interfaces accept optional filter/sort params with defaults
 - SearchFilterBloc provides global filter state across ResourceListScreen
+
+## Phase 9 Status Audit
+
+- **Audit Date**: 2026-04-21
+- **Repo Status**: Phase 9 code is merged into `main` via merge commit `7a4ad14` (`Merge feature/phase9-real-api-search into main`).
+- **Implementation Status**: CONTEXT Phase 9 summary and git history both show Track A (P9-A1 through P9-A9) and Track B (P9-B1 through P9-B4) complete.
+- **Code Presence Verified**: Key Phase 9 files exist in the working tree, including `backend/plugins/src/har_parser.rs`, `backend/plugins/src/http_client.rs`, `backend/plugins/src/chromium_session.rs`, and `frontend/lib/blocs/search_filter/search_filter_bloc.dart`.
+- **Documentation Gap**: `tasks/phase9.md` checklist is stale; it still contains `0` checked boxes and `82` unchecked boxes even though the work was merged and summarized elsewhere.
+
+## Phase 10 Planning Kickoff
+
+- **Planning Date**: 2026-04-21
+- **Request**: Build a Phase 10 task document from both stale unchecked Phase 9 checklist items and repo-wide deferred/TODO work.
+- **Planning Rule**: Treat `tasks/phase9.md` as audit input only; do not blindly carry its unchecked boxes forward.
+- **Primary Sources**: `tasks/phase9.md`, `CONTEXT.md`, `TODO.md`, `docs/superpowers/specs/2026-04-20-phase9-real-api-advanced-features-design.md`, and `backend/plugins/src/ecosystem/*` `TODO(network-inspection)` comments.
+- **Likely Phase 10 Candidate Buckets**: BookWalker real integration, search UX follow-up (tag autocomplete/history), mobile hardening, performance profiling, bulk-ops polish, and connector TODO cleanup after code-state audit.
+
+## Phase 10 Backlog Created
+
+- **Date**: 2026-04-21
+- **Task File**: `tasks/phase10.md`
+- **Purpose**: Carry only genuine unfinished work forward after Phase 9 instead of blindly copying stale unchecked boxes from `tasks/phase9.md`.
+
+### What Phase 10 Now Contains
+1. **Connector hardening** — DLSite, FANZA, Kindle, and BookWalker connector work that still has `TODO(network-inspection)` debt or placeholder auth/library assumptions in code.
+2. **Search UX completion** — durable search history, history replay UI, facet UI, and tag autocomplete/typeahead.
+3. **Mobile release readiness** — Android release identity/signing cleanup plus an iOS device-signing and release-export runbook.
+4. **Performance and batch polish** — measured list/filter optimization plus safer batch operation UX.
+
+### What Was Explicitly Not Carried Forward
+- The unchecked Phase 9 checklist in `tasks/phase9.md` was treated as stale documentation, not unfinished implementation.
+- Existing foundations already shipped in earlier phases stay out of Phase 10 scope: batch update/copy/import APIs and screen, search history core model/service, Android debug build verification, and the existing mobile CI baseline.
