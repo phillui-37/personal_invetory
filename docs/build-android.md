@@ -20,7 +20,9 @@ flutter build apk --debug
 flutter test
 ```
 
-CI follows the same contract in `.github/workflows/mobile-builds.yml`.
+Current CI does **not** run `flutter test` in the same job after the debug APK build.
+`.github/workflows/mobile-builds.yml` validates the APK in `build-apk`, then runs `flutter test --coverage` separately in `run-flutter-tests`.
+Treat the command block above as the local repo gate for this APK-before-tests contract.
 
 ## Build commands
 

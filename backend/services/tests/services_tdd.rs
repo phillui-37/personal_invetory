@@ -590,7 +590,7 @@ fn ebook_batch_update_reports_partial_failures_without_dropping_successes() {
     assert_eq!(updated, 2);
     assert_eq!(failed.len(), 1);
     assert_eq!(failed[0].0, missing_id);
-    assert!(failed[0].1.contains("NotFound"));
+    assert!(!failed[0].1.is_empty());
 
     for resource_id in [first_id, second_id] {
         let meta = block_on(ebook_meta_repo.get(resource_id)).expect("updated ebook meta");

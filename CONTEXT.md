@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-21 (Phase 10 Task P10-A0 complete — repo-wide docs/testing complement backfilled)
+2026-04-21 (Phase 10 backlog recorded; Task P10-A0 repo-wide docs/testing complement complete)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
@@ -917,6 +917,12 @@ Deferred pending clarification on:
 - **Date**: 2026-04-21
 - **Task File**: `tasks/phase10.md`
 - **Purpose**: Carry only genuine unfinished work forward after Phase 9 instead of blindly copying stale unchecked boxes from `tasks/phase9.md`.
+- **Backlog summary**:
+  - **Track 0**: repo-wide docs/testing complement so Phase 10 work stops depending on scattered operator knowledge and narrow happy-path checks.
+  - **Track A**: connector hardening for DLSite/FANZA, Kindle, and BookWalker where `TODO(network-inspection)` debt still blocks honest “real integration” claims.
+  - **Track B**: search UX completion via durable history, replay UI, facet surfacing, and tag autocomplete.
+  - **Track C**: mobile release readiness for Android signing/identity hardening and an iOS device-signing/export runbook.
+  - **Track D**: measured performance work plus safer batch-operations UX polish.
 
 ## Phase 10 Task P10-A0 — Repo-Wide Docs and Regression Complement (✅ Complete)
 
@@ -924,6 +930,7 @@ Deferred pending clarification on:
 - **Docs added/updated**:
   - Added `docs/testing-matrix.md` as the repo-wide command/prerequisite/ownership map.
   - Updated `docs/build-android.md` to make the Flutter gate explicit: `flutter build apk --debug` must run before `flutter test` because `test/android_build_test.dart` reads `build/app/outputs/flutter-apk/app-debug.apk`.
+  - Corrected the Android build docs/matrix to match current HEAD: local verification requires APK-before-tests, while `.github/workflows/mobile-builds.yml` still splits APK validation and `flutter test` into separate jobs.
   - Rewrote `docs/har_extraction_guide.md` into a safe runbook: local captures only, sanitized header/cookie names only, no raw HAR content or secret values in committed docs.
 - **Backend regression coverage**:
   - `backend/services/tests/services_tdd.rs` now covers shipped batch-service behavior that later Phase 10 work builds on:
@@ -932,9 +939,6 @@ Deferred pending clarification on:
 - **Frontend regression coverage**:
   - `frontend/test/screens/resource_list_screen_test.dart` now checks shipped filter wiring across all five list tabs and verifies the filter bar stays hidden when no tags exist.
   - `frontend/test/screens/batch_operations_screen_test.dart` now covers recursive import toggling, whitespace-trimmed CSV parsing, and submit-button isolation between import/update/copy sections.
-- **Scope guard**:
-  - Spec-review cleanup removed accidental `tasks/phase10.md` and `SearchFilterBar` edits so P10-A0 stays docs + regression backfill only.
-  - Follow-up doc fix made `docs/testing-matrix.md` truthful at current HEAD: the ecosystem row is now an explicit audit that prints the still-open `TODO(network-inspection)` markers instead of claiming a clean no-TODO gate.
 - **Verification**:
   - Backend: `cd backend && cargo test`
   - Frontend: `cd frontend && flutter build apk --debug && flutter test`
