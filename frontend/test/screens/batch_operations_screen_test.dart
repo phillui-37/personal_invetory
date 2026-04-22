@@ -225,6 +225,69 @@ void main() {
       expect(find.text('2 items succeeded.'), findsOneWidget);
     });
 
+    testWidgets('shows error feedback when batch import fully fails',
+        (tester) async {
+      final repository = _FakeBatchOperationRepository.importSuccess(
+        const BatchOperationResponse(
+          type: BatchOperationType.importResources,
+          results: [
+            BatchOperationItemResult(
+              itemKey: '/a',
+              success: false,
+              errorMessage: 'bad file',
+            ),
+            BatchOperationItemResult(
+              itemKey: '/b',
+              success: false,
+              errorMessage: 'missing metadata',
+            ),
+          ],
+        ),
+      );
+      final batchBloc = BatchBloc(repository);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BlocProvider.value(
+            value: batchBloc,
+            child: BatchOperationsScreen(
+              onImport: (req) => batchBloc.add(BatchImportRequested(req)),
+              onUpdate: (_) {},
+              onCopy: (_) {},
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('batch-import-paths')),
+        '/a,/b',
+      );
+      await tester.tap(find.byKey(const Key('batch-import-submit')));
+      await tester.pump();
+      await tester.pump();
+
+      final importCard = sectionCard('Batch import');
+      expect(
+        find.descendant(of: importCard, matching: find.text('Import failed')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: importCard,
+          matching: find.text('0 succeeded, 2 failed.'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: importCard,
+          matching: find.byIcon(Icons.error_outline),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets(
         'shows update progress and completion feedback inside update section',
         (tester) async {

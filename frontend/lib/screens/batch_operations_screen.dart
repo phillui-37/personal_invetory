@@ -215,6 +215,13 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
         response.results.where((result) => result.success).length;
     final failureCount = response.results.length - successCount;
 
+    if (successCount == 0 && failureCount > 0) {
+      return _SubmissionFeedback.error(
+        title: '${response.type.label} failed',
+        message: '$successCount succeeded, $failureCount failed.',
+      );
+    }
+
     if (failureCount > 0) {
       return _SubmissionFeedback.info(
         title: '${response.type.label} completed with issues',

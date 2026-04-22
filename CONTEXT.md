@@ -20,6 +20,7 @@ Personal inventory system for Phil to track resources (ebooks, web-readers, imag
     - success/error feedback stays attached to the same flow card after completion, and each flow keeps its own latest feedback state.
   - Validation coverage now explicitly checks invalid import/update/copy submissions stay blocked and surface the inline validator messages for trimmed-empty and self-target cases.
   - `loading_widgets.dart` includes `BatchFeedbackCard` for persistent batch result messaging.
+  - Quality-review follow-up: all-failure batch results must render with error tone instead of the partial-failure info tone; add a regression test for that path.
 
 ## Key Decisions
 
