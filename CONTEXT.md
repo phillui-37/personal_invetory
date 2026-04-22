@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-21 (Phase 10 backlog recorded; Task P10-A0 repo-wide docs/testing complement complete)
+2026-04-22 (Task P10-E1 cross-OS repo task dispatchers added)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
@@ -969,3 +969,25 @@ Deferred pending clarification on:
 - **Docs alignment**:
   - Updated `README.md` current-focus wording to mention repo task tooling alongside the existing Phase 10 tracks.
   - Tightened `tasks/phase10.md` readiness wording so `P10-B4` is explicitly gated behind the earlier search-history/replay UI wave, and `P10-D1` stays second-wave because the same list/filter surfaces are still moving.
+
+## Phase 10 Task P10-E1 — Cross-OS Repo Task Dispatchers
+
+- **Date**: 2026-04-22
+- **Files**: `bin/app`, `bin/app.ps1`, `bin/lib.sh`, `bin/lib.ps1`, `README.md`
+- **Shipped contract**:
+  - `start backend`
+  - `start frontend <macos|windows|linux|ios|android>`
+  - `build backend`
+  - `build frontend <macos|windows|linux|ios|android>`
+  - `test <backend|frontend|all>`
+  - `clean`
+  - `gen-api`
+- **Behavior rules**:
+  - Both dispatchers resolve repo root from script location instead of depending on the caller's working directory.
+  - Invalid verb/area/target combinations fail with usage output; unsupported host/target pairs fail loudly instead of pretending to cross-compile.
+  - Backend release builds copy the app binary into `dist/backend/`.
+  - Frontend release builds copy target-specific artifacts into `dist/frontend/<target>/`.
+  - Frontend test dispatch keeps the existing repo rule: build the debug APK first, then run `flutter test`.
+- **Current repo/platform reality**:
+  - This repo currently has Flutter platform directories for `android`, `ios`, and `macos`; `windows` and `linux` targets are part of the contract but will fail clearly until those platform folders exist.
+  - POSIX smoke is locally runnable on macOS/Linux. PowerShell command behavior was implemented to match the same contract, but full Windows execution still needs a Windows host.
