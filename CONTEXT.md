@@ -1005,7 +1005,7 @@ Deferred pending clarification on:
   - Added `Invoke-NativeCommand` so repo dispatcher native calls convert non-zero `$LASTEXITCODE` into a controlled repo exit signal.
   - `bin/app.ps1` now wraps top-level dispatch in `try/catch` and exits cleanly on that repo exit signal while still rethrowing unexpected exceptions.
   - `Fail` now writes `error: ...` to stderr and reuses the same exit-signal path; `Show-Usage` now uses `WriteLine` for the usage block.
-  - Enabled `$PSNativeCommandUseErrorActionPreference` when the host supports it, but kept the explicit native-command wrapper so behavior does not depend on that feature alone.
+  - Follow-up fix: removed `$PSNativeCommandUseErrorActionPreference` from `bin/lib.ps1` because on PowerShell 7.3+ it can throw before `Invoke-NativeCommand` sees `$LASTEXITCODE`, collapsing real native failures into the noisy generic exit-1 path. `Invoke-NativeCommand` stays the single exit-code authority.
 - **Verification limits**:
   - `git diff --check` stays clean after the patch.
   - Static inspection confirms every dispatcher `cargo`, `flutter`, and `sh` invocation now goes through `Invoke-NativeCommand`.
