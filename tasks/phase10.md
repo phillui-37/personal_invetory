@@ -319,7 +319,7 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 - [ ] Load release-signing settings from ignored local files and/or CI secrets instead of using debug signing for release.
 - [ ] Keep debug APK verification intact while adding a release-path guardrail for configured environments.
 - [ ] Expand `docs/build-android.md` so the local and CI release paths use the same signing/config contract.
-- [ ] Verify repo-local guards with `cd frontend && flutter build apk --debug && flutter test test/android_build_test.dart && flutter build apk --debug && flutter test`; only count release-path smoke as complete when ignored signing config or CI secrets are actually configured.
+- [ ] Verify repo-local guards with `cd frontend && flutter build apk --debug && flutter test test/android_build_test.dart && flutter test`; only count release-path smoke as complete when ignored signing config or CI secrets are actually configured.
 
 ### Task P10-C2: Add iOS Device-Signing and Release-Export Runbook
 
