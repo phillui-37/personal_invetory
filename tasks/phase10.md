@@ -130,6 +130,8 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 
 **Goal:** Complement the overall project docs and tests so the repo stops depending on tribal knowledge and narrow happy-path checks for already-shipped features.
 
+**Readiness:** **Repo-local executable.** This is pure repo cleanup/complement work and can be started and verified from committed state alone.
+
 **Files:**
 - Create: `docs/testing-matrix.md`
 - Modify: `CONTEXT.md`
@@ -403,6 +405,7 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 
 ```
 First execution wave (ready from repo state now):
+  P10-A0
   P10-E1 -> P10-B1 -> P10-B2
   P10-C1
   P10-D2
@@ -414,12 +417,14 @@ Second wave (repo-local follow-up after the first wave settles):
 Blocked / conditional tracks:
   P10-A1 -> P10-A2 -> P10-A3
     - Needs sanitized external capture/session input before closure is honest.
-  P10-C1
-    - Repo changes are ready now, but release-path validation is conditional on signing config/secrets.
   P10-C2
     - Runbook/config work is ready now; archive/export validation is conditional on Apple signing assets.
+
+Conditional closure notes for ready-now work:
+  P10-C1
+    - Start repo-local Gradle/docs/CI work now, but do not mark the task fully closed until signing config or CI secrets allow release-path validation.
   P10-E1
-    - POSIX smoke is repo-local; Windows PowerShell smoke is host-limited.
+    - Start repo-local script/docs work now, but keep Windows PowerShell smoke explicitly host-limited until it runs on a Windows-capable host.
 ```
 
 ---
