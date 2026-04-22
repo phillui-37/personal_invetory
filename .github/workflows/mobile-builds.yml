@@ -48,6 +48,10 @@ jobs:
         run: |
           flutter build apk --debug
 
+      - name: Run Android build guard test
+        run: |
+          flutter test test/android_build_test.dart
+
       - name: Verify APK structure
         run: |
           APK_PATH="build/app/outputs/flutter-apk/app-debug.apk"
@@ -85,6 +89,19 @@ jobs:
           
           echo "APK validation successful"
           ls -lh "$APK_PATH"
+
+      - name: Build release APK when signing inputs are configured
+        if: ${{ vars.ANDROID_APPLICATION_ID != '' && secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+        env:
+          ANDROID_APPLICATION_ID: ${{ vars.ANDROID_APPLICATION_ID }}
+          ANDROID_KEYSTORE_PATH: ci-release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "android/$ANDROID_KEYSTORE_PATH"
+          flutter build apk --release
 
       - name: Upload APK artifact
         if: always()
@@ -146,7 +163,7 @@ jobs:
           echo "Podfile syntax validation passed"
 
   run-flutter-tests:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     name: Run Flutter Tests
     defaults:
       run:
@@ -154,6 +171,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -168,6 +191,7 @@ jobs:
 
       - name: Run Flutter tests
         run: |
+          flutter build apk --debug
           flutter test --coverage
 
       - name: Upload coverage reports

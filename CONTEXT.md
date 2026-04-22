@@ -1075,3 +1075,44 @@ Deferred pending clarification on:
   - Added resource-list coverage for replay restoring query/tags/sort/filter logic, replay issuing exactly one filtered reload wave, and remove/clear persistence behavior.
   - Added resource-list coverage proving normal typing/tag filtering now call into `SearchHistoryService` and persist the latest combined snapshot.
   - Added bloc coverage for replay snapshot application emitting one combined filter state.
+
+## Phase 10 Task P10-C1 — Android Release Identity and Signing Hardening
+
+- **Date**: 2026-04-22
+- **Files**: `frontend/android/app/build.gradle.kts`, `frontend/android/app/src/main/kotlin/dev/phillui/personal_inventory/MainActivity.kt`, `.github/workflows/mobile-builds.yml`, `docs/build-android.md`, `frontend/test/android_build_test.dart`
+- **Problem fixed**:
+  - Android Gradle still shipped the Flutter example identity and reused debug signing for release.
+  - The Android guard test only covered the debug APK artifact, so release-signing drift in Gradle/docs/CI could slip through.
+  - CI still split `flutter build apk --debug` from `flutter test`, which did not match the repo-local APK-before-tests rule.
+- **Hardening shipped**:
+  - `frontend/android/app/build.gradle.kts` now reads release identity/signing inputs from ignored local files (`frontend/android/key.properties` or `frontend/android/local.properties`) or CI env vars (`ANDROID_APPLICATION_ID`, `ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`).
+  - Release builds now fail fast with a clear Gradle error when any required release input is missing; they no longer fall back to debug signing.
+  - Android package identity moved off the example namespace/package to `dev.phillui.personal_inventory`.
+  - `frontend/test/android_build_test.dart` now guards the release contract too: no example app ID, no debug-signing fallback, shared env-var contract across Gradle/docs/CI, and the debug-APK-before-tests rule stays intact.
+  - `.github/workflows/mobile-builds.yml` now runs `flutter test test/android_build_test.dart` after the debug APK build, runs the full Flutter suite only after `flutter build apk --debug`, and only attempts `flutter build apk --release` when the signing inputs are present in GitHub vars/secrets.
+  - `docs/build-android.md` now documents the exact local/CI release contract and states plainly that repo-local checks prove wiring only; a real signed release still depends on real signing material.
+- **Verification**:
+  - Red step: after tightening `frontend/test/android_build_test.dart`, `cd frontend && flutter build apk --debug && flutter test test/android_build_test.dart` failed on the old example app ID/debug-signing assumptions and missing release-contract docs/CI wiring.
+  - Green step: `cd frontend && flutter build apk --debug && flutter test test/android_build_test.dart`
+  - Full frontend gate: `cd frontend && flutter build apk --debug && flutter test`
+  - Extra hardening check: `cd frontend && flutter build apk --release` now fails fast with the expected missing-config error unless real release inputs are supplied.
+
+### Phase 10 Task P10-C1 — Review Fixes
+
+- **Date**: 2026-04-22
+- **Files**: `.github/workflows/mobile-builds.yml`, `docs/build-android.md`, `frontend/test/android_build_test.dart`
+- **Review issues fixed**:
+  - CI release signing wrote the decoded keystore into `frontend/`, but Gradle resolves `ANDROID_KEYSTORE_PATH` with `rootProject.file(...)` from `frontend/android/`.
+  - `frontend/test/android_build_test.dart` loaded repo files in `setUpAll`, so a missing file could crash the whole suite before the real assertions ran.
+  - The workflow-order assertion used global `indexOf`, so unrelated text in another job could satisfy or break the check by accident.
+- **Fix**:
+  - `.github/workflows/mobile-builds.yml` now decodes `ANDROID_KEYSTORE_BASE64` into `frontend/android/$ANDROID_KEYSTORE_PATH`, while keeping `ANDROID_KEYSTORE_PATH=ci-release.keystore` so Gradle and CI use the same contract.
+  - `docs/build-android.md` now states plainly why the keystore file lives under `frontend/android/` and why the env var stays relative.
+  - `frontend/test/android_build_test.dart` now reads workflow/docs/Gradle files inside each test with existence assertions, so missing files fail the specific test instead of exploding `setUpAll`.
+  - The workflow-order assertion now extracts the `run-flutter-tests` job block first, then checks `flutter build apk --debug` before `flutter test --coverage` inside that job only.
+  - Added a targeted regression assertion that checks the CI keystore decode path against Gradle's `rootProject.file(...)` behavior.
+- **Verification**:
+  - Red: `cd frontend && flutter test test/android_build_test.dart` failed on the old CI keystore path and on the loose job-scope assertion helper.
+  - Green: `cd frontend && flutter test test/android_build_test.dart`
+  - Full frontend gate: `cd frontend && flutter build apk --debug && flutter test`
+  - Fail-fast release guard still intact: `cd frontend && flutter build apk --release` fails with the expected missing signing input error in an unsigned local environment.
