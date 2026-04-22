@@ -96,11 +96,17 @@ function Clean-Repo {
 }
 
 function Generate-Api {
-    $specUrl = if ($env:OPENAPI_SPEC_URL) { $env:OPENAPI_SPEC_URL } else { 'http://localhost:8080/api/v1/system/openapi' }
-    & openapi-generator-cli generate `
-        -i $specUrl `
-        -g dart `
-        -o (Join-Path $repoRoot 'frontend/lib/api')
+    $scriptPath = Join-Path $repoRoot 'frontend/scripts/gen-api-client.sh'
+    if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
+        Fail "missing generator script '$scriptPath'"
+    }
+
+    $shCommand = Get-Command sh -ErrorAction SilentlyContinue
+    if (-not $shCommand) {
+        Fail "missing 'sh' required to run '$scriptPath'"
+    }
+
+    & $shCommand.Source $scriptPath
 }
 
 switch ("$Verb:$Area:$Target") {

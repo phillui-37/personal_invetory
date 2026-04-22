@@ -991,3 +991,4 @@ Deferred pending clarification on:
 - **Current repo/platform reality**:
   - This repo currently has Flutter platform directories for `android`, `ios`, and `macos`; `windows` and `linux` targets are part of the contract but will fail clearly until those platform folders exist.
   - POSIX smoke is locally runnable on macOS/Linux. PowerShell command behavior was implemented to match the same contract, but full Windows execution still needs a Windows host.
+  - Spec-gap fix: `bin/app.ps1 gen-api` now dispatches through `frontend/scripts/gen-api-client.sh` via `sh` and fails clearly if the repo script or shell bridge is missing, instead of bypassing the repo contract with a direct `openapi-generator-cli` call.
