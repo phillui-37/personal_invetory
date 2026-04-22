@@ -566,10 +566,9 @@ Implemented multi-tag filtering, sorting, and faceting for resource search acros
 
 ### Next Steps (Future Phases)
 1. **Integration**: Wire SearchFilterBar into ResourceListScreen, hook to BLoCs
-2. **Persistence**: Add SharedPreferences or similar for search history durability
-3. **API integration**: Add sort_by, sort_order, with_facets params to backend list endpoints
-4. **UX**: Show facets UI, display search history widget, replay saved searches
-5. **Analytics**: Track popular searches, facet click patterns
+2. **API integration**: Add sort_by, sort_order, with_facets params to backend list endpoints
+3. **UX**: Show facets UI, display persisted search history widget, replay saved searches
+4. **Analytics**: Track popular searches, facet click patterns
 
 ### Architecture Notes
 - **Backend**: Tag filtering logic isolated in `tag_filter.rs`, sort logic in `search_aggregation.rs`, clean separation
@@ -1022,3 +1021,6 @@ Deferred pending clarification on:
   - Service behavior stays LIFO and still trims to `maxHistory`; oversized persisted payloads are truncated on load and written back in trimmed form.
   - Corrupted persisted payloads fail open to empty history and the bad stored value is cleared instead of blocking app startup.
   - Every mutating service operation (`addSearch`, `removeById`, `clearHistory`) writes the full current history snapshot through the storage seam.
+- **Process note**:
+  - This task did run a targeted red step before implementation, but the branch was later squashed into one shipped commit, so repo history does not show a standalone failing-test commit.
+  - The targeted red coverage was the new storage tests for loading existing persisted history, failing open on malformed payloads, and preserving the SearchHistory JSON contract, plus the new service tests for loading saved history, trimming oversized saved history on load, and persisting snapshots on add/remove/clear mutations before the SharedPreferences startup wiring was added.
