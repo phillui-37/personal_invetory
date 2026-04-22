@@ -28,6 +28,7 @@
 | Search UX completion | Search history is still in-memory only; no replay widget or facet UI is wired; tag entry is still plain text without suggestions. | `CONTEXT.md:567-572`, `frontend/lib/services/search_history_service.dart`, `frontend/lib/widgets/search_filter_bar.dart`, `frontend/lib/widgets/tag_chip_list.dart` |
 | Mobile release readiness | Android release build still uses debug signing and example app ID; iOS verification exists, but device/release signing flow is still only partially documented. | `frontend/android/app/build.gradle.kts`, `docs/build-android.md`, `frontend/test/ios_build_config_test.dart` |
 | Performance + batch polish | The codebase calls this out as future work, and the current batch screen is still raw text-field driven rather than a polished bulk workflow. | `CONTEXT.md:684-686`, `frontend/lib/screens/batch_operations_screen.dart` |
+| Repo task tooling | Common backend/frontend run, build, test, clean, and API-generation commands are still scattered across docs and platform-specific knowledge; there is no top-level cross-OS task entrypoint or `dist/` copy flow. | `README.md`, `docs/build-android.md`, `frontend/scripts/gen-api-client.sh`, absence of `bin/` |
 
 ---
 
@@ -83,6 +84,9 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 | `frontend/test/screens/resource_list_screen_facets_test.dart` | Resource-list integration tests for facet rendering and selection |
 | `frontend/test/screens/batch_operations_validation_test.dart` | Batch-flow validation/progress tests beyond the existing happy-path screen checks |
 | `docs/build-ios-device.md` | Concrete iOS device-signing and release-export steps |
+| `bin/app` | POSIX task dispatcher for macOS and Arch Linux repo workflows |
+| `bin/app.ps1` | PowerShell task dispatcher for Windows repo workflows |
+| `docs/superpowers/specs/2026-04-22-bin-dispatcher-design.md` | Approved design for the cross-OS bin dispatcher and `dist/` output contract |
 
 ### Modified Files
 
@@ -108,6 +112,7 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 | `.github/workflows/mobile-builds.yml` | Add release-path validation when signing secrets/config are available |
 | `docs/build-android.md` | Replace partial release guidance with exact repo-compatible signing/config steps |
 | `CONTEXT.md` | Record shipped UX rules, profiling results, and final Phase 10 behavior summaries |
+| `README.md` | Point contributors at the new `bin/` entrypoints once they exist |
 
 ---
 
@@ -342,6 +347,32 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 
 ---
 
+## Track E — Repo Task Tooling
+
+### Task P10-E1: Add Cross-OS `bin/` Task Dispatchers
+
+**Goal:** Add one obvious repo-level task entrypoint for macOS, Arch Linux, and Windows so common backend/frontend commands stop living as tribal knowledge scattered across docs.
+
+**Files:**
+- Create: `bin/app`
+- Create: `bin/app.ps1`
+- Optional create: `bin/lib.sh`
+- Optional create: `bin/lib.ps1`
+- Modify: `README.md`
+- Modify: `CONTEXT.md`
+- Reference: `docs/superpowers/specs/2026-04-22-bin-dispatcher-design.md`
+
+- [ ] Add `bin/app` as the POSIX dispatcher for macOS and Arch Linux, keeping it `sh`-compatible instead of bash-heavy.
+- [ ] Add `bin/app.ps1` as the Windows-native PowerShell dispatcher with the same command contract.
+- [ ] Support `start backend` and `start frontend <macos|windows|linux|ios|android>` using the existing Cargo/Flutter commands.
+- [ ] Support `build backend` and `build frontend <macos|windows|linux|ios|android>` in release mode, then copy the produced native artifacts into `dist/`.
+- [ ] Wire `test <backend|frontend|all>`, `clean`, and `gen-api`, preserving the repo rule that frontend tests require `flutter build apk --debug` before `flutter test`.
+- [ ] Fail loudly on invalid verb/target pairs and unsupported host/target combinations; do not add fake cross-compilation behavior.
+- [ ] Update `README.md` and `CONTEXT.md` so contributors know `bin/app` and `bin/app.ps1` are the preferred repo task entrypoints.
+- [ ] Verify with `bin/app test backend`, `bin/app test frontend`, and target-specific smoke checks for `start`/`build` help-path validation on both shell families where available.
+
+---
+
 ## Execution Order Summary
 
 ```
@@ -350,6 +381,7 @@ Parallelizable first:
   P10-B1 (durable history)
   P10-C1 (Android release hardening)
   P10-D2 (batch UX polish)
+  P10-E1 (cross-OS bin task tooling)
 
 Backend connector sequence:
   P10-A1 (DLSite/FANZA hardening)
@@ -369,6 +401,9 @@ Mobile sequence:
 Polish sequence:
   P10-D1 (profile first, optimize second)
   P10-D2 (batch workflow polish)
+
+Tooling sequence:
+  P10-E1 (cross-OS bin dispatcher)
 ```
 
 ---
@@ -386,3 +421,4 @@ Phase 10 is complete when all of the following are true:
 7. The Phase 9 stale checklist is explicitly treated as historical documentation, not unfinished scope.
 8. Every Phase 10 track lands repo-facing documentation and stronger regression coverage, not only narrow happy-path changes.
 9. The repo has one clear testing reference (`docs/testing-matrix.md`) for the commands and prerequisites that Phase 10 relies on.
+10. The repo has one clear cross-OS task entrypoint via `bin/app` and `bin/app.ps1`, including `dist/` copy behavior for backend and frontend build outputs.

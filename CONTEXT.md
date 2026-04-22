@@ -948,3 +948,33 @@ Deferred pending clarification on:
 - **Date**: 2026-04-21
 - **File**: `README.md`
 - **Purpose**: Add a repo-entry guide that points readers to `CONTEXT.md`, `docs/testing-matrix.md`, key operator docs, and the current Phase 10 backlog.
+
+## 2026-04-22 Backlog Audit
+
+- **Question answered**: "any todo or possible enhancement left?"
+- **Canonical source**: `tasks/phase10.md` remains the current backlog; `README.md` points to it as the remaining-work file.
+- **Done already**: Phases 1-9 are merged; Phase 10 Task P10-A0 (repo-wide docs/testing complement) is complete.
+- **Still open in Phase 10**:
+  - **Track A**: ecosystem connector hardening for DLSite/FANZA, Kindle, and BookWalker where `TODO(network-inspection)` debt still exists in connector code.
+  - **Track B**: search UX completion via durable search history, replay UI, facet surfacing, and tag autocomplete.
+  - **Track C**: mobile release readiness via Android release signing/identity hardening and an iOS device-signing/export runbook.
+  - **Track D**: measured resource-list performance work and batch-operations UX polish.
+- **Live code evidence**:
+  - `backend/plugins/src/ecosystem/dlsite.rs`, `fanza.rs`, `kindle.rs`, and `bookwalker.rs` still carry `TODO(network-inspection)` comments.
+  - `frontend/lib/services/search_history_service.dart` is still in-memory only.
+  - `frontend/android/app/build.gradle.kts` still uses example app ID values and debug signing for release.
+  - `frontend/lib/screens/batch_operations_screen.dart` is still a raw comma-separated text-field workflow.
+- **Conclusion**: Yes, there is still real backlog left; it is no longer "what is unfinished?" but "which Phase 10 track to do next?"
+
+## 2026-04-22 Phase 10 Update — Bin Dispatcher Task Added
+
+- **Request**: Add the approved cross-OS `bin/` task-entrypoint work into the Phase 10 backlog.
+- **Backlog change**: `tasks/phase10.md` now carries **Track E / Task P10-E1** for repo task tooling.
+- **Task summary**:
+  - add `bin/app` for macOS + Arch Linux
+  - add `bin/app.ps1` for Windows PowerShell
+  - support backend/frontend start commands
+  - support backend/frontend release build commands that copy native artifacts into `dist/`
+  - add `test`, `clean`, and `gen-api`
+  - document the new entrypoints in repo-facing docs
+- **Design reference**: `docs/superpowers/specs/2026-04-22-bin-dispatcher-design.md`
