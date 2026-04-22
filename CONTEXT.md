@@ -964,6 +964,6 @@ Deferred pending clarification on:
   - Marked connector tasks as blocked on sanitized external capture/session input instead of pretending the repo alone can close them.
   - Marked mobile release tasks as locally editable but release-validation-dependent on ignored signing config and CI secrets.
   - Added `P10-E1` for cross-OS `bin/` entrypoints and called out that Windows PowerShell smoke is host-limited from this macOS environment.
-  - Locked the first execution wave to `P10-A0`, `P10-E1 -> P10-B1 -> P10-B2`, plus `P10-C1` and `P10-D2`, while keeping `P10-C1`/`P10-E1` closure notes explicitly conditional on signing/host validation instead of treating them as blocked starts.
+  - Locked the first execution wave to `P10-A0`, `P10-E1`, `P10-B1 -> P10-B2`, plus `P10-C1`, `P10-C2`, and `P10-D2`, while keeping `P10-C1`/`P10-C2`/`P10-E1` closure notes explicitly conditional on signing/host validation instead of treating ready-now work as blocked.
 - **Docs alignment**:
   - Updated `README.md` current-focus wording to mention repo task tooling alongside the existing Phase 10 tracks.

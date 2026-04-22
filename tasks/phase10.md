@@ -406,8 +406,10 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 ```
 First execution wave (ready from repo state now):
   P10-A0
-  P10-E1 -> P10-B1 -> P10-B2
+  P10-E1
+  P10-B1 -> P10-B2
   P10-C1
+  P10-C2
   P10-D2
 
 Second wave (repo-local follow-up after the first wave settles):
@@ -417,12 +419,12 @@ Second wave (repo-local follow-up after the first wave settles):
 Blocked / conditional tracks:
   P10-A1 -> P10-A2 -> P10-A3
     - Needs sanitized external capture/session input before closure is honest.
-  P10-C2
-    - Runbook/config work is ready now; archive/export validation is conditional on Apple signing assets.
 
 Conditional closure notes for ready-now work:
   P10-C1
     - Start repo-local Gradle/docs/CI work now, but do not mark the task fully closed until signing config or CI secrets allow release-path validation.
+  P10-C2
+    - Start repo-local runbook/config work now, but keep archive/export validation explicitly conditional on real Apple signing assets.
   P10-E1
     - Start repo-local script/docs work now, but keep Windows PowerShell smoke explicitly host-limited until it runs on a Windows-capable host.
 ```
