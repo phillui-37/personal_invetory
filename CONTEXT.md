@@ -1010,3 +1010,15 @@ Deferred pending clarification on:
   - `git diff --check` stays clean after the patch.
   - Static inspection confirms every dispatcher `cargo`, `flutter`, and `sh` invocation now goes through `Invoke-NativeCommand`.
   - Runtime PowerShell smoke is still host-limited here because this macOS environment does not have `pwsh` installed.
+
+## Phase 10 Task P10-B1 — Durable Search History
+
+- **Date**: 2026-04-22
+- **Files**: `frontend/lib/services/search_history_service.dart`, `frontend/lib/services/search_history_storage.dart`, `frontend/lib/main.dart`, `frontend/test/services/search_history_service_test.dart`, `frontend/test/services/search_history_storage_test.dart`
+- **Shipped contract**:
+  - Search history now loads once during app startup before `runApp`, so previously saved entries survive app restarts.
+  - Persistence uses `SharedPreferencesSearchHistoryStorage` with the single key `search_history` and stores a JSON array of `SearchHistory.toJson()` payloads.
+  - The JSON object shape stays unchanged: `id`, `query`, `tags`, `sortBy`, `filterLogic`, `timestamp`.
+  - Service behavior stays LIFO and still trims to `maxHistory`; oversized persisted payloads are truncated on load and written back in trimmed form.
+  - Corrupted persisted payloads fail open to empty history and the bad stored value is cleared instead of blocking app startup.
+  - Every mutating service operation (`addSearch`, `removeById`, `clearHistory`) writes the full current history snapshot through the storage seam.
