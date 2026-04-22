@@ -11,6 +11,8 @@ class SearchFilterBar extends StatefulWidget {
     required this.onLogicChanged,
     this.sortOption = 'title',
     this.filterLogic = 'and',
+    this.query = '',
+    this.onQueryChanged,
     super.key,
   });
 
@@ -21,6 +23,8 @@ class SearchFilterBar extends StatefulWidget {
   final ValueChanged<String> onLogicChanged;
   final String sortOption;
   final String filterLogic;
+  final String query;
+  final ValueChanged<String>? onQueryChanged;
 
   @override
   State<SearchFilterBar> createState() => _SearchFilterBarState();
@@ -30,6 +34,7 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
   late List<String> _selectedTags;
   late String _sortOption;
   late String _filterLogic;
+  late final TextEditingController _queryController;
 
   @override
   void initState() {
@@ -37,6 +42,34 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
     _selectedTags = List.from(widget.selectedTags);
     _sortOption = widget.sortOption;
     _filterLogic = widget.filterLogic;
+    _queryController = TextEditingController(text: widget.query);
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchFilterBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (!_sameTags(oldWidget.selectedTags, widget.selectedTags)) {
+      _selectedTags = List<String>.from(widget.selectedTags);
+    }
+    if (oldWidget.sortOption != widget.sortOption) {
+      _sortOption = widget.sortOption;
+    }
+    if (oldWidget.filterLogic != widget.filterLogic) {
+      _filterLogic = widget.filterLogic;
+    }
+    if (_queryController.text != widget.query) {
+      _queryController.value = TextEditingValue(
+        text: widget.query,
+        selection: TextSelection.collapsed(offset: widget.query.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    super.dispose();
   }
 
   void _toggleTag(String tagName) {
@@ -50,13 +83,37 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
     widget.onTagsChanged(_selectedTags);
   }
 
+  bool _sameTags(List<String> left, List<String> right) {
+    if (left.length != right.length) {
+      return false;
+    }
+    for (var i = 0; i < left.length; i++) {
+      if (left[i] != right[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Sort and filter logic controls
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            child: TextField(
+              key: const Key('search-query-input'),
+              controller: _queryController,
+              onChanged: widget.onQueryChanged,
+              decoration: const InputDecoration(
+                labelText: 'Search resources',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.search),
+              ),
+            ),
+          ),
           if (_selectedTags.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -109,41 +166,41 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
                 ],
               ),
             ),
-          // Tag filter chips
-          SizedBox(
-            height: 48,
-            child: ListView(
-              key: const Key('tag-chips-list'),
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              children: [
-                if (_selectedTags.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: InputChip(
-                      key: const Key('clear-filters-chip'),
-                      label: const Text('Clear'),
-                      onDeleted: () {
-                        setState(() => _selectedTags.clear());
-                        widget.onTagsChanged(_selectedTags);
-                      },
-                      deleteIcon: const Icon(Icons.close, size: 16),
+          if (widget.tags.isNotEmpty)
+            SizedBox(
+              height: 48,
+              child: ListView(
+                key: const Key('tag-chips-list'),
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                children: [
+                  if (_selectedTags.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: InputChip(
+                        key: const Key('clear-filters-chip'),
+                        label: const Text('Clear'),
+                        onDeleted: () {
+                          setState(() => _selectedTags.clear());
+                          widget.onTagsChanged(_selectedTags);
+                        },
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                      ),
+                    ),
+                  ...widget.tags.map(
+                    (tag) => Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: FilterChip(
+                        key: Key('filter-tag-${tag.name}'),
+                        label: Text(tag.name),
+                        selected: _selectedTags.contains(tag.name),
+                        onSelected: (_) => _toggleTag(tag.name),
+                      ),
                     ),
                   ),
-                ...widget.tags.map(
-                  (tag) => Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: FilterChip(
-                      key: Key('filter-tag-${tag.name}'),
-                      label: Text(tag.name),
-                      selected: _selectedTags.contains(tag.name),
-                      onSelected: (_) => _toggleTag(tag.name),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );

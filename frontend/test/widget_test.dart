@@ -9,12 +9,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:personal_inventory_frontend/main.dart';
+import 'package:personal_inventory_frontend/services/search_history_service.dart';
 
 void main() {
   testWidgets('PersonalInventoryApp renders without errors',
       (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const PersonalInventoryApp());
+    await tester.pumpWidget(
+      PersonalInventoryApp(searchHistoryService: SearchHistoryService()),
+    );
 
     // Verify that the app shell renders with navigation bar
     expect(find.byIcon(Icons.inventory_2), findsOneWidget);

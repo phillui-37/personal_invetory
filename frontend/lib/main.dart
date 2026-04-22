@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'blocs/batch/batch_bloc.dart';
 import 'blocs/dedup/dedup_bloc.dart';
@@ -27,13 +28,28 @@ import 'screens/bulk_import_screen.dart';
 import 'screens/ecosystem_screen.dart';
 import 'screens/resource_list_screen.dart';
 import 'screens/search_screen.dart';
+import 'services/search_history_service.dart';
+import 'services/search_history_storage.dart';
 
-void main() {
-  runApp(const PersonalInventoryApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final preferences = await SharedPreferences.getInstance();
+  final searchHistoryService = SearchHistoryService(
+    storage: SharedPreferencesSearchHistoryStorage(preferences),
+  );
+  await searchHistoryService.load();
+
+  runApp(PersonalInventoryApp(searchHistoryService: searchHistoryService));
 }
 
 class PersonalInventoryApp extends StatelessWidget {
-  const PersonalInventoryApp({super.key});
+  const PersonalInventoryApp({
+    required this.searchHistoryService,
+    super.key,
+  });
+
+  final SearchHistoryService searchHistoryService;
 
   @override
   Widget build(BuildContext context) {
@@ -54,29 +70,32 @@ class PersonalInventoryApp extends StatelessWidget {
       resourceType: ResourceType.ebook,
     );
 
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<EbookBloc>(create: (_) => EbookBloc(ebookRepository)),
-        BlocProvider<WebReaderBloc>(
-            create: (_) => WebReaderBloc(webReaderRepository)),
-        BlocProvider<ImageBloc>(create: (_) => ImageBloc(imageRepository)),
-        BlocProvider<VideoBloc>(create: (_) => VideoBloc(videoRepository)),
-        BlocProvider<GameBloc>(create: (_) => GameBloc(gameRepository)),
-        BlocProvider<ProgressBloc>(
-            create: (_) => ProgressBloc(progressRepository)),
-        BlocProvider<TagBloc>(create: (_) => TagBloc(tagRepository)),
-        BlocProvider<SearchFilterBloc>(create: (_) => SearchFilterBloc()),
-        BlocProvider<VaultBloc>(create: (_) => VaultBloc(vaultRepository)),
-        BlocProvider<DedupBloc>(create: (_) => DedupBloc(dedupRepository)),
-        BlocProvider<SyncBloc>(create: (_) => SyncBloc(syncRepository)),
-        BlocProvider<DeviceBloc>(create: (_) => DeviceBloc(deviceRepository)),
-        BlocProvider<BatchBloc>(create: (_) => BatchBloc(batchRepository)),
-      ],
-      child: MaterialApp(
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
-        home: _AppShell(ebookRepository: ebookRepository),
+    return RepositoryProvider<SearchHistoryService>.value(
+      value: searchHistoryService,
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<EbookBloc>(create: (_) => EbookBloc(ebookRepository)),
+          BlocProvider<WebReaderBloc>(
+              create: (_) => WebReaderBloc(webReaderRepository)),
+          BlocProvider<ImageBloc>(create: (_) => ImageBloc(imageRepository)),
+          BlocProvider<VideoBloc>(create: (_) => VideoBloc(videoRepository)),
+          BlocProvider<GameBloc>(create: (_) => GameBloc(gameRepository)),
+          BlocProvider<ProgressBloc>(
+              create: (_) => ProgressBloc(progressRepository)),
+          BlocProvider<TagBloc>(create: (_) => TagBloc(tagRepository)),
+          BlocProvider<SearchFilterBloc>(create: (_) => SearchFilterBloc()),
+          BlocProvider<VaultBloc>(create: (_) => VaultBloc(vaultRepository)),
+          BlocProvider<DedupBloc>(create: (_) => DedupBloc(dedupRepository)),
+          BlocProvider<SyncBloc>(create: (_) => SyncBloc(syncRepository)),
+          BlocProvider<DeviceBloc>(create: (_) => DeviceBloc(deviceRepository)),
+          BlocProvider<BatchBloc>(create: (_) => BatchBloc(batchRepository)),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeMode.system,
+          home: _AppShell(ebookRepository: ebookRepository),
+        ),
       ),
     );
   }

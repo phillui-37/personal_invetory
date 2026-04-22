@@ -1,0 +1,141 @@
+#!/bin/sh
+set -eu
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+
+. "$SCRIPT_DIR/lib.sh"
+
+start_backend() {
+  cd "$REPO_ROOT/backend"
+  cargo run -p app
+}
+
+start_frontend() {
+  target=$1
+  require_frontend_target "$target"
+
+  cd "$REPO_ROOT/frontend"
+  flutter run -d "$target"
+}
+
+build_backend() {
+  cd "$REPO_ROOT/backend"
+  cargo build -p app --release
+
+  copy_artifact \
+    "$REPO_ROOT/backend/target/release/app" \
+    "$REPO_ROOT/dist/backend/app"
+}
+
+build_frontend() {
+  target=$1
+  require_frontend_target "$target"
+
+  cd "$REPO_ROOT/frontend"
+
+  case "$target" in
+    android)
+      flutter build apk --release
+      copy_artifact \
+        "$REPO_ROOT/frontend/build/app/outputs/flutter-apk/app-release.apk" \
+        "$REPO_ROOT/dist/frontend/android/app-release.apk"
+      ;;
+    macos)
+      flutter build macos --release
+      artifact=$(find_single_path "$REPO_ROOT/frontend/build/macos/Build/Products/Release" "*.app")
+      copy_artifact "$artifact" "$REPO_ROOT/dist/frontend/macos/$(basename "$artifact")"
+      ;;
+    ios)
+      flutter build ios --release --no-codesign
+      artifact=$(find_single_path "$REPO_ROOT/frontend/build/ios/iphoneos" "*.app")
+      copy_artifact "$artifact" "$REPO_ROOT/dist/frontend/ios/$(basename "$artifact")"
+      ;;
+    windows)
+      flutter build windows --release
+      copy_artifact \
+        "$REPO_ROOT/frontend/build/windows/x64/runner/Release" \
+        "$REPO_ROOT/dist/frontend/windows/Release"
+      ;;
+    linux)
+      flutter build linux --release
+      copy_artifact \
+        "$REPO_ROOT/frontend/build/linux/x64/release/bundle" \
+        "$REPO_ROOT/dist/frontend/linux/bundle"
+      ;;
+    *)
+      die "unsupported frontend target '$target'"
+      ;;
+  esac
+}
+
+test_backend() {
+  cd "$REPO_ROOT/backend"
+  cargo test
+}
+
+test_frontend() {
+  cd "$REPO_ROOT/frontend"
+  flutter build apk --debug
+  flutter test
+}
+
+clean() {
+  rm -rf "$REPO_ROOT/dist"
+
+  cd "$REPO_ROOT/backend"
+  cargo clean
+
+  cd "$REPO_ROOT/frontend"
+  flutter clean
+}
+
+gen_api() {
+  script=$REPO_ROOT/frontend/scripts/gen-api-client.sh
+  [ -f "$script" ] || die "missing generator script '$script'"
+
+  sh "$script"
+}
+
+case "${1-}:${2-}:${3-}" in
+  start:backend:)
+    [ "$#" -eq 2 ] || usage
+    start_backend
+    ;;
+  start:frontend:macos|start:frontend:windows|start:frontend:linux|start:frontend:ios|start:frontend:android)
+    [ "$#" -eq 3 ] || usage
+    start_frontend "$3"
+    ;;
+  build:backend:)
+    [ "$#" -eq 2 ] || usage
+    build_backend
+    ;;
+  build:frontend:macos|build:frontend:windows|build:frontend:linux|build:frontend:ios|build:frontend:android)
+    [ "$#" -eq 3 ] || usage
+    build_frontend "$3"
+    ;;
+  test:backend:)
+    [ "$#" -eq 2 ] || usage
+    test_backend
+    ;;
+  test:frontend:)
+    [ "$#" -eq 2 ] || usage
+    test_frontend
+    ;;
+  test:all:)
+    [ "$#" -eq 2 ] || usage
+    test_backend
+    test_frontend
+    ;;
+  clean::)
+    [ "$#" -eq 1 ] || usage
+    clean
+    ;;
+  gen-api::)
+    [ "$#" -eq 1 ] || usage
+    gen_api
+    ;;
+  *)
+    usage
+    ;;
+esac

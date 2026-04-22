@@ -1,7 +1,7 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-21 (Phase 10 backlog recorded; Task P10-A0 repo-wide docs/testing complement complete)
+2026-04-22 (Task P10-E1 cross-OS repo task dispatchers added)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
@@ -566,10 +566,9 @@ Implemented multi-tag filtering, sorting, and faceting for resource search acros
 
 ### Next Steps (Future Phases)
 1. **Integration**: Wire SearchFilterBar into ResourceListScreen, hook to BLoCs
-2. **Persistence**: Add SharedPreferences or similar for search history durability
-3. **API integration**: Add sort_by, sort_order, with_facets params to backend list endpoints
-4. **UX**: Show facets UI, display search history widget, replay saved searches
-5. **Analytics**: Track popular searches, facet click patterns
+2. **API integration**: Add sort_by, sort_order, with_facets params to backend list endpoints
+3. **UX**: Show facets UI, display persisted search history widget, replay saved searches
+4. **Analytics**: Track popular searches, facet click patterns
 
 ### Architecture Notes
 - **Backend**: Tag filtering logic isolated in `tag_filter.rs`, sort logic in `search_aggregation.rs`, clean separation
@@ -978,3 +977,101 @@ Deferred pending clarification on:
   - add `test`, `clean`, and `gen-api`
   - document the new entrypoints in repo-facing docs
 - **Design reference**: `docs/superpowers/specs/2026-04-22-bin-dispatcher-design.md`
+
+## Phase 10 Backlog Tightened Before Code Work
+
+- **Date**: 2026-04-22
+- **Purpose**: Make `tasks/phase10.md` honest before any automated execution wave starts.
+- **Live repo audit confirmed**:
+  - Connector debt is still real: `TODO(network-inspection)` remains in `backend/plugins/src/ecosystem/dlsite.rs`, `fanza.rs`, `kindle.rs`, and `bookwalker.rs`.
+  - `frontend/lib/services/search_history_service.dart` is still in-memory only.
+  - `frontend/android/app/build.gradle.kts` still uses example identity values and debug signing for release.
+  - `frontend/lib/screens/batch_operations_screen.dart` is still raw CSV/text-field driven.
+  - The Phase 10 backlog needed an explicit `bin/` tooling track so repo task entrypoints are not implied work hiding in other bullets.
+- **Backlog tightening applied**:
+  - Added readiness language that separates repo-local executable work from external-input-dependent and secret/config-dependent tracks.
+  - Marked connector tasks as blocked on sanitized external capture/session input instead of pretending the repo alone can close them.
+  - Marked mobile release tasks as locally editable but release-validation-dependent on ignored signing config and CI secrets.
+  - Added `P10-E1` for cross-OS `bin/` entrypoints and called out that Windows PowerShell smoke is host-limited from this macOS environment.
+  - Kept `P10-A0` as a historical backlog record only because the repo-wide docs/testing complement was already complete at base SHA `5a7f91091158c37b5130244d29af1310fb0379c1`; it should not stay in the executable first wave.
+  - Locked the executable first wave to `P10-E1`, `P10-B1 -> P10-B2`, plus `P10-C1`, `P10-C2`, and `P10-D2`. `P10-C2` was promoted because the runbook and config-guard work are repo-local right now even though archive/export proof still stays explicitly conditional on real Apple signing assets.
+- **Docs alignment**:
+  - Updated `README.md` current-focus wording to mention repo task tooling alongside the existing Phase 10 tracks.
+  - Tightened `tasks/phase10.md` readiness wording so `P10-B4` is explicitly gated behind the earlier search-history/replay UI wave, and `P10-D1` stays second-wave because the same list/filter surfaces are still moving.
+
+## Phase 10 Task P10-E1 — Cross-OS Repo Task Dispatchers
+
+- **Date**: 2026-04-22
+- **Files**: `bin/app`, `bin/app.ps1`, `bin/lib.sh`, `bin/lib.ps1`, `README.md`
+- **Audit note**: `tasks/phase10.md` briefly drifted into a narrower `bin/test` / `bin/test.ps1` description during backlog tightening; corrected back to the approved `bin/app` / `bin/app.ps1` dispatcher contract and README+`CONTEXT.md` doc scope.
+- **Shipped contract**:
+  - `start backend`
+  - `start frontend <macos|windows|linux|ios|android>`
+  - `build backend`
+  - `build frontend <macos|windows|linux|ios|android>`
+  - `test <backend|frontend|all>`
+  - `clean`
+  - `gen-api`
+- **Behavior rules**:
+  - Both dispatchers resolve repo root from script location instead of depending on the caller's working directory.
+  - Invalid verb/area/target combinations fail with usage output; unsupported host/target pairs fail loudly instead of pretending to cross-compile.
+  - Backend release builds copy the app binary into `dist/backend/`.
+  - Frontend release builds copy target-specific artifacts into `dist/frontend/<target>/`.
+  - Frontend test dispatch keeps the existing repo rule: build the debug APK first, then run `flutter test`.
+- **Current repo/platform reality**:
+  - This repo currently has Flutter platform directories for `android`, `ios`, and `macos`; `windows` and `linux` targets are part of the contract but will fail clearly until those platform folders exist.
+  - POSIX smoke is locally runnable on macOS/Linux. PowerShell command behavior was implemented to match the same contract, but full Windows execution still needs a Windows host.
+  - Spec-gap fix: `bin/app.ps1 gen-api` now dispatches through `frontend/scripts/gen-api-client.sh` via `sh` and fails clearly if the repo script or shell bridge is missing, instead of bypassing the repo contract with a direct `openapi-generator-cli` call.
+
+## Phase 10 Task P10-E1 — PowerShell Dispatcher Hardening
+
+- **Date**: 2026-04-22
+- **Files**: `bin/lib.ps1`, `bin/app.ps1`
+- **Root cause**:
+  - PowerShell was invoking native tools (`cargo`, `flutter`, `sh`) directly, but non-zero native exits do not automatically honor `$ErrorActionPreference` on all supported PowerShell paths.
+  - `Fail` used `throw`, so dispatcher-level validation errors printed a full exception record instead of a plain CLI error line.
+- **Fix**:
+  - Added `Invoke-NativeCommand` so repo dispatcher native calls convert non-zero `$LASTEXITCODE` into a controlled repo exit signal.
+  - `bin/app.ps1` now wraps top-level dispatch in `try/catch` and exits cleanly on that repo exit signal while still rethrowing unexpected exceptions.
+  - `Fail` now writes `error: ...` to stderr and reuses the same exit-signal path; `Show-Usage` now uses `WriteLine` for the usage block.
+  - Follow-up fix: removed `$PSNativeCommandUseErrorActionPreference` from `bin/lib.ps1` because on PowerShell 7.3+ it can throw before `Invoke-NativeCommand` sees `$LASTEXITCODE`, collapsing real native failures into the noisy generic exit-1 path. `Invoke-NativeCommand` stays the single exit-code authority.
+- **Verification limits**:
+  - `git diff --check` stays clean after the patch.
+  - Static inspection confirms every dispatcher `cargo`, `flutter`, and `sh` invocation now goes through `Invoke-NativeCommand`.
+  - Runtime PowerShell smoke is still host-limited here because this macOS environment does not have `pwsh` installed.
+
+## Phase 10 Task P10-B1 — Durable Search History
+
+- **Date**: 2026-04-22
+- **Files**: `frontend/lib/services/search_history_service.dart`, `frontend/lib/services/search_history_storage.dart`, `frontend/lib/main.dart`, `frontend/test/services/search_history_service_test.dart`, `frontend/test/services/search_history_storage_test.dart`
+- **Shipped contract**:
+  - Search history now loads once during app startup before `runApp`, so previously saved entries survive app restarts.
+  - Persistence uses `SharedPreferencesSearchHistoryStorage` with the single key `search_history` and stores a JSON array of `SearchHistory.toJson()` payloads.
+  - The JSON object shape stays unchanged: `id`, `query`, `tags`, `sortBy`, `filterLogic`, `timestamp`.
+  - Service behavior stays LIFO and still trims to `maxHistory`; oversized persisted payloads are truncated on load and written back in trimmed form.
+  - Corrupted persisted payloads fail open to empty history and the bad stored value is cleared instead of blocking app startup.
+  - Every mutating service operation (`addSearch`, `removeById`, `clearHistory`) writes the full current history snapshot through the storage seam.
+- **Process note**:
+  - This task did run a targeted red step before implementation, but the branch was later squashed into one shipped commit, so repo history does not show a standalone failing-test commit.
+  - The targeted red coverage was the new storage tests for loading existing persisted history, failing open on malformed payloads, and preserving the SearchHistory JSON contract, plus the new service tests for loading saved history, trimming oversized saved history on load, and persisting snapshots on add/remove/clear mutations before the SharedPreferences startup wiring was added.
+
+## Phase 10 Task P10-B2 — Search History Replay UI
+
+- **Date**: 2026-04-22
+- **Files**: `frontend/lib/blocs/search_filter/search_filter_bloc.dart`, `frontend/lib/widgets/search_history_panel.dart`, `frontend/lib/widgets/search_filter_bar.dart`, `frontend/lib/screens/resource_list_screen.dart`, `frontend/test/blocs/search_filter/search_filter_bloc_test.dart`, `frontend/test/screens/resource_list_screen_search_history_test.dart`
+- **UI behavior shipped**:
+  - Resource list now always shows a free-text search box even when there are no tags yet.
+  - Recent saved searches render under the filter bar through `SearchHistoryPanel` instead of staying hidden inside `SearchHistoryService`.
+  - Replaying a saved entry restores the whole saved state: query text, selected tags, sort field, and AND/OR filter logic.
+  - Per-item remove deletes one persisted history entry; clear-all wipes the persisted history list.
+- **State rules**:
+  - Search history still uses the `SearchHistoryService` durable store and keeps the existing max-history limit from `P10-B1` (default 50, newest first).
+  - Query filtering on the resource list is applied client-side to the currently loaded tab data, while replayed tags/sort/filter logic still reload each tab through `SearchFilterBloc`.
+  - Replay now applies tags, sort field, and filter logic through one `SearchFilterBloc` state transition (`ApplyFilterSnapshot`) so the resource-list listener runs one backend reload wave instead of three partial reload waves.
+  - Normal list-screen searching now persists through the same service path: debounced query edits and filter changes save one snapshot of the latest query/tags/sort/filter state, but the screen skips empty default state so initial loads and blank resets do not spam history.
+  - Replaying a saved search restores state without immediately writing a duplicate history entry; remove and clear still stay the only destructive history actions.
+- **Tests**:
+  - Added widget coverage for history rendering, replay callback, remove, and clear.
+  - Added resource-list coverage for replay restoring query/tags/sort/filter logic, replay issuing exactly one filtered reload wave, and remove/clear persistence behavior.
+  - Added resource-list coverage proving normal typing/tag filtering now call into `SearchHistoryService` and persist the latest combined snapshot.
+  - Added bloc coverage for replay snapshot application emitting one combined filter state.

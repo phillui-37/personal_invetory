@@ -6,7 +6,7 @@ Personal inventory system for tracking ebooks, web readers, images, videos, and 
 
 - **Phases 1-9**: implemented and merged
 - **Phase 10 backlog**: recorded in `tasks/phase10.md`
-- **Current focus**: repo-wide docs/testing complement, connector hardening, search UX follow-up, mobile release readiness, and polish work
+- **Current focus**: repo task tooling, repo-wide docs/testing complement, connector hardening, search UX follow-up, mobile release readiness, and polish work
 
 ## Project shape
 
@@ -32,6 +32,38 @@ cd ../frontend && flutter build apk --debug && flutter test
 ```
 
 The Flutter suite is **not** safe to run cold. `frontend/test/android_build_test.dart` expects `build/app/outputs/flutter-apk/app-debug.apk`, so build the debug APK first.
+
+## Repo task entrypoints
+
+Use the repo-local dispatcher instead of memorizing raw commands:
+
+```bash
+bin/app start backend
+bin/app test all
+bin/app build frontend android
+```
+
+Windows uses the PowerShell entrypoint:
+
+```powershell
+.\bin\app.ps1 start backend
+.\bin\app.ps1 test all
+.\bin\app.ps1 build frontend android
+```
+
+Supported contract:
+
+```text
+start backend
+start frontend <macos|windows|linux|ios|android>
+build backend
+build frontend <macos|windows|linux|ios|android>
+test <backend|frontend|all>
+clean
+gen-api
+```
+
+Today this repo only has Flutter platform folders for `android`, `ios`, and `macos`. `windows` and `linux` stay in the command contract, but the dispatcher fails clearly until those repo targets are added.
 
 ## Key guides
 
