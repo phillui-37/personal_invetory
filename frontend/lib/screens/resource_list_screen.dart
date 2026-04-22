@@ -11,10 +11,13 @@ import '../blocs/video/video_bloc.dart';
 import '../blocs/web_reader/web_reader_bloc.dart';
 import '../models/failures.dart';
 import '../models/resources.dart';
+import '../models/search_history.dart';
 import '../models/tag.dart';
+import '../services/search_history_service.dart';
 import '../widgets/error_display.dart';
 import '../widgets/resource_list_item.dart';
 import '../widgets/search_filter_bar.dart';
+import '../widgets/search_history_panel.dart';
 import 'add_resource_screen.dart';
 import 'batch_operations_screen.dart';
 import 'resource_detail_screen.dart';
@@ -27,30 +30,92 @@ class ResourceListScreen extends StatefulWidget {
 }
 
 class _ResourceListScreenState extends State<ResourceListScreen> {
+  late final SearchHistoryService _searchHistoryService;
+  List<SearchHistory> _history = const [];
+  String _query = '';
+
   void _loadAllResources(BuildContext context) {
     final f = context.read<SearchFilterBloc>().state;
-    context.read<EbookBloc>().add(LoadEbooks(
-      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
-    ));
-    context.read<WebReaderBloc>().add(LoadWebReaders(
-      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
-    ));
-    context.read<ImageBloc>().add(LoadImages(
-      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
-    ));
-    context.read<VideoBloc>().add(LoadVideos(
-      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
-    ));
-    context.read<GameBloc>().add(LoadGames(
-      tags: f.selectedTags, sortBy: f.sortBy, sortOrder: f.sortOrder, filterLogic: f.filterLogic,
-    ));
+    context.read<EbookBloc>().add(
+          LoadEbooks(
+            tags: f.selectedTags,
+            sortBy: f.sortBy,
+            sortOrder: f.sortOrder,
+            filterLogic: f.filterLogic,
+          ),
+        );
+    context.read<WebReaderBloc>().add(
+          LoadWebReaders(
+            tags: f.selectedTags,
+            sortBy: f.sortBy,
+            sortOrder: f.sortOrder,
+            filterLogic: f.filterLogic,
+          ),
+        );
+    context.read<ImageBloc>().add(
+          LoadImages(
+            tags: f.selectedTags,
+            sortBy: f.sortBy,
+            sortOrder: f.sortOrder,
+            filterLogic: f.filterLogic,
+          ),
+        );
+    context.read<VideoBloc>().add(
+          LoadVideos(
+            tags: f.selectedTags,
+            sortBy: f.sortBy,
+            sortOrder: f.sortOrder,
+            filterLogic: f.filterLogic,
+          ),
+        );
+    context.read<GameBloc>().add(
+          LoadGames(
+            tags: f.selectedTags,
+            sortBy: f.sortBy,
+            sortOrder: f.sortOrder,
+            filterLogic: f.filterLogic,
+          ),
+        );
   }
 
   @override
   void initState() {
     super.initState();
+    _searchHistoryService = context.read<SearchHistoryService>();
+    _history = _searchHistoryService.history;
     _loadAllResources(context);
     context.read<TagBloc>().add(const LoadTags());
+  }
+
+  Future<void> _removeHistory(String id) async {
+    await _searchHistoryService.removeById(id);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _history = _searchHistoryService.history;
+    });
+  }
+
+  Future<void> _clearHistory() async {
+    await _searchHistoryService.clearHistory();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _history = _searchHistoryService.history;
+    });
+  }
+
+  void _replayHistory(SearchHistory entry) {
+    setState(() {
+      _query = entry.query;
+    });
+
+    final bloc = context.read<SearchFilterBloc>();
+    bloc.add(UpdateSelectedTags(entry.tags));
+    bloc.add(UpdateSortBy(entry.sortBy));
+    bloc.add(UpdateFilterLogic(entry.filterLogic));
   }
 
   @override
@@ -104,159 +169,198 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             _loadAllResources(context);
           },
           child: Column(
-          children: [
-            BlocBuilder<TagBloc, TagState>(
-              builder: (context, tagState) {
-                if (tagState is! TagListLoaded || tagState.tags.isEmpty) {
-                  return const SizedBox.shrink();
-                }
-                return BlocBuilder<SearchFilterBloc, SearchFilterState>(
-                  builder: (context, filterState) {
-                    return SearchFilterBar(
-                      tags: tagState.tags,
-                      selectedTags: filterState.selectedTags,
-                      onTagsChanged: (tags) => context.read<SearchFilterBloc>().add(UpdateSelectedTags(tags)),
-                      onSortChanged: (sort) => context.read<SearchFilterBloc>().add(UpdateSortBy(sort)),
-                      onLogicChanged: (logic) => context.read<SearchFilterBloc>().add(UpdateFilterLogic(logic)),
-                    );
-                  },
-                );
-              },
-            ),
-            Expanded(
-              child: TabBarView(
-                children: [
-            _ResourceTab<EbookBloc, EbookState>(
-              isLoading: (state) => state is EbookLoading,
-              isError: (state) => state is EbookError,
-              failure: (state) => state is EbookError ? state.failure : null,
-              resources: (state) =>
-                  state is EbookListLoaded ? state.ebooks : const <Resource>[],
-              onRetry: () => _loadAllResources(context),
-              onRefresh: () async {
-                _loadAllResources(context);
-              },
-              onTap: (resource) async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ResourceDetailScreen(
-                      resourceId: resource.id,
-                      resourceType: ResourceType.ebook,
-                    ),
-                  ),
-                );
-                if (!context.mounted) {
-                  return;
-                }
-                _loadAllResources(context);
-              },
-            ),
-            _ResourceTab<WebReaderBloc, WebReaderState>(
-              isLoading: (state) => state is WebReaderLoading,
-              isError: (state) => state is WebReaderError,
-              failure: (state) => state is WebReaderError ? state.failure : null,
-              resources: (state) => state is WebReaderListLoaded
-                  ? state.webReaders
-                  : const <Resource>[],
-              onRetry: () => _loadAllResources(context),
-              onRefresh: () async {
-                _loadAllResources(context);
-              },
-              onTap: (resource) async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ResourceDetailScreen(
-                      resourceId: resource.id,
-                      resourceType: ResourceType.webReader,
-                    ),
-                  ),
-                );
-                if (!context.mounted) {
-                  return;
-                }
-                _loadAllResources(context);
-              },
-            ),
-            _ResourceTab<ImageBloc, ImageState>(
-              isLoading: (state) => state is ImageLoading,
-              isError: (state) => state is ImageError,
-              failure: (state) => state is ImageError ? state.failure : null,
-              resources: (state) =>
-                  state is ImageListLoaded ? state.images : const <Resource>[],
-              onRetry: () => _loadAllResources(context),
-              onRefresh: () async {
-                _loadAllResources(context);
-              },
-              onTap: (resource) async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ResourceDetailScreen(
-                      resourceId: resource.id,
-                      resourceType: ResourceType.image,
-                    ),
-                  ),
-                );
-                if (!context.mounted) {
-                  return;
-                }
-                _loadAllResources(context);
-              },
-            ),
-            _ResourceTab<VideoBloc, VideoState>(
-              isLoading: (state) => state is VideoLoading,
-              isError: (state) => state is VideoError,
-              failure: (state) => state is VideoError ? state.failure : null,
-              resources: (state) =>
-                  state is VideoListLoaded ? state.videos : const <Resource>[],
-              onRetry: () => _loadAllResources(context),
-              onRefresh: () async {
-                _loadAllResources(context);
-              },
-              onTap: (resource) async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ResourceDetailScreen(
-                      resourceId: resource.id,
-                      resourceType: ResourceType.video,
-                    ),
-                  ),
-                );
-                if (!context.mounted) {
-                  return;
-                }
-                _loadAllResources(context);
-              },
-            ),
-            _ResourceTab<GameBloc, GameState>(
-              isLoading: (state) => state is GameLoading,
-              isError: (state) => state is GameError,
-              failure: (state) => state is GameError ? state.failure : null,
-              resources: (state) =>
-                  state is GameListLoaded ? state.games : const <Resource>[],
-              onRetry: () => _loadAllResources(context),
-              onRefresh: () async {
-                _loadAllResources(context);
-              },
-              onTap: (resource) async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ResourceDetailScreen(
-                      resourceId: resource.id,
-                      resourceType: ResourceType.game,
-                    ),
-                  ),
-                );
-                if (!context.mounted) {
-                  return;
-                }
-                _loadAllResources(context);
-              },
-            ),
-                ],
+            children: [
+              BlocBuilder<TagBloc, TagState>(
+                builder: (context, tagState) {
+                  final tags =
+                      tagState is TagListLoaded ? tagState.tags : const <Tag>[];
+                  return BlocBuilder<SearchFilterBloc, SearchFilterState>(
+                    builder: (context, filterState) {
+                      return Column(
+                        children: [
+                          SearchFilterBar(
+                            tags: tags,
+                            query: _query,
+                            selectedTags: filterState.selectedTags,
+                            sortOption: filterState.sortBy,
+                            filterLogic: filterState.filterLogic,
+                            onQueryChanged: (value) {
+                              setState(() {
+                                _query = value;
+                              });
+                            },
+                            onTagsChanged: (tags) => context
+                                .read<SearchFilterBloc>()
+                                .add(UpdateSelectedTags(tags)),
+                            onSortChanged: (sort) => context
+                                .read<SearchFilterBloc>()
+                                .add(UpdateSortBy(sort)),
+                            onLogicChanged: (logic) => context
+                                .read<SearchFilterBloc>()
+                                .add(UpdateFilterLogic(logic)),
+                          ),
+                          SearchHistoryPanel(
+                            history: _history,
+                            onReplay: _replayHistory,
+                            onRemove: (id) {
+                              _removeHistory(id);
+                            },
+                            onClear: _clearHistory,
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
               ),
-            ),
-          ],
-        ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _ResourceTab<EbookBloc, EbookState>(
+                      query: _query,
+                      isLoading: (state) => state is EbookLoading,
+                      isError: (state) => state is EbookError,
+                      failure: (state) =>
+                          state is EbookError ? state.failure : null,
+                      resources: (state) => state is EbookListLoaded
+                          ? state.ebooks
+                          : const <Resource>[],
+                      onRetry: () => _loadAllResources(context),
+                      onRefresh: () async {
+                        _loadAllResources(context);
+                      },
+                      onTap: (resource) async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ResourceDetailScreen(
+                              resourceId: resource.id,
+                              resourceType: ResourceType.ebook,
+                            ),
+                          ),
+                        );
+                        if (!context.mounted) {
+                          return;
+                        }
+                        _loadAllResources(context);
+                      },
+                    ),
+                    _ResourceTab<WebReaderBloc, WebReaderState>(
+                      query: _query,
+                      isLoading: (state) => state is WebReaderLoading,
+                      isError: (state) => state is WebReaderError,
+                      failure: (state) =>
+                          state is WebReaderError ? state.failure : null,
+                      resources: (state) => state is WebReaderListLoaded
+                          ? state.webReaders
+                          : const <Resource>[],
+                      onRetry: () => _loadAllResources(context),
+                      onRefresh: () async {
+                        _loadAllResources(context);
+                      },
+                      onTap: (resource) async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ResourceDetailScreen(
+                              resourceId: resource.id,
+                              resourceType: ResourceType.webReader,
+                            ),
+                          ),
+                        );
+                        if (!context.mounted) {
+                          return;
+                        }
+                        _loadAllResources(context);
+                      },
+                    ),
+                    _ResourceTab<ImageBloc, ImageState>(
+                      query: _query,
+                      isLoading: (state) => state is ImageLoading,
+                      isError: (state) => state is ImageError,
+                      failure: (state) =>
+                          state is ImageError ? state.failure : null,
+                      resources: (state) => state is ImageListLoaded
+                          ? state.images
+                          : const <Resource>[],
+                      onRetry: () => _loadAllResources(context),
+                      onRefresh: () async {
+                        _loadAllResources(context);
+                      },
+                      onTap: (resource) async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ResourceDetailScreen(
+                              resourceId: resource.id,
+                              resourceType: ResourceType.image,
+                            ),
+                          ),
+                        );
+                        if (!context.mounted) {
+                          return;
+                        }
+                        _loadAllResources(context);
+                      },
+                    ),
+                    _ResourceTab<VideoBloc, VideoState>(
+                      query: _query,
+                      isLoading: (state) => state is VideoLoading,
+                      isError: (state) => state is VideoError,
+                      failure: (state) =>
+                          state is VideoError ? state.failure : null,
+                      resources: (state) => state is VideoListLoaded
+                          ? state.videos
+                          : const <Resource>[],
+                      onRetry: () => _loadAllResources(context),
+                      onRefresh: () async {
+                        _loadAllResources(context);
+                      },
+                      onTap: (resource) async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ResourceDetailScreen(
+                              resourceId: resource.id,
+                              resourceType: ResourceType.video,
+                            ),
+                          ),
+                        );
+                        if (!context.mounted) {
+                          return;
+                        }
+                        _loadAllResources(context);
+                      },
+                    ),
+                    _ResourceTab<GameBloc, GameState>(
+                      query: _query,
+                      isLoading: (state) => state is GameLoading,
+                      isError: (state) => state is GameError,
+                      failure: (state) =>
+                          state is GameError ? state.failure : null,
+                      resources: (state) => state is GameListLoaded
+                          ? state.games
+                          : const <Resource>[],
+                      onRetry: () => _loadAllResources(context),
+                      onRefresh: () async {
+                        _loadAllResources(context);
+                      },
+                      onTap: (resource) async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ResourceDetailScreen(
+                              resourceId: resource.id,
+                              resourceType: ResourceType.game,
+                            ),
+                          ),
+                        );
+                        if (!context.mounted) {
+                          return;
+                        }
+                        _loadAllResources(context);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         floatingActionButton: FloatingActionButton(
           key: const Key('add-resource-fab'),
@@ -280,6 +384,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
 
 class _ResourceTab<B extends StateStreamable<S>, S> extends StatelessWidget {
   const _ResourceTab({
+    required this.query,
     required this.isLoading,
     required this.isError,
     required this.failure,
@@ -289,6 +394,7 @@ class _ResourceTab<B extends StateStreamable<S>, S> extends StatelessWidget {
     required this.onTap,
   });
 
+  final String query;
   final bool Function(S state) isLoading;
   final bool Function(S state) isError;
   final AppFailure? Function(S state) failure;
@@ -326,12 +432,26 @@ class _ResourceTab<B extends StateStreamable<S>, S> extends StatelessWidget {
           return const Center(child: Text('No resources yet'));
         }
 
+        final normalizedQuery = query.trim().toLowerCase();
+        final visibleItems = normalizedQuery.isEmpty
+            ? items
+            : items
+                .where(
+                  (resource) =>
+                      resource.title.toLowerCase().contains(normalizedQuery),
+                )
+                .toList();
+
+        if (visibleItems.isEmpty) {
+          return const Center(child: Text('No matching resources'));
+        }
+
         return RefreshIndicator(
           onRefresh: onRefresh,
           child: ListView.builder(
-            itemCount: items.length,
+            itemCount: visibleItems.length,
             itemBuilder: (context, index) {
-              final resource = items[index];
+              final resource = visibleItems[index];
               return ResourceListItem(
                 resource: resource,
                 onTap: () => onTap(resource),

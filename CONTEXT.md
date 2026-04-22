@@ -1024,3 +1024,19 @@ Deferred pending clarification on:
 - **Process note**:
   - This task did run a targeted red step before implementation, but the branch was later squashed into one shipped commit, so repo history does not show a standalone failing-test commit.
   - The targeted red coverage was the new storage tests for loading existing persisted history, failing open on malformed payloads, and preserving the SearchHistory JSON contract, plus the new service tests for loading saved history, trimming oversized saved history on load, and persisting snapshots on add/remove/clear mutations before the SharedPreferences startup wiring was added.
+
+## Phase 10 Task P10-B2 — Search History Replay UI
+
+- **Date**: 2026-04-22
+- **Files**: `frontend/lib/widgets/search_history_panel.dart`, `frontend/lib/widgets/search_filter_bar.dart`, `frontend/lib/screens/resource_list_screen.dart`
+- **UI behavior shipped**:
+  - Resource list now always shows a free-text search box even when there are no tags yet.
+  - Recent saved searches render under the filter bar through `SearchHistoryPanel` instead of staying hidden inside `SearchHistoryService`.
+  - Replaying a saved entry restores the whole saved state: query text, selected tags, sort field, and AND/OR filter logic.
+  - Per-item remove deletes one persisted history entry; clear-all wipes the persisted history list.
+- **State rules**:
+  - Search history still uses the `SearchHistoryService` durable store and keeps the existing max-history limit from `P10-B1` (default 50, newest first).
+  - Query filtering on the resource list is applied client-side to the currently loaded tab data, while replayed tags/sort/filter logic still reload each tab through `SearchFilterBloc`.
+- **Tests**:
+  - Added widget coverage for history rendering, replay callback, remove, and clear.
+  - Added resource-list coverage for replay restoring query/tags/sort/filter logic plus remove/clear persistence behavior.

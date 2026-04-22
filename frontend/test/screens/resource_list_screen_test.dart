@@ -15,6 +15,7 @@ import 'package:personal_inventory_frontend/models/resources.dart';
 import 'package:personal_inventory_frontend/models/result.dart';
 import 'package:personal_inventory_frontend/models/tag.dart';
 import 'package:personal_inventory_frontend/screens/resource_list_screen.dart';
+import 'package:personal_inventory_frontend/services/search_history_service.dart';
 
 import '../support/fake_repositories.dart';
 
@@ -167,28 +168,35 @@ void main() {
     FakeTagRepository? tagRepo,
     SearchFilterBloc? searchFilterBloc,
   }) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(
-            create: (_) => EbookBloc(ebookRepo ?? FakeEbookRepository())),
-        BlocProvider(
-            create: (_) =>
-                WebReaderBloc(webReaderRepo ?? FakeWebReaderRepository())),
-        BlocProvider(
-            create: (_) => ImageBloc(imageRepo ?? FakeImageRepository())),
-        BlocProvider(
-            create: (_) => VideoBloc(videoRepo ?? FakeVideoRepository())),
-        BlocProvider(create: (_) => GameBloc(gameRepo ?? FakeGameRepository())),
-        BlocProvider(create: (_) => TagBloc(tagRepo ?? FakeTagRepository())),
-        BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),
-        BlocProvider(create: (_) => BatchBloc(FakeBatchOperationRepository())),
-        if (searchFilterBloc != null)
-          BlocProvider<SearchFilterBloc>.value(value: searchFilterBloc)
-        else
-          BlocProvider(create: (_) => SearchFilterBloc()),
-      ],
-      child: const MaterialApp(
-        home: ResourceListScreen(),
+    final searchHistoryService = SearchHistoryService();
+
+    return RepositoryProvider<SearchHistoryService>.value(
+      value: searchHistoryService,
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider(
+              create: (_) => EbookBloc(ebookRepo ?? FakeEbookRepository())),
+          BlocProvider(
+              create: (_) =>
+                  WebReaderBloc(webReaderRepo ?? FakeWebReaderRepository())),
+          BlocProvider(
+              create: (_) => ImageBloc(imageRepo ?? FakeImageRepository())),
+          BlocProvider(
+              create: (_) => VideoBloc(videoRepo ?? FakeVideoRepository())),
+          BlocProvider(
+              create: (_) => GameBloc(gameRepo ?? FakeGameRepository())),
+          BlocProvider(create: (_) => TagBloc(tagRepo ?? FakeTagRepository())),
+          BlocProvider(create: (_) => ProgressBloc(FakeProgressRepository())),
+          BlocProvider(
+              create: (_) => BatchBloc(FakeBatchOperationRepository())),
+          if (searchFilterBloc != null)
+            BlocProvider<SearchFilterBloc>.value(value: searchFilterBloc)
+          else
+            BlocProvider(create: (_) => SearchFilterBloc()),
+        ],
+        child: const MaterialApp(
+          home: ResourceListScreen(),
+        ),
       ),
     );
   }
@@ -308,7 +316,8 @@ void main() {
     expect(find.byKey(const Key('clear-filters-chip')), findsOneWidget);
   });
 
-  testWidgets('ResourceListScreen skips filter bar when no tags are available',
+  testWidgets(
+      'ResourceListScreen keeps search input when no tags are available',
       (tester) async {
     await tester.pumpWidget(
       buildScreen(
@@ -319,6 +328,7 @@ void main() {
     );
     await tester.pump();
 
+    expect(find.byKey(const Key('search-query-input')), findsOneWidget);
     expect(find.byKey(const Key('tag-chips-list')), findsNothing);
     expect(find.byKey(const Key('clear-filters-chip')), findsNothing);
   });
