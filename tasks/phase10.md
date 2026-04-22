@@ -130,7 +130,7 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 
 **Goal:** Complement the overall project docs and tests so the repo stops depending on tribal knowledge and narrow happy-path checks for already-shipped features.
 
-> **Status:** Already complete at base SHA `d2a5a9eb8d9a014f20bb94cc5b36ca8c1d7207ef`. Keep this entry as closed history only. Do **not** schedule, reopen, or rerun it as part of the first execution wave; create a new follow-up task instead if docs/tests regress later.
+> **Status:** Already complete at base SHA `5a7f91091158c37b5130244d29af1310fb0379c1`. Keep this entry as closed history only. Do **not** schedule, reopen, or rerun it as part of the first execution wave; create a new follow-up task instead if docs/tests regress later.
 
 **Readiness:** **Already completed at base SHA.** Historical record only; not executable backlog for the next wave.
 
