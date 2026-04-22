@@ -1,10 +1,13 @@
 # Project Context: Personal Inventory System
 
 ## Last Updated
-2026-04-22 (Task P10-E1 cross-OS repo task dispatchers added)
+2026-04-22 (Task P10-D2 batch operations UX polish added)
 
 ## Summary
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
+
+## Task Notes
+- **P10-D2 Batch operations UX polish**: `BatchOperationsScreen` now groups import/update/copy forms into cards, validates inputs inline, disables submission while a batch request is in flight, and shows visible busy/success/error feedback. `loading_widgets.dart` now includes `BatchFeedbackCard` for persistent batch result messaging.
 
 ## Key Decisions
 
