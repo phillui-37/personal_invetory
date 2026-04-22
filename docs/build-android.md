@@ -103,6 +103,6 @@ The workflow keeps debug verification unconditional, then only runs `flutter bui
 - repo variable: `ANDROID_APPLICATION_ID`
 - repo secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`
 
-The workflow decodes `ANDROID_KEYSTORE_BASE64` into `frontend/android/ci-release.keystore`, exports `ANDROID_KEYSTORE_PATH=ci-release.keystore`, and then runs the release build.
+The workflow decodes `ANDROID_KEYSTORE_BASE64` into `frontend/android/ci-release.keystore`, exports `ANDROID_KEYSTORE_PATH=ci-release.keystore`, and then runs the release build. That path split is intentional: Gradle resolves `ANDROID_KEYSTORE_PATH` with `rootProject.file(...)`, so the env var stays relative to `frontend/android/` while the workflow writes the decoded keystore into that same directory.
 
 That means repo-local tests can prove the contract is wired, but they cannot prove a real signed release without actual signing material.
