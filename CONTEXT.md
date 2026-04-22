@@ -964,7 +964,8 @@ Deferred pending clarification on:
   - Marked connector tasks as blocked on sanitized external capture/session input instead of pretending the repo alone can close them.
   - Marked mobile release tasks as locally editable but release-validation-dependent on ignored signing config and CI secrets.
   - Added `P10-E1` for cross-OS `bin/` entrypoints and called out that Windows PowerShell smoke is host-limited from this macOS environment.
-  - Locked the first execution wave to `P10-A0`, `P10-E1`, `P10-B1 -> P10-B2`, plus `P10-C1`, `P10-C2`, and `P10-D2`, while keeping `P10-C1`/`P10-C2`/`P10-E1` closure notes explicitly conditional on signing/host validation instead of treating ready-now work as blocked.
+  - Kept `P10-A0` as a historical backlog record only because the repo-wide docs/testing complement was already complete at base SHA `d2a5a9eb8d9a014f20bb94cc5b36ca8c1d7207ef`; it should not stay in the executable first wave.
+  - Locked the executable first wave to `P10-E1`, `P10-B1 -> P10-B2`, plus `P10-C1`, `P10-C2`, and `P10-D2`. `P10-C2` was promoted because the runbook and config-guard work are repo-local right now even though archive/export proof still stays explicitly conditional on real Apple signing assets.
 - **Docs alignment**:
   - Updated `README.md` current-focus wording to mention repo task tooling alongside the existing Phase 10 tracks.
   - Tightened `tasks/phase10.md` readiness wording so `P10-B4` is explicitly gated behind the earlier search-history/replay UI wave, and `P10-D1` stays second-wave because the same list/filter surfaces are still moving.

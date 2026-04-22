@@ -126,11 +126,13 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 
 ## Track 0 — Overall Documentation and Regression Complement
 
-### Task P10-A0: Backfill Repo-Wide Docs and Regression Coverage
+### Task P10-A0: Backfill Repo-Wide Docs and Regression Coverage (✅ Already complete at base SHA)
 
 **Goal:** Complement the overall project docs and tests so the repo stops depending on tribal knowledge and narrow happy-path checks for already-shipped features.
 
-**Readiness:** **Repo-local executable.** This is pure repo cleanup/complement work and can be started and verified from committed state alone.
+> **Status:** Already complete at base SHA `d2a5a9eb8d9a014f20bb94cc5b36ca8c1d7207ef`. Keep this entry as closed history only. Do **not** schedule, reopen, or rerun it as part of the first execution wave; create a new follow-up task instead if docs/tests regress later.
+
+**Readiness:** **Already completed at base SHA.** Historical record only; not executable backlog for the next wave.
 
 **Files:**
 - Create: `docs/testing-matrix.md`
@@ -141,11 +143,11 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 - Modify: `frontend/test/screens/resource_list_screen_test.dart`
 - Modify: `frontend/test/screens/batch_operations_screen_test.dart`
 
-- [ ] Build a shipped-feature matrix covering backend workspace tests, Flutter test prerequisites, ecosystem capture docs, search/filter flows, and batch workflows.
-- [ ] Write `docs/testing-matrix.md` with exact commands, prerequisites, and suite ownership, including the `flutter build apk --debug` prerequisite for the Flutter suite.
-- [ ] Strengthen existing service-level and screen-level regression tests for already-shipped flows that Phase 10 will extend.
-- [ ] Append the repo-wide documentation/testing complement summary to `CONTEXT.md`.
-- [ ] Verify with `cd backend && cargo test && cd ../frontend && flutter build apk --debug && flutter test`
+- [x] Build a shipped-feature matrix covering backend workspace tests, Flutter test prerequisites, ecosystem capture docs, search/filter flows, and batch workflows.
+- [x] Write `docs/testing-matrix.md` with exact commands, prerequisites, and suite ownership, including the `flutter build apk --debug` prerequisite for the Flutter suite.
+- [x] Strengthen existing service-level and screen-level regression tests for already-shipped flows that Phase 10 will extend.
+- [x] Append the repo-wide documentation/testing complement summary to `CONTEXT.md`.
+- [x] Verify with `cd backend && cargo test && cd ../frontend && flutter build apk --debug && flutter test`
 
 ---
 
@@ -404,8 +406,10 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 ## Execution Order Summary
 
 ```
-First execution wave (ready from repo state now):
+Already complete at base SHA (do not execute in the next wave):
   P10-A0
+
+First execution wave (ready from repo state now):
   P10-E1
   P10-B1 -> P10-B2
   P10-C1
