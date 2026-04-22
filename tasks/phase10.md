@@ -108,7 +108,7 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 | `docs/har_extraction_guide.md` | Keep connector capture, sanitization, endpoint, and selector guidance in sync with shipped code |
 | `backend/services/tests/services_tdd.rs` | Strengthen service-level regression coverage for already-shipped sync/search flows that Phase 10 extends |
 | `backend/plugins/src/browser_session.rs` | Extend browser-session helpers only if connector hardening exposes missing primitives |
-| `README.md` | Keep current-focus wording aligned once repo task entrypoints become part of the active wave |
+| `README.md` | Reflect the already-landed current-focus wording that now includes repo task tooling alongside the active Phase 10 tracks |
 | `frontend/lib/services/search_history_service.dart` | Delegate persistence/load/save instead of in-memory-only behavior |
 | `frontend/lib/widgets/search_filter_bar.dart` | Add facet rendering hook and tag-autocomplete entry path |
 | `frontend/lib/widgets/tag_chip_list.dart` | Replace free-text tag add flow with suggestion-aware input |
@@ -281,7 +281,7 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 
 **Goal:** Replace plain free-text tag entry with suggestion-aware input in both search filters and resource tag editing.
 
-**Readiness:** **Repo-local executable.** This is follow-on UI work, not a blocker for the first ready wave.
+**Readiness:** **Repo-local executable after earlier search UI work lands.** Do not start this in the first ready wave; it depends on the search-history durability/replay path first and should wait until that list-screen work has settled.
 
 **Files:**
 - Create: `frontend/lib/widgets/tag_autocomplete_field.dart`
@@ -343,7 +343,7 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 
 **Goal:** Replace vague “performance profiling” with a measured pass over the heaviest list/filter flows and implement only the fixes proven to matter.
 
-**Readiness:** **Repo-local executable.** Keep it out of the first wave until the more concrete B/C/D tasks stop moving the same screens.
+**Readiness:** **Repo-local executable, but intentionally second-wave.** Keep it out of the first wave until the concrete search/batch follow-up work stops moving `resource_list_screen.dart` and `search_filter_bar.dart`, otherwise the profile data will be stale before the fixes land.
 
 **Files:**
 - Modify: `frontend/lib/screens/resource_list_screen.dart`

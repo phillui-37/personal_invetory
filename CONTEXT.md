@@ -967,3 +967,4 @@ Deferred pending clarification on:
   - Locked the first execution wave to `P10-A0`, `P10-E1`, `P10-B1 -> P10-B2`, plus `P10-C1`, `P10-C2`, and `P10-D2`, while keeping `P10-C1`/`P10-C2`/`P10-E1` closure notes explicitly conditional on signing/host validation instead of treating ready-now work as blocked.
 - **Docs alignment**:
   - Updated `README.md` current-focus wording to mention repo task tooling alongside the existing Phase 10 tracks.
+  - Tightened `tasks/phase10.md` readiness wording so `P10-B4` is explicitly gated behind the earlier search-history/replay UI wave, and `P10-D1` stays second-wave because the same list/filter surfaces are still moving.
