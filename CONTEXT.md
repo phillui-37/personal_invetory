@@ -993,3 +993,20 @@ Deferred pending clarification on:
   - This repo currently has Flutter platform directories for `android`, `ios`, and `macos`; `windows` and `linux` targets are part of the contract but will fail clearly until those platform folders exist.
   - POSIX smoke is locally runnable on macOS/Linux. PowerShell command behavior was implemented to match the same contract, but full Windows execution still needs a Windows host.
   - Spec-gap fix: `bin/app.ps1 gen-api` now dispatches through `frontend/scripts/gen-api-client.sh` via `sh` and fails clearly if the repo script or shell bridge is missing, instead of bypassing the repo contract with a direct `openapi-generator-cli` call.
+
+## Phase 10 Task P10-E1 — PowerShell Dispatcher Hardening
+
+- **Date**: 2026-04-22
+- **Files**: `bin/lib.ps1`, `bin/app.ps1`
+- **Root cause**:
+  - PowerShell was invoking native tools (`cargo`, `flutter`, `sh`) directly, but non-zero native exits do not automatically honor `$ErrorActionPreference` on all supported PowerShell paths.
+  - `Fail` used `throw`, so dispatcher-level validation errors printed a full exception record instead of a plain CLI error line.
+- **Fix**:
+  - Added `Invoke-NativeCommand` so repo dispatcher native calls convert non-zero `$LASTEXITCODE` into a controlled repo exit signal.
+  - `bin/app.ps1` now wraps top-level dispatch in `try/catch` and exits cleanly on that repo exit signal while still rethrowing unexpected exceptions.
+  - `Fail` now writes `error: ...` to stderr and reuses the same exit-signal path; `Show-Usage` now uses `WriteLine` for the usage block.
+  - Enabled `$PSNativeCommandUseErrorActionPreference` when the host supports it, but kept the explicit native-command wrapper so behavior does not depend on that feature alone.
+- **Verification limits**:
+  - `git diff --check` stays clean after the patch.
+  - Static inspection confirms every dispatcher `cargo`, `flutter`, and `sh` invocation now goes through `Invoke-NativeCommand`.
+  - Runtime PowerShell smoke is still host-limited here because this macOS environment does not have `pwsh` installed.

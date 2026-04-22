@@ -12,18 +12,18 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Get-RepoRoot
 
 function Start-Backend {
-    Invoke-InDirectory (Join-Path $repoRoot 'backend') { cargo run -p app }
+    Invoke-InDirectory (Join-Path $repoRoot 'backend') { Invoke-NativeCommand cargo run -p app }
 }
 
 function Start-Frontend {
     param([string]$FrontendTarget)
 
     Assert-FrontendTarget -RepoRoot $repoRoot -Target $FrontendTarget
-    Invoke-InDirectory (Join-Path $repoRoot 'frontend') { flutter run -d $FrontendTarget }
+    Invoke-InDirectory (Join-Path $repoRoot 'frontend') { Invoke-NativeCommand flutter run -d $FrontendTarget }
 }
 
 function Build-Backend {
-    Invoke-InDirectory (Join-Path $repoRoot 'backend') { cargo build -p app --release }
+    Invoke-InDirectory (Join-Path $repoRoot 'backend') { Invoke-NativeCommand cargo build -p app --release }
     $binaryName = Get-BackendBinaryName
     Copy-Artifact `
         -Source (Join-Path $repoRoot "backend/target/release/$binaryName") `
@@ -37,29 +37,29 @@ function Build-Frontend {
 
     switch ($FrontendTarget) {
         'android' {
-            Invoke-InDirectory (Join-Path $repoRoot 'frontend') { flutter build apk --release }
+            Invoke-InDirectory (Join-Path $repoRoot 'frontend') { Invoke-NativeCommand flutter build apk --release }
             Copy-Artifact `
                 -Source (Join-Path $repoRoot 'frontend/build/app/outputs/flutter-apk/app-release.apk') `
                 -Destination (Join-Path $repoRoot 'dist/frontend/android/app-release.apk')
         }
         'macos' {
-            Invoke-InDirectory (Join-Path $repoRoot 'frontend') { flutter build macos --release }
+            Invoke-InDirectory (Join-Path $repoRoot 'frontend') { Invoke-NativeCommand flutter build macos --release }
             $artifact = Find-SingleItem -Directory (Join-Path $repoRoot 'frontend/build/macos/Build/Products/Release') -Filter '*.app'
             Copy-Artifact -Source $artifact -Destination (Join-Path $repoRoot ("dist/frontend/macos/{0}" -f (Split-Path -Leaf $artifact)))
         }
         'ios' {
-            Invoke-InDirectory (Join-Path $repoRoot 'frontend') { flutter build ios --release --no-codesign }
+            Invoke-InDirectory (Join-Path $repoRoot 'frontend') { Invoke-NativeCommand flutter build ios --release --no-codesign }
             $artifact = Find-SingleItem -Directory (Join-Path $repoRoot 'frontend/build/ios/iphoneos') -Filter '*.app'
             Copy-Artifact -Source $artifact -Destination (Join-Path $repoRoot ("dist/frontend/ios/{0}" -f (Split-Path -Leaf $artifact)))
         }
         'windows' {
-            Invoke-InDirectory (Join-Path $repoRoot 'frontend') { flutter build windows --release }
+            Invoke-InDirectory (Join-Path $repoRoot 'frontend') { Invoke-NativeCommand flutter build windows --release }
             Copy-Artifact `
                 -Source (Join-Path $repoRoot 'frontend/build/windows/x64/runner/Release') `
                 -Destination (Join-Path $repoRoot 'dist/frontend/windows/Release')
         }
         'linux' {
-            Invoke-InDirectory (Join-Path $repoRoot 'frontend') { flutter build linux --release }
+            Invoke-InDirectory (Join-Path $repoRoot 'frontend') { Invoke-NativeCommand flutter build linux --release }
             Copy-Artifact `
                 -Source (Join-Path $repoRoot 'frontend/build/linux/x64/release/bundle') `
                 -Destination (Join-Path $repoRoot 'dist/frontend/linux/bundle')
@@ -71,13 +71,13 @@ function Build-Frontend {
 }
 
 function Test-Backend {
-    Invoke-InDirectory (Join-Path $repoRoot 'backend') { cargo test }
+    Invoke-InDirectory (Join-Path $repoRoot 'backend') { Invoke-NativeCommand cargo test }
 }
 
 function Test-Frontend {
     Invoke-InDirectory (Join-Path $repoRoot 'frontend') {
-        flutter build apk --debug
-        flutter test
+        Invoke-NativeCommand flutter build apk --debug
+        Invoke-NativeCommand flutter test
     }
 }
 
@@ -91,8 +91,8 @@ function Clean-Repo {
         Remove-Item -LiteralPath (Join-Path $repoRoot 'dist') -Recurse -Force
     }
 
-    Invoke-InDirectory (Join-Path $repoRoot 'backend') { cargo clean }
-    Invoke-InDirectory (Join-Path $repoRoot 'frontend') { flutter clean }
+    Invoke-InDirectory (Join-Path $repoRoot 'backend') { Invoke-NativeCommand cargo clean }
+    Invoke-InDirectory (Join-Path $repoRoot 'frontend') { Invoke-NativeCommand flutter clean }
 }
 
 function Generate-Api {
@@ -106,96 +106,106 @@ function Generate-Api {
         Fail "missing 'sh' required to run '$scriptPath'"
     }
 
-    & $shCommand.Source $scriptPath
+    Invoke-NativeCommand $shCommand.Source $scriptPath
 }
 
-switch ("$Verb:$Area:$Target") {
-    'start:backend:' {
-        if ($PSBoundParameters.Count -ne 2) { Show-Usage }
-        Start-Backend
-        break
+try {
+    switch ("$Verb:$Area:$Target") {
+        'start:backend:' {
+            if ($PSBoundParameters.Count -ne 2) { Show-Usage }
+            Start-Backend
+            break
+        }
+        'start:frontend:macos' {
+            if ($PSBoundParameters.Count -ne 3) { Show-Usage }
+            Start-Frontend $Target
+            break
+        }
+        'start:frontend:windows' {
+            if ($PSBoundParameters.Count -ne 3) { Show-Usage }
+            Start-Frontend $Target
+            break
+        }
+        'start:frontend:linux' {
+            if ($PSBoundParameters.Count -ne 3) { Show-Usage }
+            Start-Frontend $Target
+            break
+        }
+        'start:frontend:ios' {
+            if ($PSBoundParameters.Count -ne 3) { Show-Usage }
+            Start-Frontend $Target
+            break
+        }
+        'start:frontend:android' {
+            if ($PSBoundParameters.Count -ne 3) { Show-Usage }
+            Start-Frontend $Target
+            break
+        }
+        'build:backend:' {
+            if ($PSBoundParameters.Count -ne 2) { Show-Usage }
+            Build-Backend
+            break
+        }
+        'build:frontend:macos' {
+            if ($PSBoundParameters.Count -ne 3) { Show-Usage }
+            Build-Frontend $Target
+            break
+        }
+        'build:frontend:windows' {
+            if ($PSBoundParameters.Count -ne 3) { Show-Usage }
+            Build-Frontend $Target
+            break
+        }
+        'build:frontend:linux' {
+            if ($PSBoundParameters.Count -ne 3) { Show-Usage }
+            Build-Frontend $Target
+            break
+        }
+        'build:frontend:ios' {
+            if ($PSBoundParameters.Count -ne 3) { Show-Usage }
+            Build-Frontend $Target
+            break
+        }
+        'build:frontend:android' {
+            if ($PSBoundParameters.Count -ne 3) { Show-Usage }
+            Build-Frontend $Target
+            break
+        }
+        'test:backend:' {
+            if ($PSBoundParameters.Count -ne 2) { Show-Usage }
+            Test-Backend
+            break
+        }
+        'test:frontend:' {
+            if ($PSBoundParameters.Count -ne 2) { Show-Usage }
+            Test-Frontend
+            break
+        }
+        'test:all:' {
+            if ($PSBoundParameters.Count -ne 2) { Show-Usage }
+            Test-All
+            break
+        }
+        'clean::' {
+            if ($PSBoundParameters.Count -ne 1) { Show-Usage }
+            Clean-Repo
+            break
+        }
+        'gen-api::' {
+            if ($PSBoundParameters.Count -ne 1) { Show-Usage }
+            Generate-Api
+            break
+        }
+        default {
+            Show-Usage
+        }
     }
-    'start:frontend:macos' {
-        if ($PSBoundParameters.Count -ne 3) { Show-Usage }
-        Start-Frontend $Target
-        break
+}
+catch {
+    $exitCode = $_.Exception.Data['RepoExitCode']
+    if ($null -ne $exitCode) {
+        exit [int]$exitCode
     }
-    'start:frontend:windows' {
-        if ($PSBoundParameters.Count -ne 3) { Show-Usage }
-        Start-Frontend $Target
-        break
-    }
-    'start:frontend:linux' {
-        if ($PSBoundParameters.Count -ne 3) { Show-Usage }
-        Start-Frontend $Target
-        break
-    }
-    'start:frontend:ios' {
-        if ($PSBoundParameters.Count -ne 3) { Show-Usage }
-        Start-Frontend $Target
-        break
-    }
-    'start:frontend:android' {
-        if ($PSBoundParameters.Count -ne 3) { Show-Usage }
-        Start-Frontend $Target
-        break
-    }
-    'build:backend:' {
-        if ($PSBoundParameters.Count -ne 2) { Show-Usage }
-        Build-Backend
-        break
-    }
-    'build:frontend:macos' {
-        if ($PSBoundParameters.Count -ne 3) { Show-Usage }
-        Build-Frontend $Target
-        break
-    }
-    'build:frontend:windows' {
-        if ($PSBoundParameters.Count -ne 3) { Show-Usage }
-        Build-Frontend $Target
-        break
-    }
-    'build:frontend:linux' {
-        if ($PSBoundParameters.Count -ne 3) { Show-Usage }
-        Build-Frontend $Target
-        break
-    }
-    'build:frontend:ios' {
-        if ($PSBoundParameters.Count -ne 3) { Show-Usage }
-        Build-Frontend $Target
-        break
-    }
-    'build:frontend:android' {
-        if ($PSBoundParameters.Count -ne 3) { Show-Usage }
-        Build-Frontend $Target
-        break
-    }
-    'test:backend:' {
-        if ($PSBoundParameters.Count -ne 2) { Show-Usage }
-        Test-Backend
-        break
-    }
-    'test:frontend:' {
-        if ($PSBoundParameters.Count -ne 2) { Show-Usage }
-        Test-Frontend
-        break
-    }
-    'test:all:' {
-        if ($PSBoundParameters.Count -ne 2) { Show-Usage }
-        Test-All
-        break
-    }
-    'clean::' {
-        if ($PSBoundParameters.Count -ne 1) { Show-Usage }
-        Clean-Repo
-        break
-    }
-    'gen-api::' {
-        if ($PSBoundParameters.Count -ne 1) { Show-Usage }
-        Generate-Api
-        break
-    }
-    default {
-        Show-Usage
-    }
+
+    throw
 }

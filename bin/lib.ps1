@@ -1,14 +1,27 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+    $PSNativeCommandUseErrorActionPreference = $true
+}
+
+function Request-Exit {
+    param([int]$Code)
+
+    $exception = [System.Exception]::new('repo-task-dispatcher exit')
+    $exception.Data['RepoExitCode'] = $Code
+    throw $exception
+}
+
 function Fail {
     param([string]$Message)
 
-    throw "error: $Message"
+    [Console]::Error.WriteLine("error: $Message")
+    Request-Exit 1
 }
 
 function Show-Usage {
-    [Console]::Error.Write(@'
+    [Console]::Error.WriteLine(@'
 usage:
   .\bin\app.ps1 start backend
   .\bin\app.ps1 start frontend <macos|windows|linux|ios|android>
@@ -18,7 +31,23 @@ usage:
   .\bin\app.ps1 clean
   .\bin\app.ps1 gen-api
 '@)
-    exit 1
+    Request-Exit 1
+}
+
+function Invoke-NativeCommand {
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$FilePath,
+
+        [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
+        [string[]]$ArgumentList = @()
+    )
+
+    & $FilePath @ArgumentList
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        Request-Exit $exitCode
+    }
 }
 
 function Get-RepoRoot {
