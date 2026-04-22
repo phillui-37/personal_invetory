@@ -948,3 +948,22 @@ Deferred pending clarification on:
 - **Date**: 2026-04-21
 - **File**: `README.md`
 - **Purpose**: Add a repo-entry guide that points readers to `CONTEXT.md`, `docs/testing-matrix.md`, key operator docs, and the current Phase 10 backlog.
+
+## Phase 10 Backlog Tightened Before Code Work
+
+- **Date**: 2026-04-22
+- **Purpose**: Make `tasks/phase10.md` honest before any automated execution wave starts.
+- **Live repo audit confirmed**:
+  - Connector debt is still real: `TODO(network-inspection)` remains in `backend/plugins/src/ecosystem/dlsite.rs`, `fanza.rs`, `kindle.rs`, and `bookwalker.rs`.
+  - `frontend/lib/services/search_history_service.dart` is still in-memory only.
+  - `frontend/android/app/build.gradle.kts` still uses example identity values and debug signing for release.
+  - `frontend/lib/screens/batch_operations_screen.dart` is still raw CSV/text-field driven.
+  - The Phase 10 backlog needed an explicit `bin/` tooling track so repo task entrypoints are not implied work hiding in other bullets.
+- **Backlog tightening applied**:
+  - Added readiness language that separates repo-local executable work from external-input-dependent and secret/config-dependent tracks.
+  - Marked connector tasks as blocked on sanitized external capture/session input instead of pretending the repo alone can close them.
+  - Marked mobile release tasks as locally editable but release-validation-dependent on ignored signing config and CI secrets.
+  - Added `P10-E1` for cross-OS `bin/` entrypoints and called out that Windows PowerShell smoke is host-limited from this macOS environment.
+  - Locked the first execution wave to `P10-E1 -> P10-B1 -> P10-B2`, plus `P10-C1` and `P10-D2`.
+- **Docs alignment**:
+  - Updated `README.md` current-focus wording to mention repo task tooling alongside the existing Phase 10 tracks.

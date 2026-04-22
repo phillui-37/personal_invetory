@@ -6,7 +6,7 @@ Personal inventory system for tracking ebooks, web readers, images, videos, and 
 
 - **Phases 1-9**: implemented and merged
 - **Phase 10 backlog**: recorded in `tasks/phase10.md`
-- **Current focus**: repo-wide docs/testing complement, connector hardening, search UX follow-up, mobile release readiness, and polish work
+- **Current focus**: repo task tooling, repo-wide docs/testing complement, connector hardening, search UX follow-up, mobile release readiness, and polish work
 
 ## Project shape
 
