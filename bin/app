@@ -91,7 +91,10 @@ clean() {
 }
 
 gen_api() {
-  sh "$REPO_ROOT/frontend/scripts/gen-api-client.sh"
+  script=$REPO_ROOT/frontend/scripts/gen-api-client.sh
+  [ -f "$script" ] || die "missing generator script '$script'"
+
+  sh "$script"
 }
 
 case "${1-}:${2-}:${3-}" in

@@ -8,7 +8,7 @@ function Fail {
 }
 
 function Show-Usage {
-    @'
+    [Console]::Error.Write(@'
 usage:
   .\bin\app.ps1 start backend
   .\bin\app.ps1 start frontend <macos|windows|linux|ios|android>
@@ -17,7 +17,7 @@ usage:
   .\bin\app.ps1 test <backend|frontend|all>
   .\bin\app.ps1 clean
   .\bin\app.ps1 gen-api
-'@ | Write-Error
+'@)
     exit 1
 }
 
