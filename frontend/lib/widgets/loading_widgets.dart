@@ -337,6 +337,7 @@ class BatchOperationProgress extends StatelessWidget {
   final int itemsProcessed;
   final int totalItems;
   final List<String> currentItemLabels;
+  final int? currentItemCount;
   final bool hasErrors;
   final int? estimatedSecondsRemaining;
 
@@ -346,6 +347,7 @@ class BatchOperationProgress extends StatelessWidget {
     required this.itemsProcessed,
     required this.totalItems,
     this.currentItemLabels = const [],
+    this.currentItemCount,
     this.hasErrors = false,
     this.estimatedSecondsRemaining,
   });
@@ -354,6 +356,9 @@ class BatchOperationProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     final progress = totalItems > 0 ? itemsProcessed / totalItems : 0.0;
     final percentage = (progress * 100).toStringAsFixed(0);
+    final visibleLabels = currentItemLabels.take(2).toList();
+    final overflowCount =
+        (currentItemCount ?? currentItemLabels.length) - visibleLabels.length;
 
     return Container(
       padding: EdgeInsets.all(16),
@@ -375,8 +380,8 @@ class BatchOperationProgress extends StatelessWidget {
               Text(
                 'Batch ${operationType.toUpperCase()}',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -407,28 +412,121 @@ class BatchOperationProgress extends StatelessWidget {
           ),
           if (currentItemLabels.isNotEmpty) ...[
             SizedBox(height: 8),
-            ...currentItemLabels.take(2).map((label) => Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text(
-                '• $label',
-                style: Theme.of(context).textTheme.labelSmall,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            )),
-            if (currentItemLabels.length > 2)
+            ...visibleLabels.map((label) => Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    '• $label',
+                    style: Theme.of(context).textTheme.labelSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                )),
+            if (overflowCount > 0)
               Text(
-                '• +${currentItemLabels.length - 2} more',
+                '• +$overflowCount more',
                 style: Theme.of(context).textTheme.labelSmall,
               ),
           ],
-          if (estimatedSecondsRemaining != null && estimatedSecondsRemaining! > 0) ...[
+          if (estimatedSecondsRemaining != null &&
+              estimatedSecondsRemaining! > 0) ...[
             SizedBox(height: 8),
             Text(
               'Est. time: ${estimatedSecondsRemaining}s',
               style: Theme.of(context).textTheme.labelSmall,
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+enum BatchFeedbackTone {
+  success,
+  info,
+  error,
+}
+
+class BatchFeedbackCard extends StatelessWidget {
+  const BatchFeedbackCard({
+    super.key,
+    required this.title,
+    required this.message,
+    required this.tone,
+  });
+
+  const BatchFeedbackCard.success({
+    super.key,
+    required this.title,
+    required this.message,
+  }) : tone = BatchFeedbackTone.success;
+
+  const BatchFeedbackCard.error({
+    super.key,
+    required this.title,
+    required this.message,
+  }) : tone = BatchFeedbackTone.error;
+
+  final String title;
+  final String message;
+  final BatchFeedbackTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = switch (tone) {
+      BatchFeedbackTone.success => (
+          border: Colors.green.shade300,
+          background: Colors.green.shade50,
+          foreground: Colors.green.shade800,
+          icon: Icons.check_circle,
+        ),
+      BatchFeedbackTone.info => (
+          border: Colors.blue.shade300,
+          background: Colors.blue.shade50,
+          foreground: Colors.blue.shade800,
+          icon: Icons.info_outline,
+        ),
+      BatchFeedbackTone.error => (
+          border: Colors.red.shade300,
+          background: Colors.red.shade50,
+          foreground: Colors.red.shade800,
+          icon: Icons.error_outline,
+        ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(colors.icon, color: colors.foreground),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: colors.foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colors.foreground,
+                      ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

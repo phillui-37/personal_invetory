@@ -100,7 +100,8 @@ void main() {
     });
 
     group('SkeletonCard', () {
-      testWidgets('renders card skeleton with specified height', (tester) async {
+      testWidgets('renders card skeleton with specified height',
+          (tester) async {
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
@@ -118,7 +119,7 @@ void main() {
 
       testWidgets('has correct height', (tester) async {
         const testHeight = 200.0;
-        
+
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
@@ -410,6 +411,42 @@ void main() {
         );
 
         expect(find.text('Batch IMPORT'), findsOneWidget);
+      });
+    });
+
+    group('BatchFeedbackCard', () {
+      testWidgets('renders success feedback details', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: BatchFeedbackCard.success(
+                title: 'Import completed',
+                message: '2 items succeeded.',
+              ),
+            ),
+          ),
+        );
+
+        expect(find.text('Import completed'), findsOneWidget);
+        expect(find.text('2 items succeeded.'), findsOneWidget);
+        expect(find.byIcon(Icons.check_circle), findsOneWidget);
+      });
+
+      testWidgets('renders error feedback details', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: BatchFeedbackCard.error(
+                title: 'Copy failed',
+                message: 'Local error: copy exploded',
+              ),
+            ),
+          ),
+        );
+
+        expect(find.text('Copy failed'), findsOneWidget);
+        expect(find.text('Local error: copy exploded'), findsOneWidget);
+        expect(find.byIcon(Icons.error_outline), findsOneWidget);
       });
     });
   });
