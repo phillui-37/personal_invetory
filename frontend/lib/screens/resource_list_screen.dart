@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -30,9 +32,12 @@ class ResourceListScreen extends StatefulWidget {
 }
 
 class _ResourceListScreenState extends State<ResourceListScreen> {
+  static const _searchHistorySaveDebounce = Duration(milliseconds: 400);
+
   late final SearchHistoryService _searchHistoryService;
   List<SearchHistory> _history = const [];
   String _query = '';
+  Timer? _searchHistorySaveTimer;
 
   void _loadAllResources(BuildContext context) {
     final f = context.read<SearchFilterBloc>().state;
@@ -87,6 +92,12 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
     context.read<TagBloc>().add(const LoadTags());
   }
 
+  @override
+  void dispose() {
+    _searchHistorySaveTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _removeHistory(String id) async {
     await _searchHistoryService.removeById(id);
     if (!mounted) {
@@ -108,6 +119,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
   }
 
   void _replayHistory(SearchHistory entry) {
+    _searchHistorySaveTimer?.cancel();
     setState(() {
       _query = entry.query;
     });
@@ -119,6 +131,65 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             filterLogic: entry.filterLogic,
           ),
         );
+  }
+
+  void _scheduleSearchPersistence({
+    String? query,
+    List<String>? tags,
+    String? sortBy,
+    String? filterLogic,
+  }) {
+    _searchHistorySaveTimer?.cancel();
+    final tagsSnapshot = tags == null ? null : List<String>.from(tags);
+    _searchHistorySaveTimer = Timer(_searchHistorySaveDebounce, () {
+      unawaited(
+        _persistSearchSnapshot(
+          query: query,
+          tags: tagsSnapshot,
+          sortBy: sortBy,
+          filterLogic: filterLogic,
+        ),
+      );
+    });
+  }
+
+  Future<void> _persistSearchSnapshot({
+    String? query,
+    List<String>? tags,
+    String? sortBy,
+    String? filterLogic,
+  }) async {
+    if (!mounted) {
+      return;
+    }
+
+    final filterState = context.read<SearchFilterBloc>().state;
+    final normalizedQuery = (query ?? _query).trim();
+    final selectedTags = tags ?? filterState.selectedTags;
+    final selectedSortBy = sortBy ?? filterState.sortBy;
+    final selectedFilterLogic = filterLogic ?? filterState.filterLogic;
+    const defaultFilterState = SearchFilterState();
+
+    final hasMeaningfulSearch = normalizedQuery.isNotEmpty ||
+        selectedTags.isNotEmpty ||
+        selectedSortBy != defaultFilterState.sortBy ||
+        selectedFilterLogic != defaultFilterState.filterLogic;
+    if (!hasMeaningfulSearch) {
+      return;
+    }
+
+    await _searchHistoryService.addSearch(
+      query: normalizedQuery,
+      tags: selectedTags,
+      sortBy: selectedSortBy,
+      filterLogic: selectedFilterLogic,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _history = _searchHistoryService.history;
+    });
   }
 
   @override
@@ -191,16 +262,26 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                               setState(() {
                                 _query = value;
                               });
+                              _scheduleSearchPersistence(query: value);
                             },
-                            onTagsChanged: (tags) => context
-                                .read<SearchFilterBloc>()
-                                .add(UpdateSelectedTags(tags)),
-                            onSortChanged: (sort) => context
-                                .read<SearchFilterBloc>()
-                                .add(UpdateSortBy(sort)),
-                            onLogicChanged: (logic) => context
-                                .read<SearchFilterBloc>()
-                                .add(UpdateFilterLogic(logic)),
+                            onTagsChanged: (tags) {
+                              context
+                                  .read<SearchFilterBloc>()
+                                  .add(UpdateSelectedTags(tags));
+                              _scheduleSearchPersistence(tags: tags);
+                            },
+                            onSortChanged: (sort) {
+                              context
+                                  .read<SearchFilterBloc>()
+                                  .add(UpdateSortBy(sort));
+                              _scheduleSearchPersistence(sortBy: sort);
+                            },
+                            onLogicChanged: (logic) {
+                              context
+                                  .read<SearchFilterBloc>()
+                                  .add(UpdateFilterLogic(logic));
+                              _scheduleSearchPersistence(filterLogic: logic);
+                            },
                           ),
                           SearchHistoryPanel(
                             history: _history,

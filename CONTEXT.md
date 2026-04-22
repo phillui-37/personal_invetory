@@ -1038,7 +1038,10 @@ Deferred pending clarification on:
   - Search history still uses the `SearchHistoryService` durable store and keeps the existing max-history limit from `P10-B1` (default 50, newest first).
   - Query filtering on the resource list is applied client-side to the currently loaded tab data, while replayed tags/sort/filter logic still reload each tab through `SearchFilterBloc`.
   - Replay now applies tags, sort field, and filter logic through one `SearchFilterBloc` state transition (`ApplyFilterSnapshot`) so the resource-list listener runs one backend reload wave instead of three partial reload waves.
+  - Normal list-screen searching now persists through the same service path: debounced query edits and filter changes save one snapshot of the latest query/tags/sort/filter state, but the screen skips empty default state so initial loads and blank resets do not spam history.
+  - Replaying a saved search restores state without immediately writing a duplicate history entry; remove and clear still stay the only destructive history actions.
 - **Tests**:
   - Added widget coverage for history rendering, replay callback, remove, and clear.
   - Added resource-list coverage for replay restoring query/tags/sort/filter logic, replay issuing exactly one filtered reload wave, and remove/clear persistence behavior.
+  - Added resource-list coverage proving normal typing/tag filtering now call into `SearchHistoryService` and persist the latest combined snapshot.
   - Added bloc coverage for replay snapshot application emitting one combined filter state.

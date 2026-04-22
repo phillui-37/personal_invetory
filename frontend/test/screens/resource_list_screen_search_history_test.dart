@@ -26,6 +26,7 @@ class _MemorySearchHistoryStorage implements SearchHistoryStorage {
       : _history = List<SearchHistory>.from(initialHistory ?? const []);
 
   List<SearchHistory> _history;
+  final List<List<SearchHistory>> savedSnapshots = [];
 
   @override
   Future<List<SearchHistory>> load() async =>
@@ -34,6 +35,7 @@ class _MemorySearchHistoryStorage implements SearchHistoryStorage {
   @override
   Future<void> save(List<SearchHistory> history) async {
     _history = List<SearchHistory>.from(history);
+    savedSnapshots.add(List<SearchHistory>.from(history));
   }
 }
 
@@ -336,5 +338,70 @@ void main() {
     expect(find.byKey(const Key('search-history-item-saved-1')), findsNothing);
     expect(find.text('Recent searches'), findsNothing);
     expect(historyService.history, isEmpty);
+  });
+
+  testWidgets('typing a query saves a new search history entry',
+      (tester) async {
+    final historyStorage = _MemorySearchHistoryStorage();
+    final historyService = SearchHistoryService(storage: historyStorage);
+    await historyService.load();
+
+    await tester.pumpWidget(
+      _buildScreen(
+        searchHistoryService: historyService,
+        tagRepo: FakeTagRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('search-query-input')),
+      'Alpha',
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(historyService.history, hasLength(1));
+    expect(historyService.history.single.query, 'Alpha');
+    expect(historyStorage.savedSnapshots, hasLength(1));
+    expect(find.text('Recent searches'), findsOneWidget);
+    expect(find.text('Alpha'), findsWidgets);
+  });
+
+  testWidgets('tag filtering saves the latest combined search snapshot', (
+    tester,
+  ) async {
+    final historyStorage = _MemorySearchHistoryStorage();
+    final historyService = SearchHistoryService(storage: historyStorage);
+    await historyService.load();
+
+    await tester.pumpWidget(
+      _buildScreen(
+        searchHistoryService: historyService,
+        tagRepo: FakeTagRepository(
+          listResult: Success<List<Tag>, AppFailure>([
+            Tag(
+              id: 'tag-1',
+              name: 'favorite',
+              createdAt: DateTime.utc(2026, 4, 21),
+            ),
+          ]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('search-query-input')),
+      'Alpha',
+    );
+    await tester.tap(find.byKey(const Key('filter-tag-favorite')));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(historyService.history, hasLength(1));
+    expect(historyService.history.single.query, 'Alpha');
+    expect(historyService.history.single.tags, ['favorite']);
+    expect(historyService.history.single.sortBy, 'date_added');
+    expect(historyService.history.single.filterLogic, 'and');
+    expect(historyStorage.savedSnapshots, hasLength(1));
   });
 }
