@@ -15,8 +15,9 @@ Personal inventory system for Phil to track resources (ebooks, web-readers, imag
     - copy: require non-empty source resource ID, at least one non-empty trimmed target ID, and reject target lists that include the source ID.
   - Submission/progress rules shipped:
     - while any batch request is in flight, all form controls stay disabled.
-    - the active flow shows `BatchOperationProgress` directly above its form with `0 / N items` plus up to three submitted item labels.
+    - the active flow shows `BatchOperationProgress` directly above its form with `0 / N items`, up to two submitted item labels, then `+N more` when more labels exist.
     - success/error feedback stays attached to the same flow card after completion, and each flow keeps its own latest feedback state.
+  - Validation coverage now explicitly checks invalid import/update/copy submissions stay blocked and surface the inline validator messages for trimmed-empty and self-target cases.
   - `loading_widgets.dart` includes `BatchFeedbackCard` for persistent batch result messaging.
 
 ## Key Decisions
