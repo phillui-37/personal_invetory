@@ -32,6 +32,13 @@ void main() {
       );
     }
 
+    Finder sectionCard(String title) {
+      return find.ancestor(
+        of: find.text(title),
+        matching: find.byType(Card),
+      );
+    }
+
     testWidgets('renders all three sections', (tester) async {
       await tester.pumpWidget(
         SizedBox(
@@ -188,6 +195,190 @@ void main() {
       expect(find.text('2 items succeeded.'), findsOneWidget);
     });
 
+    testWidgets(
+        'shows update progress and completion feedback inside update section',
+        (tester) async {
+      final completer = Completer<void>();
+
+      await tester.pumpWidget(
+        SizedBox(
+          width: 400,
+          height: 800,
+          child: MaterialApp(
+            home: BatchOperationsScreen(
+              onImport: (_) {},
+              onUpdate: (_) => completer.future,
+              onCopy: (_) {},
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('batch-update-ids')),
+        'id1,id2',
+      );
+      await tester.enterText(
+        find.byKey(const Key('batch-update-field-key')),
+        'author',
+      );
+      await tester.enterText(
+        find.byKey(const Key('batch-update-field-value')),
+        'Jane',
+      );
+      await tester.ensureVisible(find.byKey(const Key('batch-update-submit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('batch-update-submit')));
+      await tester.pump();
+
+      final updateCard = sectionCard('Batch metadata update');
+      expect(
+        find.descendant(of: updateCard, matching: find.text('Batch UPDATE')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: updateCard, matching: find.text('0 / 2 items')),
+        findsOneWidget,
+      );
+
+      final ElevatedButton button = tester.widget(
+        find.byKey(const Key('batch-update-submit')),
+      );
+      expect(button.onPressed, isNull);
+
+      completer.complete();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: updateCard,
+          matching: find.text('Update request submitted'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'shows success feedback inside update section after bloc success',
+        (tester) async {
+      final repository = _FakeBatchOperationRepository.updateSuccess(
+        const BatchOperationResponse(
+          type: BatchOperationType.updateMetadata,
+          results: [
+            BatchOperationItemResult(itemKey: 'id1', success: true),
+            BatchOperationItemResult(itemKey: 'id2', success: true),
+          ],
+        ),
+      );
+      final batchBloc = BatchBloc(repository);
+
+      await tester.pumpWidget(
+        SizedBox(
+          width: 400,
+          height: 800,
+          child: MaterialApp(
+            home: BlocProvider.value(
+              value: batchBloc,
+              child: BatchOperationsScreen(
+                onImport: (_) {},
+                onUpdate: (req) =>
+                    batchBloc.add(BatchUpdateMetadataRequested(req)),
+                onCopy: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('batch-update-ids')),
+        'id1,id2',
+      );
+      await tester.enterText(
+        find.byKey(const Key('batch-update-field-key')),
+        'author',
+      );
+      await tester.enterText(
+        find.byKey(const Key('batch-update-field-value')),
+        'Jane',
+      );
+      await tester.ensureVisible(find.byKey(const Key('batch-update-submit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('batch-update-submit')));
+      await tester.pump();
+      await tester.pump();
+
+      final updateCard = sectionCard('Batch metadata update');
+      expect(
+        find.descendant(
+            of: updateCard, matching: find.text('Update completed')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+            of: updateCard, matching: find.text('2 items succeeded.')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'shows failure feedback inside update section after bloc failure',
+        (tester) async {
+      final repository = _FakeBatchOperationRepository.updateFailure(
+        const LocalFailure('update exploded'),
+      );
+      final batchBloc = BatchBloc(repository);
+
+      await tester.pumpWidget(
+        SizedBox(
+          width: 400,
+          height: 800,
+          child: MaterialApp(
+            home: BlocProvider.value(
+              value: batchBloc,
+              child: BatchOperationsScreen(
+                onImport: (_) {},
+                onUpdate: (req) =>
+                    batchBloc.add(BatchUpdateMetadataRequested(req)),
+                onCopy: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('batch-update-ids')),
+        'id1,id2',
+      );
+      await tester.enterText(
+        find.byKey(const Key('batch-update-field-key')),
+        'author',
+      );
+      await tester.enterText(
+        find.byKey(const Key('batch-update-field-value')),
+        'Jane',
+      );
+      await tester.ensureVisible(find.byKey(const Key('batch-update-submit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('batch-update-submit')));
+      await tester.pump();
+      await tester.pump();
+
+      final updateCard = sectionCard('Batch metadata update');
+      expect(
+        find.descendant(of: updateCard, matching: find.text('Update failed')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: updateCard,
+          matching: find.text('Local error: update exploded'),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('shows failure feedback after batch copy fails',
         (tester) async {
       final repository = _FakeBatchOperationRepository.copyFailure(
@@ -225,11 +416,77 @@ void main() {
       await tester.tap(find.byKey(const Key('batch-copy-submit')));
       await tester.pump();
       await tester.pump();
-      await tester.drag(find.byType(ListView), const Offset(0, 500));
+      final copyCard = sectionCard('Batch metadata copy');
+      expect(
+        find.descendant(of: copyCard, matching: find.text('Copy failed')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: copyCard,
+          matching: find.text('Local error: copy exploded'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'shows copy progress and completion feedback inside copy section',
+        (tester) async {
+      final completer = Completer<void>();
+
+      await tester.pumpWidget(
+        SizedBox(
+          width: 400,
+          height: 800,
+          child: MaterialApp(
+            home: BatchOperationsScreen(
+              onImport: (_) {},
+              onUpdate: (_) {},
+              onCopy: (_) => completer.future,
+            ),
+          ),
+        ),
+      );
+
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('batch-copy-source-id')),
+        'src1',
+      );
+      await tester.enterText(
+        find.byKey(const Key('batch-copy-target-ids')),
+        'tgt1,tgt2',
+      );
+      await tester.tap(find.byKey(const Key('batch-copy-submit')));
+      await tester.pump();
+
+      final copyCard = sectionCard('Batch metadata copy');
+      expect(
+        find.descendant(of: copyCard, matching: find.text('Batch COPY')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: copyCard, matching: find.text('0 / 2 items')),
+        findsOneWidget,
+      );
+
+      final ElevatedButton button = tester.widget(
+        find.byKey(const Key('batch-copy-submit')),
+      );
+      expect(button.onPressed, isNull);
+
+      completer.complete();
       await tester.pumpAndSettle();
 
-      expect(find.text('Copy failed'), findsOneWidget);
-      expect(find.text('Local error: copy exploded'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: copyCard,
+          matching: find.text('Copy request submitted'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets(
@@ -295,6 +552,20 @@ class _FakeBatchOperationRepository implements BatchOperationRepository {
   ) {
     return _FakeBatchOperationRepository(
       importResult: Success<BatchOperationResponse, AppFailure>(response),
+    );
+  }
+
+  factory _FakeBatchOperationRepository.updateSuccess(
+    BatchOperationResponse response,
+  ) {
+    return _FakeBatchOperationRepository(
+      updateResult: Success<BatchOperationResponse, AppFailure>(response),
+    );
+  }
+
+  factory _FakeBatchOperationRepository.updateFailure(AppFailure failure) {
+    return _FakeBatchOperationRepository(
+      updateResult: Failure<BatchOperationResponse, AppFailure>(failure),
     );
   }
 

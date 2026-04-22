@@ -39,7 +39,7 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
   bool _recursive = false;
   BatchBloc? _batchBloc;
   _PendingSubmission? _pendingSubmission;
-  _SubmissionFeedback? _feedback;
+  final Map<BatchOperationType, _SubmissionFeedback> _feedbackByType = {};
 
   @override
   void dispose() {
@@ -145,7 +145,7 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
     required FutureOr<void> Function() run,
   }) async {
     setState(() {
-      _feedback = null;
+      _feedbackByType.remove(type);
       _pendingSubmission = _PendingSubmission(
         type: type,
         totalItems: totalItems,
@@ -158,7 +158,7 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
       if (_batchBloc == null && mounted) {
         setState(() {
           _pendingSubmission = null;
-          _feedback = _SubmissionFeedback.success(
+          _feedbackByType[type] = _SubmissionFeedback.success(
             title: fallbackSuccessTitle,
             message: fallbackSuccessMessage,
           );
@@ -170,7 +170,7 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
       }
       setState(() {
         _pendingSubmission = null;
-        _feedback = _SubmissionFeedback.error(
+        _feedbackByType[type] = _SubmissionFeedback.error(
           title: '${type.label} failed',
           message: error.toString(),
         );
@@ -194,12 +194,14 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
         }
         setState(() {
           _pendingSubmission = null;
-          _feedback = _feedbackFromResponse(response);
+          _feedbackByType[pendingSubmission.type] = _feedbackFromResponse(
+            response,
+          );
         });
       case BatchError(:final failure):
         setState(() {
           _pendingSubmission = null;
-          _feedback = _SubmissionFeedback.error(
+          _feedbackByType[pendingSubmission.type] = _SubmissionFeedback.error(
             title: '${pendingSubmission.type.label} failed',
             message: appFailureMessage(failure),
           );
@@ -229,12 +231,12 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
     );
   }
 
-  Widget _buildStatusPanel() {
-    if (_pendingSubmission != null) {
+  Widget _buildStatusPanel(BatchOperationType type) {
+    if (_pendingSubmission?.type == type) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: BatchOperationProgress(
-          operationType: _pendingSubmission!.type.slug,
+          operationType: type.slug,
           itemsProcessed: 0,
           totalItems: _pendingSubmission!.totalItems,
           currentItemLabels: _pendingSubmission!.currentItemLabels,
@@ -242,13 +244,14 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
       );
     }
 
-    if (_feedback != null) {
+    final feedback = _feedbackByType[type];
+    if (feedback != null) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: BatchFeedbackCard(
-          title: _feedback!.title,
-          message: _feedback!.message,
-          tone: _feedback!.tone,
+          title: feedback.title,
+          message: feedback.message,
+          tone: feedback.tone,
         ),
       );
     }
@@ -263,117 +266,127 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildStatusPanel(),
           _SectionCard(
             title: 'Batch import',
             description: 'Paste one or more comma-separated paths to import.',
-            child: Form(
-              key: _importFormKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              child: Column(
-                children: [
-                  TextFormField(
-                    key: const Key('batch-import-paths'),
-                    controller: _importPaths,
-                    enabled: !_isBusy,
-                    decoration: const InputDecoration(
-                      labelText: 'Paths (comma separated)',
-                      helperText: 'Example: /books/a.epub, /books/b.pdf',
-                    ),
-                    validator: (value) {
-                      if (_csv(value ?? '').isEmpty) {
-                        return 'Enter at least one path.';
-                      }
-                      return null;
-                    },
+            child: Column(
+              children: [
+                _buildStatusPanel(BatchOperationType.importResources),
+                Form(
+                  key: _importFormKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        key: const Key('batch-import-paths'),
+                        controller: _importPaths,
+                        enabled: !_isBusy,
+                        decoration: const InputDecoration(
+                          labelText: 'Paths (comma separated)',
+                          helperText: 'Example: /books/a.epub, /books/b.pdf',
+                        ),
+                        validator: (value) {
+                          if (_csv(value ?? '').isEmpty) {
+                            return 'Enter at least one path.';
+                          }
+                          return null;
+                        },
+                      ),
+                      SwitchListTile(
+                        value: _recursive,
+                        onChanged: _isBusy
+                            ? null
+                            : (value) => setState(() => _recursive = value),
+                        title: const Text('Recursive'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: ElevatedButton.icon(
+                          key: const Key('batch-import-submit'),
+                          onPressed: _isBusy ? null : _submitImport,
+                          icon: const Icon(Icons.file_upload_outlined),
+                          label: const Text('Submit import request'),
+                        ),
+                      ),
+                    ],
                   ),
-                  SwitchListTile(
-                    value: _recursive,
-                    onChanged: _isBusy
-                        ? null
-                        : (value) => setState(() => _recursive = value),
-                    title: const Text('Recursive'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: ElevatedButton.icon(
-                      key: const Key('batch-import-submit'),
-                      onPressed: _isBusy ? null : _submitImport,
-                      icon: const Icon(Icons.file_upload_outlined),
-                      label: const Text('Submit import request'),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
           _SectionCard(
             title: 'Batch metadata update',
             description: 'Apply one metadata field to multiple resource IDs.',
-            child: Form(
-              key: _updateFormKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              child: Column(
-                children: [
-                  TextFormField(
-                    key: const Key('batch-update-ids'),
-                    controller: _updateResourceIds,
-                    enabled: !_isBusy,
-                    decoration: const InputDecoration(
-                      labelText: 'Resource IDs',
-                      helperText: 'Separate multiple IDs with commas.',
-                    ),
-                    validator: (value) {
-                      if (_csv(value ?? '').isEmpty) {
-                        return 'Enter at least one resource ID.';
-                      }
-                      return null;
-                    },
+            child: Column(
+              children: [
+                _buildStatusPanel(BatchOperationType.updateMetadata),
+                Form(
+                  key: _updateFormKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        key: const Key('batch-update-ids'),
+                        controller: _updateResourceIds,
+                        enabled: !_isBusy,
+                        decoration: const InputDecoration(
+                          labelText: 'Resource IDs',
+                          helperText: 'Separate multiple IDs with commas.',
+                        ),
+                        validator: (value) {
+                          if (_csv(value ?? '').isEmpty) {
+                            return 'Enter at least one resource ID.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        key: const Key('batch-update-field-key'),
+                        controller: _updateFieldKey,
+                        enabled: !_isBusy,
+                        decoration:
+                            const InputDecoration(labelText: 'Field key'),
+                        validator: (value) {
+                          if ((value ?? '').trim().isEmpty) {
+                            return 'Enter a field key.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        key: const Key('batch-update-field-value'),
+                        controller: _updateFieldValue,
+                        enabled: !_isBusy,
+                        decoration: const InputDecoration(
+                          labelText: 'Field value',
+                          helperText:
+                              'Use the value that should be applied to every resource.',
+                        ),
+                        validator: (value) {
+                          if ((value ?? '').trim().isEmpty) {
+                            return 'Enter a field value.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: ElevatedButton.icon(
+                          key: const Key('batch-update-submit'),
+                          onPressed: _isBusy ? null : _submitUpdate,
+                          icon: const Icon(Icons.edit_note),
+                          label: const Text('Submit metadata update request'),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    key: const Key('batch-update-field-key'),
-                    controller: _updateFieldKey,
-                    enabled: !_isBusy,
-                    decoration: const InputDecoration(labelText: 'Field key'),
-                    validator: (value) {
-                      if ((value ?? '').trim().isEmpty) {
-                        return 'Enter a field key.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    key: const Key('batch-update-field-value'),
-                    controller: _updateFieldValue,
-                    enabled: !_isBusy,
-                    decoration: const InputDecoration(
-                      labelText: 'Field value',
-                      helperText:
-                          'Use the value that should be applied to every resource.',
-                    ),
-                    validator: (value) {
-                      if ((value ?? '').trim().isEmpty) {
-                        return 'Enter a field value.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: ElevatedButton.icon(
-                      key: const Key('batch-update-submit'),
-                      onPressed: _isBusy ? null : _submitUpdate,
-                      icon: const Icon(Icons.edit_note),
-                      label: const Text('Submit metadata update request'),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -381,57 +394,64 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
             title: 'Batch metadata copy',
             description:
                 'Copy metadata from one source resource to many targets.',
-            child: Form(
-              key: _copyFormKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              child: Column(
-                children: [
-                  TextFormField(
-                    key: const Key('batch-copy-source-id'),
-                    controller: _copySourceId,
-                    enabled: !_isBusy,
-                    decoration:
-                        const InputDecoration(labelText: 'Source resource ID'),
-                    validator: (value) {
-                      if ((value ?? '').trim().isEmpty) {
-                        return 'Enter a source resource ID.';
-                      }
-                      return null;
-                    },
+            child: Column(
+              children: [
+                _buildStatusPanel(BatchOperationType.copyMetadata),
+                Form(
+                  key: _copyFormKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        key: const Key('batch-copy-source-id'),
+                        controller: _copySourceId,
+                        enabled: !_isBusy,
+                        decoration: const InputDecoration(
+                            labelText: 'Source resource ID'),
+                        validator: (value) {
+                          if ((value ?? '').trim().isEmpty) {
+                            return 'Enter a source resource ID.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        key: const Key('batch-copy-target-ids'),
+                        controller: _copyTargetIds,
+                        enabled: !_isBusy,
+                        decoration: const InputDecoration(
+                          labelText: 'Target IDs',
+                          helperText:
+                              'Separate multiple target IDs with commas.',
+                        ),
+                        validator: (value) {
+                          final targets = _csv(value ?? '');
+                          if (targets.isEmpty) {
+                            return 'Enter at least one target ID.';
+                          }
+                          final sourceId = _copySourceId.text.trim();
+                          if (sourceId.isNotEmpty &&
+                              targets.contains(sourceId)) {
+                            return 'Source resource must not be in target IDs.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: ElevatedButton.icon(
+                          key: const Key('batch-copy-submit'),
+                          onPressed: _isBusy ? null : _submitCopy,
+                          icon: const Icon(Icons.copy_all_outlined),
+                          label: const Text('Submit metadata copy request'),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    key: const Key('batch-copy-target-ids'),
-                    controller: _copyTargetIds,
-                    enabled: !_isBusy,
-                    decoration: const InputDecoration(
-                      labelText: 'Target IDs',
-                      helperText: 'Separate multiple target IDs with commas.',
-                    ),
-                    validator: (value) {
-                      final targets = _csv(value ?? '');
-                      if (targets.isEmpty) {
-                        return 'Enter at least one target ID.';
-                      }
-                      final sourceId = _copySourceId.text.trim();
-                      if (sourceId.isNotEmpty && targets.contains(sourceId)) {
-                        return 'Source resource must not be in target IDs.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: ElevatedButton.icon(
-                      key: const Key('batch-copy-submit'),
-                      onPressed: _isBusy ? null : _submitCopy,
-                      icon: const Icon(Icons.copy_all_outlined),
-                      label: const Text('Submit metadata copy request'),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],

@@ -7,7 +7,17 @@
 Personal inventory system for Phil to track resources (ebooks, web-readers, images, videos, games) across devices, platforms, and storage locations.
 
 ## Task Notes
-- **P10-D2 Batch operations UX polish**: `BatchOperationsScreen` now groups import/update/copy forms into cards, validates inputs inline, disables submission while a batch request is in flight, and shows visible busy/success/error feedback. `loading_widgets.dart` now includes `BatchFeedbackCard` for persistent batch result messaging.
+- **P10-D2 Batch operations UX polish**:
+  - `BatchOperationsScreen` keeps import/update/copy in separate cards and shows progress/result feedback inside the same card as the submitted flow instead of only at page top.
+  - Inline validation rules shipped:
+    - import: require at least one non-empty trimmed path.
+    - update: require at least one non-empty trimmed resource ID plus non-empty field key and field value.
+    - copy: require non-empty source resource ID, at least one non-empty trimmed target ID, and reject target lists that include the source ID.
+  - Submission/progress rules shipped:
+    - while any batch request is in flight, all form controls stay disabled.
+    - the active flow shows `BatchOperationProgress` directly above its form with `0 / N items` plus up to three submitted item labels.
+    - success/error feedback stays attached to the same flow card after completion, and each flow keeps its own latest feedback state.
+  - `loading_widgets.dart` includes `BatchFeedbackCard` for persistent batch result messaging.
 
 ## Key Decisions
 
@@ -941,7 +951,7 @@ Deferred pending clarification on:
     - web-reader metadata copy clones shared fields while preserving target URLs
 - **Frontend regression coverage**:
   - `frontend/test/screens/resource_list_screen_test.dart` now checks shipped filter wiring across all five list tabs and verifies the filter bar stays hidden when no tags exist.
-  - `frontend/test/screens/batch_operations_screen_test.dart` now covers recursive import toggling, whitespace-trimmed CSV parsing, and submit-button isolation between import/update/copy sections.
+  - `frontend/test/screens/batch_operations_screen_test.dart` now covers recursive import toggling, whitespace-trimmed CSV parsing, submit-button isolation between import/update/copy sections, update-card busy/success/failure feedback, and copy-card busy/failure feedback placement.
 - **Verification**:
   - Backend: `cd backend && cargo test`
   - Frontend: `cd frontend && flutter build apk --debug && flutter test`
