@@ -1028,7 +1028,7 @@ Deferred pending clarification on:
 ## Phase 10 Task P10-B2 — Search History Replay UI
 
 - **Date**: 2026-04-22
-- **Files**: `frontend/lib/widgets/search_history_panel.dart`, `frontend/lib/widgets/search_filter_bar.dart`, `frontend/lib/screens/resource_list_screen.dart`
+- **Files**: `frontend/lib/blocs/search_filter/search_filter_bloc.dart`, `frontend/lib/widgets/search_history_panel.dart`, `frontend/lib/widgets/search_filter_bar.dart`, `frontend/lib/screens/resource_list_screen.dart`, `frontend/test/blocs/search_filter/search_filter_bloc_test.dart`, `frontend/test/screens/resource_list_screen_search_history_test.dart`
 - **UI behavior shipped**:
   - Resource list now always shows a free-text search box even when there are no tags yet.
   - Recent saved searches render under the filter bar through `SearchHistoryPanel` instead of staying hidden inside `SearchHistoryService`.
@@ -1037,6 +1037,8 @@ Deferred pending clarification on:
 - **State rules**:
   - Search history still uses the `SearchHistoryService` durable store and keeps the existing max-history limit from `P10-B1` (default 50, newest first).
   - Query filtering on the resource list is applied client-side to the currently loaded tab data, while replayed tags/sort/filter logic still reload each tab through `SearchFilterBloc`.
+  - Replay now applies tags, sort field, and filter logic through one `SearchFilterBloc` state transition (`ApplyFilterSnapshot`) so the resource-list listener runs one backend reload wave instead of three partial reload waves.
 - **Tests**:
   - Added widget coverage for history rendering, replay callback, remove, and clear.
-  - Added resource-list coverage for replay restoring query/tags/sort/filter logic plus remove/clear persistence behavior.
+  - Added resource-list coverage for replay restoring query/tags/sort/filter logic, replay issuing exactly one filtered reload wave, and remove/clear persistence behavior.
+  - Added bloc coverage for replay snapshot application emitting one combined filter state.

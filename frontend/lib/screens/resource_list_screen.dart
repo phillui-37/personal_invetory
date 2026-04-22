@@ -112,10 +112,13 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
       _query = entry.query;
     });
 
-    final bloc = context.read<SearchFilterBloc>();
-    bloc.add(UpdateSelectedTags(entry.tags));
-    bloc.add(UpdateSortBy(entry.sortBy));
-    bloc.add(UpdateFilterLogic(entry.filterLogic));
+    context.read<SearchFilterBloc>().add(
+          ApplyFilterSnapshot(
+            selectedTags: entry.tags,
+            sortBy: entry.sortBy,
+            filterLogic: entry.filterLogic,
+          ),
+        );
   }
 
   @override

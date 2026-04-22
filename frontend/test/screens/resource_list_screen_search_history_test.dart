@@ -53,6 +53,7 @@ class _ListCall {
 
 class _SpyEbookRepository extends FakeEbookRepository {
   _ListCall? lastListCall;
+  int listCallCount = 0;
 
   @override
   Future<Result<List<Resource>, AppFailure>> listEbooks({
@@ -61,6 +62,7 @@ class _SpyEbookRepository extends FakeEbookRepository {
     String? sortOrder,
     String? filterLogic,
   }) {
+    listCallCount += 1;
     lastListCall = _ListCall(
       tags: List<String>.from(tags),
       sortBy: sortBy,
@@ -137,6 +139,49 @@ Widget _buildScreen({
 }
 
 void main() {
+  testWidgets('replay triggers one filtered reload wave', (tester) async {
+    final historyService = await _buildHistoryService([
+      _entry(
+        id: 'saved-1',
+        query: 'Alpha',
+        tags: ['favorite'],
+        sortBy: 'title',
+        filterLogic: 'or',
+      ),
+    ]);
+    final ebookRepo = _SpyEbookRepository()
+      ..listResult = const Success<List<Resource>, AppFailure>([
+        Resource(
+          id: 'ebook-1',
+          title: 'Alpha Manual',
+          resourceType: ResourceType.ebook,
+        ),
+      ]);
+
+    await tester.pumpWidget(
+      _buildScreen(
+        searchHistoryService: historyService,
+        ebookRepo: ebookRepo,
+        tagRepo: FakeTagRepository(
+          listResult: Success<List<Tag>, AppFailure>([
+            Tag(
+              id: 'tag-1',
+              name: 'favorite',
+              createdAt: DateTime.utc(2026, 4, 21),
+            ),
+          ]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(ebookRepo.listCallCount, 1);
+
+    await tester.tap(find.byKey(const Key('search-history-item-saved-1')));
+    await tester.pumpAndSettle();
+
+    expect(ebookRepo.listCallCount, 2);
+  });
+
   testWidgets('replay restores query, tags, sort, and filter logic', (
     tester,
   ) async {

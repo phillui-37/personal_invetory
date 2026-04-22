@@ -58,6 +58,25 @@ void main() {
       );
     });
 
+    test('ApplyFilterSnapshot updates replayed filters in one emission', () async {
+      bloc.add(
+        const ApplyFilterSnapshot(
+          selectedTags: ['fiction'],
+          sortBy: 'title',
+          filterLogic: 'or',
+        ),
+      );
+      await expectLater(
+        bloc.stream,
+        emits(
+          isA<SearchFilterState>()
+              .having((s) => s.selectedTags, 'selectedTags', ['fiction'])
+              .having((s) => s.sortBy, 'sortBy', 'title')
+              .having((s) => s.filterLogic, 'filterLogic', 'or'),
+        ),
+      );
+    });
+
     test('ClearFilters resets to defaults', () async {
       bloc.add(const UpdateSelectedTags(['fiction']));
       bloc.add(const UpdateSortBy('title'));
