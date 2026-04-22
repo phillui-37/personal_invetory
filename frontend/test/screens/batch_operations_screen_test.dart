@@ -122,6 +122,36 @@ void main() {
     });
 
     testWidgets(
+        'shows true overflow count when more than three import items are submitted',
+        (tester) async {
+      final completer = Completer<void>();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BatchOperationsScreen(
+            onImport: (_) => completer.future,
+            onUpdate: (_) {},
+            onCopy: (_) {},
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('batch-import-paths')),
+        '/a,/b,/c,/d,/e',
+      );
+      await tester.tap(find.byKey(const Key('batch-import-submit')));
+      await tester.pump();
+
+      expect(find.text('• /a'), findsOneWidget);
+      expect(find.text('• /b'), findsOneWidget);
+      expect(find.text('• +3 more'), findsOneWidget);
+
+      completer.complete();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
         'shows busy progress and disables submit while import is running',
         (tester) async {
       final completer = Completer<void>();

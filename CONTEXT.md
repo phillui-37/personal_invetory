@@ -16,6 +16,7 @@ Personal inventory system for Phil to track resources (ebooks, web-readers, imag
   - Submission/progress rules shipped:
     - while any batch request is in flight, all form controls stay disabled.
     - the active flow shows `BatchOperationProgress` directly above its form with `0 / N items`, up to two submitted item labels, then `+N more` when more labels exist.
+    - pending submissions now keep the real submitted item count separate from the truncated preview labels so `+N more` stays correct for batches larger than three items.
     - success/error feedback stays attached to the same flow card after completion, and each flow keeps its own latest feedback state.
   - Validation coverage now explicitly checks invalid import/update/copy submissions stay blocked and surface the inline validator messages for trimmed-empty and self-target cases.
   - `loading_widgets.dart` includes `BatchFeedbackCard` for persistent batch result messaging.

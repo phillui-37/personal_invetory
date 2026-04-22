@@ -150,6 +150,7 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
         type: type,
         totalItems: totalItems,
         currentItemLabels: currentItemLabels.take(3).toList(),
+        currentItemCount: currentItemLabels.length,
       );
     });
 
@@ -240,6 +241,7 @@ class _BatchOperationsScreenState extends State<BatchOperationsScreen> {
           itemsProcessed: 0,
           totalItems: _pendingSubmission!.totalItems,
           currentItemLabels: _pendingSubmission!.currentItemLabels,
+          currentItemCount: _pendingSubmission!.currentItemCount,
         ),
       );
     }
@@ -505,11 +507,13 @@ class _PendingSubmission {
     required this.type,
     required this.totalItems,
     required this.currentItemLabels,
+    required this.currentItemCount,
   });
 
   final BatchOperationType type;
   final int totalItems;
   final List<String> currentItemLabels;
+  final int currentItemCount;
 }
 
 class _SubmissionFeedback {

@@ -337,6 +337,7 @@ class BatchOperationProgress extends StatelessWidget {
   final int itemsProcessed;
   final int totalItems;
   final List<String> currentItemLabels;
+  final int? currentItemCount;
   final bool hasErrors;
   final int? estimatedSecondsRemaining;
 
@@ -346,6 +347,7 @@ class BatchOperationProgress extends StatelessWidget {
     required this.itemsProcessed,
     required this.totalItems,
     this.currentItemLabels = const [],
+    this.currentItemCount,
     this.hasErrors = false,
     this.estimatedSecondsRemaining,
   });
@@ -354,6 +356,9 @@ class BatchOperationProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     final progress = totalItems > 0 ? itemsProcessed / totalItems : 0.0;
     final percentage = (progress * 100).toStringAsFixed(0);
+    final visibleLabels = currentItemLabels.take(2).toList();
+    final overflowCount =
+        (currentItemCount ?? currentItemLabels.length) - visibleLabels.length;
 
     return Container(
       padding: EdgeInsets.all(16),
@@ -407,7 +412,7 @@ class BatchOperationProgress extends StatelessWidget {
           ),
           if (currentItemLabels.isNotEmpty) ...[
             SizedBox(height: 8),
-            ...currentItemLabels.take(2).map((label) => Padding(
+            ...visibleLabels.map((label) => Padding(
                   padding: EdgeInsets.only(top: 4),
                   child: Text(
                     '• $label',
@@ -416,9 +421,9 @@ class BatchOperationProgress extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 )),
-            if (currentItemLabels.length > 2)
+            if (overflowCount > 0)
               Text(
-                '• +${currentItemLabels.length - 2} more',
+                '• +$overflowCount more',
                 style: Theme.of(context).textTheme.labelSmall,
               ),
           ],
