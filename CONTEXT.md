@@ -1132,3 +1132,17 @@ Deferred pending clarification on:
   - Green: `cd frontend && flutter test test/android_build_test.dart`
   - Full frontend gate: `cd frontend && flutter build apk --debug && flutter test`
   - Fail-fast release guard still intact: `cd frontend && flutter build apk --release` fails with the expected missing signing input error in an unsigned local environment.
+
+## 2026-04-22 Phase 10 Ready-Wave Merge Cleanup
+
+- **Merged locally into `main`**:
+  - `feature/phase10-ready-wave`
+  - `feature/phase10-c1`
+  - `feature/phase10-d2`
+- **Merge notes**:
+  - The only real merge conflicts were stale doc/context collisions in `tasks/phase10.md` and `CONTEXT.md`; no code-path conflict needed logic rework.
+  - `tasks/phase10.md` now reflects the actual state more honestly: the ready wave (`P10-E1`, `P10-B1`, `P10-B2`, `P10-C1`, `P10-D2`) is in, while `P10-A1/A2/A3`, `P10-C2`, and `P10-D1` remain blocked/conditional.
+- **Post-merge verification**:
+  - `cd backend && cargo test && cd ../frontend && flutter build apk --debug && flutter test`
+- **Cleanup target**:
+  - Remove the merged Phase 10 worktrees and local feature branches after the merged `main` verification passes.
