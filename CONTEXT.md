@@ -974,6 +974,7 @@ Deferred pending clarification on:
 
 - **Date**: 2026-04-22
 - **Files**: `bin/app`, `bin/app.ps1`, `bin/lib.sh`, `bin/lib.ps1`, `README.md`
+- **Audit note**: `tasks/phase10.md` briefly drifted into a narrower `bin/test` / `bin/test.ps1` description during backlog tightening; corrected back to the approved `bin/app` / `bin/app.ps1` dispatcher contract and README+`CONTEXT.md` doc scope.
 - **Shipped contract**:
   - `start backend`
   - `start frontend <macos|windows|linux|ios|android>`

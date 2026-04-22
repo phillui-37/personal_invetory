@@ -81,8 +81,8 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 | `backend/plugins/tests/ecosystem_kindle_test.rs` | Kindle-specific auth/library regression tests instead of hiding Kindle coverage in unrelated plugin files |
 | `backend/plugins/tests/fixtures/real/bookwalker_library.json` | Real-structure BookWalker library fixture captured from HAR/session data |
 | `docs/testing-matrix.md` | Repo-wide test commands, prerequisites, and suite ownership for already-shipped and Phase 10 work |
-| `bin/test` | POSIX repo-entry smoke script for the common verification path |
-| `bin/test.ps1` | Windows PowerShell repo-entry smoke script for the common verification path |
+| `bin/app` | POSIX repo-entry dispatcher for repo start/build/test/clean/gen-api flows |
+| `bin/app.ps1` | Windows PowerShell repo-entry dispatcher for the same cross-OS contract |
 | `frontend/lib/services/search_history_storage.dart` | Durable persistence seam for `SearchHistoryService` |
 | `frontend/lib/widgets/search_history_panel.dart` | Search history replay UI with remove/clear/reapply actions |
 | `frontend/lib/widgets/facet_summary_bar.dart` | Format facet summary chips/counters for the list screen |
@@ -385,20 +385,20 @@ Every Phase 10 task needs both **narrow tests** and **broader regression coverag
 
 ### Task P10-E1: Add Cross-OS Repo Task Entrypoints
 
-**Goal:** Stop making every contributor memorize raw command sequences. Add blunt repo-local `bin/` entrypoints for the common verification path and document how they map to the existing commands.
+**Goal:** Stop making every contributor memorize raw command sequences. Add blunt repo-local `bin/app` and `bin/app.ps1` dispatchers for the approved repo task contract and document that contract without rewriting it into a narrower test-only shim.
 
 **Readiness:** **Repo-local executable** with **host-limited validation**. The scripts and docs can be built from this repo, but Windows PowerShell smoke still needs a Windows host before anyone claims full cross-OS validation.
 
 **Files:**
-- Create: `bin/test`
-- Create: `bin/test.ps1`
+- Create: `bin/app`
+- Create: `bin/app.ps1`
 - Modify: `README.md`
-- Modify: `docs/testing-matrix.md`
 - Modify: `CONTEXT.md`
 
-- [ ] Add a small `bin/` entrypoint layer for the common repo verification path without changing the underlying commands.
+- [ ] Add repo-local `bin/app` and `bin/app.ps1` dispatchers without changing the underlying backend/frontend commands they wrap.
+- [ ] Support this contract in both entrypoints: `start backend`, `start frontend <macos|windows|linux|ios|android>`, `build backend`, `build frontend <macos|windows|linux|ios|android>`, `test <backend|frontend|all>`, `clean`, and `gen-api`.
 - [ ] Keep the shell and PowerShell entrypoints behaviorally aligned and blunt about prerequisites.
-- [ ] Document the entrypoint contract in `README.md`, `docs/testing-matrix.md`, and `CONTEXT.md`.
+- [ ] Document the entrypoint contract in `README.md` and `CONTEXT.md`.
 - [ ] Verify POSIX smoke locally from this repo, and mark Windows PowerShell smoke as host-limited until it runs on a Windows machine or equivalent PowerShell-capable host.
 
 ---
