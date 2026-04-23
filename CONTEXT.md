@@ -1146,3 +1146,30 @@ Deferred pending clarification on:
   - `cd backend && cargo test && cd ../frontend && flutter build apk --debug && flutter test`
 - **Cleanup target**:
   - Remove the merged Phase 10 worktrees and local feature branches after the merged `main` verification passes.
+
+## 2026-04-22 README Local SQLite Dev Note
+
+- **File**: `README.md`
+- **Purpose**: Add one blunt local-dev path for the real working runtime adapter: SQLite.
+- **What the README now states**:
+  - local backend dev should use a repo-root `.env` with `DATABASE_URL=sqlite://./inventory.db`
+  - `DEVICE_ID` is required for backend startup
+  - setting `API_KEY` up front avoids the bootstrap generate-and-exit cycle
+  - `bin/app start backend` is enough for the backend, but frontend local API dev still needs raw `flutter run --dart-define=...` because `BASE_URL` and `API_KEY` are compile-time Flutter config
+  - desktop/iOS simulator can use `http://127.0.0.1:8080`; Android emulator should use `http://10.0.2.2:8080`
+
+## 2026-04-22 macOS Bulk Import Directory Picker Fix
+
+- **Files**: `frontend/macos/Runner/DebugProfile.entitlements`, `frontend/macos/Runner/Release.entitlements`, `frontend/test/macos_build_config_test.dart`
+- **Symptom**: In the macOS app, choosing **Pick directory** in `BulkImportScreen` appeared to do nothing.
+- **Root cause**:
+  - The macOS app is sandboxed (`com.apple.security.app-sandbox=true`), but both entitlements files were missing `com.apple.security.files.user-selected.read-only`.
+  - `BulkImportScreen` uses `FilePicker.platform.getDirectoryPath()` and then walks the chosen folder with `Directory(...).list(...)`, so the sandboxed app needs explicit permission to read user-selected files/directories.
+- **Fix**:
+  - Added `com.apple.security.files.user-selected.read-only` to both macOS entitlements files.
+  - Added `frontend/test/macos_build_config_test.dart` so future macOS config drift fails fast in tests instead of regressing back to a dead directory-picker flow.
+- **Verification**:
+  - Red: `cd frontend && flutter test test/macos_build_config_test.dart`
+  - Green: `cd frontend && flutter test test/macos_build_config_test.dart`
+  - macOS build: `cd frontend && flutter build macos --debug`
+  - Full frontend gate: `cd frontend && flutter build apk --debug && flutter test`

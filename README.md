@@ -65,6 +65,42 @@ gen-api
 
 Today this repo only has Flutter platform folders for `android`, `ios`, and `macos`. `windows` and `linux` stay in the command contract, but the dispatcher fails clearly until those repo targets are added.
 
+## Local dev with SQLite
+
+For local development, do not use the Postgres value from `.env.example` as-is. Create a local `.env` in the repo root and point the backend at SQLite instead:
+
+```dotenv
+DATABASE_URL=sqlite://./inventory.db
+API_KEY=dev-local-key
+DEVICE_ID=550e8400-e29b-41d4-a716-446655440000
+HOST=0.0.0.0
+PORT=8080
+PLUGINS_CONFIG=plugins.toml
+```
+
+Notes:
+
+1. `DATABASE_URL` and `DEVICE_ID` are required.
+2. `API_KEY` should be set up front for a smooth dev loop. If you leave it blank or omit it, the backend will generate one, append it to `.env`, and exit once; then you rerun the backend.
+3. `bin/app start backend` is fine for the backend, but frontend local API dev still needs raw `flutter run` so you can pass compile-time `--dart-define` values.
+
+Start the backend:
+
+```bash
+bin/app start backend
+```
+
+Run the Flutter app against that local backend:
+
+```bash
+cd frontend
+flutter run -d macos \
+  --dart-define=BASE_URL=http://127.0.0.1:8080 \
+  --dart-define=API_KEY=dev-local-key
+```
+
+For iOS simulator, keep the same `BASE_URL`. For the Android emulator, use `http://10.0.2.2:8080` instead of `http://127.0.0.1:8080`.
+
 ## Key guides
 
 | File | What it covers |
